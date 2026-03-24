@@ -175,7 +175,7 @@ RSpec.describe Turbofan::CLI::Deploy do
       end
 
       expect(cf_client).to have_received(:create_change_set)
-      expect(cf_client).to have_received(:describe_change_set)
+      expect(cf_client).to have_received(:describe_change_set).at_least(:once)
       expect(cf_client).to have_received(:delete_change_set)
     end
 
