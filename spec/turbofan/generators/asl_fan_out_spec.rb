@@ -8,7 +8,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -17,7 +17,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -26,7 +26,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -125,7 +125,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -134,7 +134,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -199,7 +199,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -208,7 +208,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -246,7 +246,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -292,7 +292,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -301,7 +301,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -310,7 +310,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -360,7 +360,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -369,7 +369,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -413,7 +413,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -422,7 +422,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -431,7 +431,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -477,7 +477,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("StepA", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -486,7 +486,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("StepB", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -527,7 +527,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"

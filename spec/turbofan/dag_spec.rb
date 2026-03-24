@@ -213,7 +213,7 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -238,7 +238,7 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"

@@ -54,12 +54,11 @@ module Turbofan
       end
 
       def self.write_worker(step_dir, class_name, duckdb:, step_name:, compute_environment: :compute, cpu: 1)
-        ce_name = compute_environment.to_s.split("_").map(&:capitalize).join
         File.write(File.join(step_dir, "worker.rb"), <<~RUBY)
           class #{class_name}
             include Turbofan::Step
 
-            compute_environment ComputeEnvironments::#{ce_name}
+            compute_environment :#{compute_environment}
             cpu #{cpu}
             ram 2048
             input_schema "#{step_name}_input.json"

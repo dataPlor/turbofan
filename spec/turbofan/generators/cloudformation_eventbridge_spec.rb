@@ -10,15 +10,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
   end
 
   let(:step_class) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 

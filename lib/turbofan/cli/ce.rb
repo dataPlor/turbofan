@@ -48,7 +48,6 @@ module Turbofan
           Kernel.load(File.expand_path(path))
         end
       end
-      private_class_method :load_all_definitions
     end
   end
 end

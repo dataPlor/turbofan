@@ -13,7 +13,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       ram 4
       input_schema "passthrough.json"
@@ -422,7 +422,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         slow_step = Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -611,7 +611,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       no_schema_step = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
         def self.name = "NoSchemaStep"
@@ -627,7 +627,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       no_input_step = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         output_schema "passthrough.json"
         def self.name = "NoInputStep"
@@ -667,7 +667,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       strict_step = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "query_input.json"
         output_schema "passthrough.json"
@@ -684,7 +684,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       strict_step = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
         output_schema "latlng_output.json"
@@ -701,7 +701,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       valid_step = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "query_input.json"
         output_schema "latlng_output.json"

@@ -5,7 +5,7 @@ Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
 
 module ComputeEnvironments; end unless defined?(ComputeEnvironments)
 TestCe = Class.new { include Turbofan::ComputeEnvironment } unless defined?(TestCe)
-ComputeEnvironments::TestCe = TestCe unless ComputeEnvironments.const_defined?(:TestCe)
+ComputeEnvironments::TestCe = TestCe unless ComputeEnvironments.const_defined?(:TestCe, false)
 
 FIXTURE_SCHEMAS_DIR = File.join(__dir__, "fixtures", "schemas")
 

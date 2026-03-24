@@ -6,7 +6,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -15,7 +15,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -64,7 +64,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -73,7 +73,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Transform", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -112,7 +112,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -121,7 +121,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Transform", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -130,7 +130,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -167,7 +167,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Discover", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -176,7 +176,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -185,7 +185,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Aggregate", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -242,7 +242,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -269,7 +269,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -323,7 +323,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -364,7 +364,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -391,7 +391,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("StepA", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -413,7 +413,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("StepB", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -448,7 +448,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Only", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -487,7 +487,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -515,7 +515,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Only", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -550,7 +550,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
 
         input_schema "passthrough.json"
@@ -589,18 +589,17 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       klass
     end
 
-    it "accepts a class that includes ComputeEnvironment and stores it" do
-      ce_klass = ce_class
+    it "accepts a Symbol and stores it" do
       pipeline = Class.new do
         include Turbofan::Pipeline
 
         pipeline_name "ce-pipeline"
-        compute_environment ce_klass
+        compute_environment :test_ce
       end
-      expect(pipeline.turbofan_compute_environment).to eq(ce_class)
+      expect(pipeline.turbofan_compute_environment).to eq(:test_ce)
     end
 
-    it "raises ArgumentError if class does not include ComputeEnvironment" do
+    it "raises ArgumentError if not given a Symbol" do
       bad_class = Class.new
       expect {
         Class.new do
@@ -609,7 +608,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
           pipeline_name "bad-ce"
           compute_environment bad_class
         end
-      }.to raise_error(ArgumentError, /must include Turbofan::ComputeEnvironment/)
+      }.to raise_error(ArgumentError, /must be a Symbol/)
     end
 
     it "defaults to nil" do

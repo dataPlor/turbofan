@@ -5,7 +5,7 @@ RSpec.describe "Turbofan.discover_components" do # rubocop:disable RSpec/Describ
     step_class = Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", step_class)
@@ -36,7 +36,7 @@ RSpec.describe "Turbofan.discover_components" do # rubocop:disable RSpec/Describ
     old_class = Class.new {
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     }
 

@@ -57,8 +57,9 @@ module Turbofan
           log_group_key = "LogGroup#{Naming.pascal_case(sname)}"
 
           # Resolve CE for this step
-          ce_class = sclass.turbofan_compute_environment || @pipeline.turbofan_compute_environment
-          raise "No compute_environment resolved for step :#{sname}. Declare compute_environment on the step or pipeline." unless ce_class
+          ce_sym = sclass.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+          raise "No compute_environment resolved for step :#{sname}. Declare compute_environment on the step or pipeline." unless ce_sym
+          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
           ce_ref = {"Fn::ImportValue" => ce_class.export_name(@stage)}
 
           # Check if this step uses consumable resources

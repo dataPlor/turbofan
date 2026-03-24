@@ -12,11 +12,11 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
   end
 
   let(:step_class) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       ram 4
       uses :duckdb
@@ -25,7 +25,6 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       secret :db_url, from: "turbofan/test-pipeline/db-url"
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 
@@ -256,15 +255,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
   describe "non-duckdb step (no NVMe)" do
     let(:non_duckdb_step) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
@@ -540,28 +538,26 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
     context "with multiple steps" do
       let(:step_a) do
-        ce_klass = ce_class
+        ce_class # ensure stub_const runs
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
-          compute_environment ce_klass
         end
       end
 
       let(:step_b) do
-        ce_klass = ce_class
+        ce_class # ensure stub_const runs
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
-          compute_environment ce_klass
         end
       end
 
@@ -607,7 +603,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -616,13 +612,13 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
     let(:pipeline_with_default_ce) do
       step_klass = step_without_ce
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       stub_const("DefaultCeStep", step_klass)
       Class.new do
         include Turbofan::Pipeline
 
         pipeline_name "default-ce"
-        compute_environment ce_klass
+        compute_environment :test_ce
         pipeline do
           default_ce_step(trigger_input)
         end
@@ -652,12 +648,12 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       step_with_own_ce = Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
-      step_with_own_ce.compute_environment(other_ce)
+      step_with_own_ce.compute_environment(:other_ce)
 
       stub_const("OwnCeStep", step_with_own_ce)
       pipeline = Class.new do
@@ -668,7 +664,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           own_ce_step(trigger_input)
         end
       end
-      pipeline.compute_environment(ce_class)
+      pipeline.compute_environment(:test_ce)
 
       tmpl = described_class.new(
         pipeline: pipeline,
@@ -807,15 +803,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
   # which is not a valid VCPU value for AWS Batch.
   describe "job definition with no cpu declared" do
     let(:no_cpu_step) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         ram 4
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 

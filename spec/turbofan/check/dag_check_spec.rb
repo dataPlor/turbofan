@@ -7,7 +7,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -16,7 +16,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Load", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -55,7 +55,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Only", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -83,7 +83,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -92,7 +92,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -101,7 +101,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"

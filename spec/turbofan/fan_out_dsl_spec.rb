@@ -14,7 +14,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment ce
+      compute_environment :fan_out_ce
       cpu 1
     end
     stub_const("BrandProcess", step_class)
@@ -41,7 +41,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment ce
+      compute_environment :fan_out_ce
       cpu 1
     end
     stub_const("BrandProcess", step_class)
@@ -51,7 +51,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_output.json"
       output_schema "geocode_output.json"
-      compute_environment ce
+      compute_environment :fan_out_ce
       cpu 1
     end
     stub_const("S3Export", export_class)
@@ -77,7 +77,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment ce
+      compute_environment :fan_out_ce
       cpu 1
     end
     stub_const("BrandProcess", step_class)

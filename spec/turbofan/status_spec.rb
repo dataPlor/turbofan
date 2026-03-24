@@ -1457,7 +1457,7 @@ RSpec.describe Turbofan::Status do
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2
         size :l, cpu: 4

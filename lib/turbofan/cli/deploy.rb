@@ -39,8 +39,9 @@ module Turbofan
 
         # Verify CE stacks exist
         steps.each do |sname, sclass|
-          ce_class = sclass.turbofan_compute_environment || pipeline_class.turbofan_compute_environment
-          next unless ce_class
+          ce_sym = sclass.turbofan_compute_environment || pipeline_class.turbofan_compute_environment
+          next unless ce_sym
+          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
           ce_stack_name = ce_class.stack_name(stage)
           ce_state = Turbofan::Deploy::StackManager.detect_state(cf_client, ce_stack_name)
           if ce_state == :does_not_exist

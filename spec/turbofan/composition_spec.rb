@@ -7,7 +7,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", geocode)
@@ -17,7 +17,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "geocode_output.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandValidate", validate)
@@ -37,7 +37,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "geocode_output.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("S3Export", export)
@@ -62,7 +62,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("StepA", step_a)
@@ -72,7 +72,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("StepB", step_b)
@@ -82,7 +82,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("StepC", step_c)
@@ -125,7 +125,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", geocode)

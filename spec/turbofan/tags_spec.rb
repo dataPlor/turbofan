@@ -6,7 +6,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags stack: "geo", "stack-component": "validation"
       end
@@ -26,7 +26,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
       end
     end
@@ -74,7 +74,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags "already-string" => "value", :other => "sym"
       end
@@ -109,7 +109,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags stack: "geo"
         tags stack: "visitation"
@@ -126,7 +126,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags({})
       end
@@ -164,7 +164,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags version: 2, enabled: true
       end
@@ -186,7 +186,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
           tags "turbofan:foo" => "bar"
         end
@@ -209,7 +209,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
           tags "turbofan:managed": "true"
         end
@@ -222,7 +222,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         tags stack: "geo"
       end
@@ -232,7 +232,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
       end
     end

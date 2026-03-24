@@ -12,15 +12,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
   end
 
   let(:step_class) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 
@@ -296,15 +295,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
   describe "multiple fan_out steps with group:" do
     let(:step_class_2) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 4
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
@@ -346,15 +344,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
   describe "mixed fan_out steps (some with group:, some without)" do
     let(:step_class_2) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 4
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
@@ -602,28 +599,26 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
   describe "multiple pipelines generate independent Lambdas" do
     let(:step_class_alpha) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
     let(:step_class_beta) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 

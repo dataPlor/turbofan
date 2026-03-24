@@ -1,7 +1,7 @@
 class TestFlagCheck
   include Turbofan::Step
 
-  compute_environment ComputeEnvironments::TestCe
+  compute_environment :test_ce
   cpu 1
   ram 2
   uses :duckdb

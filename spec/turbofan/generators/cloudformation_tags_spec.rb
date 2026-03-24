@@ -10,15 +10,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
   end
 
   let(:step_class) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 
@@ -105,28 +104,26 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
 
   describe "multi-step turbofan:step tags" do
     let(:step_a) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
     let(:step_b) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
@@ -172,15 +169,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
 
   describe "custom tags from Step" do
     let(:tagged_step) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
         tags team: "data-eng", cost_center: "12345"
       end
     end

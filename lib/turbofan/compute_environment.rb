@@ -209,5 +209,16 @@ module Turbofan
         live == c
       }
     end
+
+    def self.resolve(sym)
+      class_name = "ComputeEnvironments::#{Turbofan::Naming.pascal_case(sym)}"
+      klass = Object.const_get(class_name)
+      unless klass.include?(Turbofan::ComputeEnvironment)
+        raise ArgumentError, "#{class_name} does not include Turbofan::ComputeEnvironment"
+      end
+      klass
+    rescue NameError
+      raise ArgumentError, "Could not resolve compute_environment :#{sym} (expected #{class_name})"
+    end
   end
 end

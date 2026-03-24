@@ -25,6 +25,14 @@ module Turbofan
             errors << "Step :#{step_name} has no compute_environment (must be set on each step)"
           end
 
+          if step_class.turbofan_compute_environment
+            begin
+              Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
+            rescue ArgumentError => e
+              errors << "Step :#{step_name}: #{e.message}"
+            end
+          end
+
           has_sizes = step_class.turbofan_sizes.any?
           has_cpu = step_class.turbofan_default_cpu
           has_ram = step_class.turbofan_default_ram

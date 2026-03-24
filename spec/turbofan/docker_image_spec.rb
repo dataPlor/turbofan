@@ -6,7 +6,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
       end
@@ -26,7 +26,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
       end
     end
@@ -45,7 +45,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image ""
       end
@@ -65,7 +65,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "first-image:v1"
         docker_image "second-image:v2"
@@ -82,7 +82,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
         tags stack: "ml", model: "sentiment"
@@ -102,7 +102,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
         include Turbofan::Step
 
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 4
       end
     end
@@ -127,7 +127,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/foo:latest"
         # No input_schema or output_schema
@@ -151,7 +151,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
       end
@@ -161,7 +161,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
       end
     end

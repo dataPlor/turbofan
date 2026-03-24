@@ -12,7 +12,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Fetch", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -58,7 +58,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Fetch", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -102,7 +102,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Analyze", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -151,7 +151,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Transform", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -199,7 +199,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -208,7 +208,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -218,7 +218,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -280,7 +280,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -289,7 +289,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -336,7 +336,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Simple", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -384,7 +384,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("GoodStep", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"
@@ -394,7 +394,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("BadStep", Class.new {
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
 
           input_schema "passthrough.json"

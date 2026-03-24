@@ -37,7 +37,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       step_class = Class.new do
         include Turbofan::Step
 
-        compute_environment ComputeEnvironments::FamilyRemovedCe
+        compute_environment :family_removed_ce
         cpu 1
       end
 
@@ -75,7 +75,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       step_class = Class.new do
         include Turbofan::Step
 
-        compute_environment ComputeEnvironments::DirectCe
+        compute_environment :direct_ce
         cpu 2
       end
 
@@ -91,7 +91,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       step_class = Class.new do
         include Turbofan::Step
 
-        compute_environment ComputeEnvironments::DirectCe2
+        compute_environment :direct_ce2
         ram 4096
       end
 

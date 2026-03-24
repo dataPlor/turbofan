@@ -7,7 +7,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "image_tags", :schemas do #
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
@@ -73,7 +73,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "image_tags", :schemas do #
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -84,7 +84,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "image_tags", :schemas do #
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"

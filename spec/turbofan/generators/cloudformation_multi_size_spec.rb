@@ -12,18 +12,17 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     end
 
     let(:multi_size_step) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         size :s, cpu: 1, ram: 2
         size :m, cpu: 2, ram: 4
         size :l, cpu: 4, ram: 8
         uses :duckdb
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 
@@ -192,7 +191,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -251,7 +250,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           size :s, cpu: 1, ram: 8
           size :l, cpu: 4, ram: 32
           input_schema "passthrough.json"
@@ -332,7 +331,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -343,7 +342,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           size :s, cpu: 1, ram: 2
           size :l, cpu: 4, ram: 8
           input_schema "passthrough.json"

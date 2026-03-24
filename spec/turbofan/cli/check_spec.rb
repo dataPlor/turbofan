@@ -128,7 +128,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
           class CheckNocpuPipelineStep1
             include Turbofan::Step
 
-            compute_environment TestCe
+            compute_environment :test_ce
             input_schema "check_nocpu_pipeline_step1_input.json"
             output_schema "check_nocpu_pipeline_step1_output.json"
 
@@ -167,7 +167,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
           class CheckNocpuPipelineStep1
             include Turbofan::Step
 
-            compute_environment TestCe
+            compute_environment :test_ce
             input_schema "check_nocpu_pipeline_step1_input.json"
             output_schema "check_nocpu_pipeline_step1_output.json"
 
@@ -216,7 +216,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
     before { remove_consts(:CheckBadcePipeline, :CheckBadcePipelineStep1) }
     after { remove_consts(:CheckBadcePipeline, :CheckBadcePipelineStep1) }
 
-    it "reports error when step compute_environment does not include ComputeEnvironment" do
+    it "reports error when compute_environment is not a Symbol" do
       Dir.chdir(tmpdir) do
         FileUtils.mkdir("turbofans")
         scaffold_pipeline_with_step("check_badce_pipeline")
@@ -228,11 +228,10 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
           class CheckBadcePipelineStep1
             include Turbofan::Step
 
-            compute_environment TestCe
+            compute_environment NotAComputeEnvironment
             cpu 1
             input_schema "check_badce_pipeline_step1_input.json"
             output_schema "check_badce_pipeline_step1_output.json"
-            compute_environment NotAComputeEnvironment
 
             def call(inputs, context)
             end
@@ -253,11 +252,11 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
           end
         RUBY
 
-        # Step's compute_environment DSL raises ArgumentError when class doesn't include
-        # Turbofan::ComputeEnvironment. The error surfaces during file load.
+        # Step's compute_environment DSL raises ArgumentError when the argument isn't a Symbol.
+        # The error surfaces during file load.
         expect {
           Turbofan::CLI.start(["check", "check_badce_pipeline", "production"])
-        }.to raise_error(ArgumentError, /must include Turbofan::ComputeEnvironment/)
+        }.to raise_error(ArgumentError, /must be a Symbol/)
       end
     end
   end

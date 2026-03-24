@@ -7,7 +7,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", step_class)
@@ -31,7 +31,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", step_class)
@@ -57,7 +57,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandGeocode", geocode)
@@ -68,7 +68,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       input_schema "incompatible_input.json"
       output_schema "geocode_output.json"
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
     end
     stub_const("BrandValidate", validate)

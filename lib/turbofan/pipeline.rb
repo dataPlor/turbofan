@@ -33,11 +33,9 @@ module Turbofan
         @turbofan_schedule = cron_string
       end
 
-      def compute_environment(klass)
-        unless klass.include?(Turbofan::ComputeEnvironment)
-          raise ArgumentError, "#{klass} must include Turbofan::ComputeEnvironment"
-        end
-        @turbofan_compute_environment = klass
+      def compute_environment(sym)
+        raise ArgumentError, "compute_environment must be a Symbol, got #{sym.class}" unless sym.is_a?(Symbol)
+        @turbofan_compute_environment = sym
       end
 
       def pipeline(&block)

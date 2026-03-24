@@ -25,7 +25,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
       class GenerateCsvs
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 2
         uses :duckdb
         input_schema "passthrough.json"
@@ -41,7 +41,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
       class BulkLoad
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -97,14 +97,14 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
 
     it "loads step classes that include Turbofan::Step" do
       generate = result.steps[:generate_csvs]
-      expect(generate.turbofan_compute_environment).to eq(TestCe)
+      expect(generate.turbofan_compute_environment).to eq(:test_ce)
       expect(generate.turbofan_default_cpu).to eq(2)
       expect(generate.turbofan_uses).to include({type: :resource, key: :duckdb})
     end
 
     it "loads all step classes with correct config" do
       bulk = result.steps[:bulk_load]
-      expect(bulk.turbofan_compute_environment).to eq(TestCe)
+      expect(bulk.turbofan_compute_environment).to eq(:test_ce)
       expect(bulk.turbofan_default_cpu).to eq(1)
       expect(bulk.turbofan_uses).to be_empty
     end
@@ -141,7 +141,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
         class LocalStep
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -160,7 +160,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
         class ExternalStep
           include Turbofan::Step
 
-          compute_environment TestCe
+          compute_environment :test_ce
           cpu 1
           docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/external-repo:latest"
           input_schema "passthrough.json"

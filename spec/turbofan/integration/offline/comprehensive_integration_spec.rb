@@ -28,7 +28,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 1
       input_schema "passthrough.json"
       output_schema "passthrough.json"
@@ -353,7 +353,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     it "fetch_brand needs duckdb (postgres resource) and uses NvmeCe" do
       expect(fetch_brand_class.turbofan_needs_duckdb?).to be true
       expect(fetch_brand_class.turbofan_resource_keys).to include(:places_read)
-      expect(fetch_brand_class.turbofan_compute_environment).to eq(nvme_ce_class)
+      expect(fetch_brand_class.turbofan_compute_environment).to eq(:nvme_ce)
     end
 
     it "read_visits has S3 dependency" do

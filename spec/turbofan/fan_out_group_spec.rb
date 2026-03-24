@@ -33,7 +33,7 @@ RSpec.describe "fan_out batch_size: parameter", :schemas do # rubocop:disable RS
 
         input_schema "geocode_input.json"
         output_schema "geocode_output.json"
-        compute_environment ce
+        compute_environment :group_ce
         cpu 1
       end
     end
@@ -45,7 +45,7 @@ RSpec.describe "fan_out batch_size: parameter", :schemas do # rubocop:disable RS
 
         input_schema "geocode_output.json"
         output_schema "geocode_output.json"
-        compute_environment ce
+        compute_environment :group_ce
         cpu 1
       end
     end

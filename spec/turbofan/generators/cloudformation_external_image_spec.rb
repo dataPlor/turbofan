@@ -10,29 +10,27 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
   end
 
   let(:external_step) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       docker_image "123456789012.dkr.ecr.us-east-1.amazonaws.com/external-repo:v1.2.3"
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 
   let(:normal_step) do
-    ce_klass = ce_class
+    ce_class # ensure stub_const runs
     Class.new do
       include Turbofan::Step
 
-      compute_environment TestCe
+      compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
-      compute_environment ce_klass
     end
   end
 
@@ -177,16 +175,15 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
 
   describe "external step with different image URIs" do
     let(:dockerhub_step) do
-      ce_klass = ce_class
+      ce_class # ensure stub_const runs
       Class.new do
         include Turbofan::Step
 
-        compute_environment TestCe
+        compute_environment :test_ce
         cpu 1
         docker_image "nginx:1.25-alpine"
         input_schema "passthrough.json"
         output_schema "passthrough.json"
-        compute_environment ce_klass
       end
     end
 

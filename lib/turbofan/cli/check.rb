@@ -2,6 +2,7 @@ module Turbofan
   class CLI < Thor
     module Check
       def self.call(pipeline_name:, stage:, load_result: nil)
+        Turbofan::CLI::Ce.load_all_definitions
         turbofans_root = "turbofans"
         pipeline_file = File.join(turbofans_root, "pipelines", "#{pipeline_name}.rb")
         load_result ||= Turbofan::Deploy::PipelineLoader.load(pipeline_file, turbofans_root: turbofans_root)
