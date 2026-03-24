@@ -42,7 +42,6 @@ RSpec.describe Turbofan::CLI::Deploy do
   before do
     FileUtils.mkdir_p(File.join(tmpdir, "steps", "process"))
     FileUtils.mkdir_p(File.join(tmpdir, "schemas"))
-    FileUtils.mkdir_p(File.join(tmpdir, "compute_environments"))
 
     allow(Turbofan::Deploy::PipelineLoader).to receive(:load).and_return(load_result)
     allow(Turbofan::CLI::Check).to receive(:call)

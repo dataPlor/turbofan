@@ -10,7 +10,6 @@ module Turbofan
         turbofans_root = "turbofans"
         pipeline_file = File.join(turbofans_root, "pipelines", "#{pipeline_name}.rb")
         schemas_dir = File.join(turbofans_root, "schemas")
-        ce_dir = File.join(turbofans_root, "compute_environments")
 
         load_result = Turbofan::Deploy::PipelineLoader.load(pipeline_file, turbofans_root: turbofans_root)
         pipeline_class = load_result.pipeline
@@ -32,7 +31,7 @@ module Turbofan
         # Compute image tags per step
         image_tags = {}
         step_dirs.each do |step_name, step_dir|
-          image_tags[step_name] = Turbofan::Deploy::ImageBuilder.content_tag(step_dir, schemas_dir, ce_dir)
+          image_tags[step_name] = Turbofan::Deploy::ImageBuilder.content_tag(step_dir, schemas_dir)
         end
 
         cf_client = Aws::CloudFormation::Client.new
@@ -93,7 +92,7 @@ module Turbofan
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
           begin
             registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, ce_dir: ce_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
+            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
           rescue => e
             warn("Image build/push failed: #{e.message}")
             warn("Rolling back stack #{stack_name}...")
@@ -104,19 +103,18 @@ module Turbofan
         else
           # Subsequent deploy: build/push images first, then update stack
           registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, ce_dir: ce_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
+          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
         end
 
         puts "Deploy complete: #{stack_name}"
       end
 
-      def self.build_and_push_all(step_dirs:, schemas_dir:, ce_dir:, stack_name:, registry:, ecr_client:, image_tags:)
+      def self.build_and_push_all(step_dirs:, schemas_dir:, stack_name:, registry:, ecr_client:, image_tags:)
         configs = step_dirs.map do |step_name, step_dir|
           {
             step_dir: step_dir,
             schemas_dir: schemas_dir,
-            ce_dir: ce_dir,
             ecr_client: ecr_client,
             repository_name: "#{stack_name}-ecr-#{step_name}",
             repository_uri: "#{registry}/#{stack_name}-ecr-#{step_name}",
