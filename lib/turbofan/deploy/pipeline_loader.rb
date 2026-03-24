@@ -6,6 +6,9 @@ module Turbofan
       def self.load(pipeline_file, turbofans_root:)
         Turbofan.schemas_path = File.join(turbofans_root, "schemas")
 
+        config_file = File.join(turbofans_root, "config", "turbofan.rb")
+        Kernel.load(File.expand_path(config_file)) if File.exist?(config_file)
+
         raise "Pipeline file not found: #{pipeline_file}" unless File.exist?(pipeline_file)
 
         before = Set.new

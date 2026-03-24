@@ -155,9 +155,28 @@ module Turbofan
         state = detect_state(cf_client, stack_name)
         changeset_type = (state == :does_not_exist) ? "CREATE" : "UPDATE"
         changeset_name = create_changeset(cf_client, stack_name: stack_name, template_body: template_body, type: changeset_type)
+        wait_for_changeset(cf_client, stack_name: stack_name, changeset_name: changeset_name)
         describe_changes(cf_client, stack_name: stack_name, changeset_name: changeset_name)
         cf_client.delete_change_set(stack_name: stack_name, change_set_name: changeset_name)
       end
+
+      def self.wait_for_changeset(cf_client, stack_name:, changeset_name:)
+        loop do
+          resp = cf_client.describe_change_set(stack_name: stack_name, change_set_name: changeset_name)
+          case resp.status
+          when "CREATE_COMPLETE"
+            return
+          when "FAILED"
+            puts "  Changeset failed: #{resp.status_reason}"
+            return
+          when "CREATE_PENDING", "CREATE_IN_PROGRESS"
+            sleep 1
+          else
+            return
+          end
+        end
+      end
+      private_class_method :wait_for_changeset
 
       def self.describe_changes(cf_client, stack_name:, changeset_name:)
         response = cf_client.describe_change_set(stack_name: stack_name, change_set_name: changeset_name)
