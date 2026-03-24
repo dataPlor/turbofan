@@ -6,9 +6,9 @@ require "aws-sdk-ecr"
 module Turbofan
   module Deploy
     class ImageBuilder
-      def self.content_tag(step_dir, schemas_dir)
+      def self.content_tag(step_dir, schemas_dir, ce_dir)
         digest = Digest::SHA256.new
-        [step_dir, schemas_dir].each do |dir|
+        [step_dir, schemas_dir, ce_dir].each do |dir|
           Dir.glob("#{dir}/**/*").select { |f| File.file?(f) }.sort.each do |f|
             digest.update(Pathname.new(f).relative_path_from(dir).to_s)
             digest.update(File.binread(f))
@@ -27,8 +27,8 @@ module Turbofan
         false
       end
 
-      def self.build(step_dir, schemas_dir, tag:, repository_uri:)
-        cmd = ["docker", "build", "--build-context", "schemas=#{schemas_dir}"]
+      def self.build(step_dir, schemas_dir, ce_dir, tag:, repository_uri:)
+        cmd = ["docker", "build", "--build-context", "schemas=#{schemas_dir}", "--build-context", "compute_environments=#{ce_dir}"]
         proxy_ca = ENV.fetch("TURBOFAN_PROXY_CA", "/usr/local/share/ca-certificates/proxy-ca.crt")
         if File.exist?(proxy_ca)
           cmd.push("--build-context", "proxy-ca=#{File.dirname(proxy_ca)}")
@@ -58,15 +58,15 @@ module Turbofan
         registry.sub(%r{\Ahttps?://}, "")
       end
 
-      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil)
-        tag ||= content_tag(step_dir, schemas_dir)
+      def self.build_and_push(step_dir:, schemas_dir:, ce_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil)
+        tag ||= content_tag(step_dir, schemas_dir, ce_dir)
 
         if image_exists?(ecr_client, repository_name, tag)
           puts "Image #{repository_name}:#{tag} already exists, skipping build"
           return tag
         end
 
-        build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri)
+        build(step_dir, schemas_dir, ce_dir, tag: tag, repository_uri: repository_uri)
         push(tag: tag, repository_uri: repository_uri)
         tag
       end

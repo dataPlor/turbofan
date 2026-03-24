@@ -11,58 +11,69 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
   describe ".content_tag" do
     let(:step_dir) { File.join(tmpdir, "step") }
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
+    let(:ce_dir) { File.join(tmpdir, "compute_environments") }
 
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
+      FileUtils.mkdir_p(ce_dir)
       File.write(File.join(step_dir, "worker.rb"), "class MyStep; end")
       File.write(File.join(step_dir, "Dockerfile"), "FROM amazonlinux:2023")
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object"}')
     end
 
     it "returns a tag starting with 'sha-'" do
-      tag = described_class.content_tag(step_dir, schemas_dir)
+      tag = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       expect(tag).to start_with("sha-")
     end
 
     it "returns a tag with 12 hex characters after 'sha-'" do
-      tag = described_class.content_tag(step_dir, schemas_dir)
+      tag = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       expect(tag).to match(/\Asha-[a-f0-9]{12}\z/)
     end
 
     it "is deterministic: same inputs produce same tag" do
-      tag1 = described_class.content_tag(step_dir, schemas_dir)
-      tag2 = described_class.content_tag(step_dir, schemas_dir)
+      tag1 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
+      tag2 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       expect(tag1).to eq(tag2)
     end
 
     it "different content produces different tags" do
-      tag1 = described_class.content_tag(step_dir, schemas_dir)
+      tag1 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       File.write(File.join(step_dir, "worker.rb"), "class MyStep; def call; end; end")
-      tag2 = described_class.content_tag(step_dir, schemas_dir)
+      tag2 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       expect(tag1).not_to eq(tag2)
     end
 
     it "changing schema files changes the tag" do
-      tag1 = described_class.content_tag(step_dir, schemas_dir)
+      tag1 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object", "required": ["id"]}')
-      tag2 = described_class.content_tag(step_dir, schemas_dir)
+      tag2 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
+      expect(tag1).not_to eq(tag2)
+    end
+
+    it "changing CE files changes the tag" do
+      tag1 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
+      File.write(File.join(ce_dir, "house_stark.rb"), "class HouseStark; end")
+      tag2 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
       expect(tag1).not_to eq(tag2)
     end
 
     it "uses relative paths so tags are stable across machines" do
-      tag1 = described_class.content_tag(step_dir, schemas_dir)
+      tag1 = described_class.content_tag(step_dir, schemas_dir, ce_dir)
 
       other_tmpdir = Dir.mktmpdir("turbofan-image-builder-other")
       other_step_dir = File.join(other_tmpdir, "step")
       other_schemas_dir = File.join(other_tmpdir, "schemas")
+      other_ce_dir = File.join(other_tmpdir, "compute_environments")
       FileUtils.mkdir_p(other_step_dir)
       FileUtils.mkdir_p(other_schemas_dir)
+      FileUtils.mkdir_p(other_ce_dir)
       File.write(File.join(other_step_dir, "worker.rb"), "class MyStep; end")
       File.write(File.join(other_step_dir, "Dockerfile"), "FROM amazonlinux:2023")
       File.write(File.join(other_schemas_dir, "input.json"), '{"type": "object"}')
 
-      tag2 = described_class.content_tag(other_step_dir, other_schemas_dir)
+      tag2 = described_class.content_tag(other_step_dir, other_schemas_dir, other_ce_dir)
       FileUtils.rm_rf(other_tmpdir)
 
       expect(tag1).to eq(tag2)
@@ -99,22 +110,25 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
   describe ".build" do
     let(:step_dir) { File.join(tmpdir, "step") }
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
+    let(:ce_dir) { File.join(tmpdir, "compute_environments") }
     let(:repository_uri) { "123456789.dkr.ecr.us-east-1.amazonaws.com/my-repo" }
 
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
+      FileUtils.mkdir_p(ce_dir)
     end
 
     it "calls system with splatted docker build command" do
       allow(described_class).to receive(:system).and_return(true)
 
-      described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
+      described_class.build(step_dir, schemas_dir, ce_dir, tag: "sha-abc123", repository_uri: repository_uri)
 
       expect(described_class).to have_received(:system) do |*args|
         expect(args.first).to eq("docker")
         expect(args[1]).to eq("build")
         expect(args).to include("--build-context", "schemas=#{schemas_dir}")
+        expect(args).to include("--build-context", "compute_environments=#{ce_dir}")
         expect(args).to include("-t", "#{repository_uri}:sha-abc123")
         expect(args.last).to eq(step_dir)
       end
@@ -124,7 +138,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       allow(described_class).to receive(:system).and_return(false)
 
       expect {
-        described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
+        described_class.build(step_dir, schemas_dir, ce_dir, tag: "sha-abc123", repository_uri: repository_uri)
       }.to raise_error(/Command failed/)
     end
   end
@@ -190,11 +204,13 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
     let(:step_dir) { File.join(tmpdir, "step") }
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
+    let(:ce_dir) { File.join(tmpdir, "compute_environments") }
     let(:repository_uri) { "123456789.dkr.ecr.us-east-1.amazonaws.com/my-repo" }
 
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
+      FileUtils.mkdir_p(ce_dir)
       File.write(File.join(step_dir, "worker.rb"), "class MyStep; end")
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object"}')
       allow(described_class).to receive(:system).and_return(true)
@@ -209,6 +225,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
         described_class.build_and_push(
           step_dir: step_dir,
           schemas_dir: schemas_dir,
+          ce_dir: ce_dir,
           ecr_client: ecr_client,
           repository_name: "my-repo",
           repository_uri: repository_uri
@@ -227,6 +244,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
         described_class.build_and_push(
           step_dir: step_dir,
           schemas_dir: schemas_dir,
+          ce_dir: ce_dir,
           ecr_client: ecr_client,
           repository_name: "my-repo",
           repository_uri: repository_uri
@@ -242,13 +260,14 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
     let(:step_configs) do
       [
-        {step_dir: dir1, schemas_dir: schemas_dir, ecr_client: ecr_client, repository_name: "repo1", repository_uri: repository_uri1},
-        {step_dir: dir2, schemas_dir: schemas_dir, ecr_client: ecr_client, repository_name: "repo2", repository_uri: repository_uri2}
+        {step_dir: dir1, schemas_dir: schemas_dir, ce_dir: ce_dir, ecr_client: ecr_client, repository_name: "repo1", repository_uri: repository_uri1},
+        {step_dir: dir2, schemas_dir: schemas_dir, ce_dir: ce_dir, ecr_client: ecr_client, repository_name: "repo2", repository_uri: repository_uri2}
       ]
     end
     let(:dir1) { File.join(tmpdir, "step1") } # rubocop:disable RSpec/IndexedLet
     let(:dir2) { File.join(tmpdir, "step2") } # rubocop:disable RSpec/IndexedLet
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
+    let(:ce_dir) { File.join(tmpdir, "compute_environments") }
     let(:repository_uri1) { "123456789.dkr.ecr.us-east-1.amazonaws.com/repo1" } # rubocop:disable RSpec/IndexedLet
     let(:repository_uri2) { "123456789.dkr.ecr.us-east-1.amazonaws.com/repo2" } # rubocop:disable RSpec/IndexedLet
 
@@ -256,6 +275,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       FileUtils.mkdir_p(dir1)
       FileUtils.mkdir_p(dir2)
       FileUtils.mkdir_p(schemas_dir)
+      FileUtils.mkdir_p(ce_dir)
       File.write(File.join(dir1, "worker.rb"), "class Step1; end")
       File.write(File.join(dir2, "worker.rb"), "class Step2; end")
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object"}')
@@ -455,10 +475,12 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
     let(:step_dir) { File.join(tmpdir, "my_step") }
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
+    let(:ce_dir) { File.join(tmpdir, "compute_environments") }
 
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
+      FileUtils.mkdir_p(ce_dir)
       File.write(File.join(step_dir, "worker.rb"), "class MyStep; end")
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object"}')
     end
@@ -468,7 +490,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
 
       expect {
         described_class.build_and_push_all(step_configs: [
-          {step_dir: step_dir, schemas_dir: schemas_dir, ecr_client: ecr_client,
+          {step_dir: step_dir, schemas_dir: schemas_dir, ce_dir: ce_dir, ecr_client: ecr_client,
            repository_name: "repo", repository_uri: "123.dkr.ecr.us-east-1.amazonaws.com/repo"}
         ])
       }.to raise_error(/Build failed for step 'my_step'/)
@@ -479,7 +501,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
 
       expect {
         described_class.build_and_push_all(step_configs: [
-          {step_dir: step_dir, schemas_dir: schemas_dir, ecr_client: ecr_client,
+          {step_dir: step_dir, schemas_dir: schemas_dir, ce_dir: ce_dir, ecr_client: ecr_client,
            repository_name: "repo", repository_uri: "123.dkr.ecr.us-east-1.amazonaws.com/repo"}
         ])
       }.to raise_error(/Command failed: docker build/)
