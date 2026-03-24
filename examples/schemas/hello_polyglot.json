@@ -1,0 +1,1 @@
+{"type":"object","properties":{"output":{"type":"array","items":{"type":"string"}}},"required":["output"]}

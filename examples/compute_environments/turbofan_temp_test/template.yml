@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Turbofan Compute Environment: TurbofanTempTest (hello_polyglot integration test)'
+
+Parameters:
+  Stage:
+    Type: String
+
+Mappings:
+  NetworkConfig:
+    production:
+      Subnets: subnet-0123456789abcdef0
+      SecurityGroups: sg-0abcdef1234567890
+    staging:
+      Subnets: subnet-0123456789abcdef0
+      SecurityGroups: sg-0abcdef1234567890
+
+Resources:
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: SPOT
+        AllocationStrategy: SPOT_PRICE_CAPACITY_OPTIMIZED
+        MinvCpus: 0
+        MaxvCpus: 12
+        InstanceTypes:
+          - c7g
+        InstanceRole: arn:aws:iam::123456789012:instance-profile/ecsInstanceRole
+        SpotIamFleetRole: arn:aws:iam::123456789012:role/AmazonEC2SpotFleetTaggingRole
+        Subnets: !Split
+          - ','
+          - !FindInMap [NetworkConfig, !Ref Stage, Subnets]
+        SecurityGroupIds: !Split
+          - ','
+          - !FindInMap [NetworkConfig, !Ref Stage, SecurityGroups]
+      Tags:
+        turbofan:managed: 'true'
+        turbofan:compute-environment: turbofan-temp-test
+
+Outputs:
+  ComputeEnvironmentArn:
+    Value: !Ref ComputeEnvironment
+    Export:
+      Name: !Sub "turbofan-ce-turbofan-temp-test-${Stage}-arn"

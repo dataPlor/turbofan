@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Turbofan Compute Environment: NvmeCe (NVMe-backed instances for DuckDB)'
+
+Parameters:
+  Stage:
+    Type: String
+
+Resources:
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: SPOT
+        MinvCpus: 0
+        MaxvCpus: 128
+        InstanceRole: arn:aws:iam::123456789012:instance-profile/ecsInstanceRole
+        InstanceTypes:
+          - c6gd.large
+          - c6gd.xlarge
+          - c7gd.large
+          - c7gd.xlarge
+          - m7gd.large
+          - m7gd.xlarge
+        Subnets:
+          - subnet-0739bad8e3389f747
+          - subnet-0fa38020b0dd14b49
+          - subnet-0123456789abcdef0
+          - subnet-03b8ab07431d494ed
+          - subnet-0ab7d1c7cadb3026c
+          - subnet-00972ff9c50e2769f
+        SecurityGroupIds:
+          - sg-0abcdef1234567890
+        SpotIamFleetRole: arn:aws:iam::123456789012:role/AmazonEC2SpotFleetTaggingRole
+
+Outputs:
+  ComputeEnvironmentArn:
+    Value: !Ref ComputeEnvironment
+    Export:
+      Name: !Sub "turbofan-ce-nvme-ce-${Stage}-arn"

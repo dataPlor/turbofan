@@ -1,0 +1,5 @@
+{
+  "type": "object",
+  "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } },
+  "required": ["lat", "lng"]
+}
