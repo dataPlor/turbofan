@@ -31,29 +31,27 @@ RSpec.describe Turbofan::Runtime::FanOut do
       allow(s3_client).to receive(:put_object)
     end
 
-    it "writes each item to S3 at {execution_id}/{step_name}/input/{index}.json" do
+    it "writes all items to a single S3 file at input/items.json" do
       items = [{"file" => "a.csv"}, {"file" => "b.csv"}, {"file" => "c.csv"}]
 
       described_class.write_inputs(items, **s3_args)
 
-      items.each_with_index do |item, index|
-        expect(s3_client).to have_received(:put_object).with(
-          bucket: bucket,
-          key: "#{execution_id}/#{step_name}/input/#{index}.json",
-          body: JSON.generate(item)
-        )
-      end
+      expect(s3_client).to have_received(:put_object).once.with(
+        bucket: bucket,
+        key: "#{execution_id}/#{step_name}/input/items.json",
+        body: JSON.generate(items)
+      )
     end
 
-    it "writes the correct number of items" do
-      items = Array.new(5) { |i| {"id" => i} }
+    it "makes exactly one S3 put regardless of item count" do
+      items = Array.new(100) { |i| {"id" => i} }
 
       described_class.write_inputs(items, **s3_args)
 
-      expect(s3_client).to have_received(:put_object).exactly(5).times
+      expect(s3_client).to have_received(:put_object).once
     end
 
-    it "handles an empty input list" do
+    it "handles an empty input list without writing" do
       described_class.write_inputs([], **s3_args)
 
       expect(s3_client).not_to have_received(:put_object)
@@ -66,60 +64,121 @@ RSpec.describe Turbofan::Runtime::FanOut do
 
       expect(s3_client).to have_received(:put_object).with(
         bucket: bucket,
-        key: "#{execution_id}/#{step_name}/input/0.json",
-        body: JSON.generate({"file" => "only.csv"})
+        key: "#{execution_id}/#{step_name}/input/items.json",
+        body: JSON.generate([{"file" => "only.csv"}])
       )
     end
-  end
 
-  describe ".write_inputs with chunking (>10,000 items)" do
-    before do
-      allow(s3_client).to receive(:put_object)
-    end
-
-    it "writes chunked paths: {execution_id}/{step_name}/input/{chunk}/{index}.json" do
-      # Use a smaller number but simulate chunked writes
+    it "handles large item counts in a single file" do
       items = Array.new(10_001) { |i| {"id" => i} }
 
       described_class.write_inputs(items, **s3_args)
 
-      # First chunk: items 0-9999 at chunk/0/
-      expect(s3_client).to have_received(:put_object).with(
-        hash_including(key: "#{execution_id}/#{step_name}/input/0/0.json")
-      )
-
-      # Second chunk: items 10000+ at chunk/1/
-      expect(s3_client).to have_received(:put_object).with(
-        hash_including(key: "#{execution_id}/#{step_name}/input/1/0.json")
-      )
+      expect(s3_client).to have_received(:put_object).once
     end
   end
 
   describe ".read_input" do
-    it "reads the correct item by AWS_BATCH_JOB_ARRAY_INDEX" do
-      item = {"file" => "target.csv", "size_mb" => 42}
-      stub_s3_read(item)
+    it "reads items.json and returns the item at array_index" do
+      items = [{"file" => "a.csv"}, {"file" => "target.csv"}, {"file" => "c.csv"}]
+      stub_s3_read(items)
 
-      result = described_class.read_input(array_index: 7, **s3_args)
+      result = described_class.read_input(array_index: 1, **s3_args)
 
-      expect(result).to eq(item)
+      expect(result).to eq({"file" => "target.csv"})
       expect(s3_client).to have_received(:get_object).with(
         bucket: bucket,
-        key: "#{execution_id}/#{step_name}/input/7.json"
+        key: "#{execution_id}/#{step_name}/input/items.json"
       )
     end
 
-    it "reads from chunked path when chunk is specified" do
-      item = {"file" => "chunked.csv"}
-      stub_s3_read(item)
+    it "returns the first item for array_index 0" do
+      items = [{"id" => 0}, {"id" => 1}]
+      stub_s3_read(items)
 
-      result = described_class.read_input(array_index: 5, chunk: 2, **s3_args)
+      result = described_class.read_input(array_index: 0, **s3_args)
 
-      expect(result).to eq(item)
+      expect(result).to eq({"id" => 0})
+    end
+
+    it "returns the last item for array_index == size - 1" do
+      items = [{"id" => 0}, {"id" => 1}, {"id" => 2}]
+      stub_s3_read(items)
+
+      result = described_class.read_input(array_index: 2, **s3_args)
+
+      expect(result).to eq({"id" => 2})
+    end
+
+    it "returns nil for out-of-bounds array_index" do
+      items = [{"id" => 0}]
+      stub_s3_read(items)
+
+      result = described_class.read_input(array_index: 5, **s3_args)
+
+      expect(result).to be_nil
+    end
+
+    it "reads from routed path when chunk is specified" do
+      items = [{"file" => "routed.csv"}]
+      stub_s3_read(items)
+
+      result = described_class.read_input(array_index: 0, chunk: "large", **s3_args)
+
+      expect(result).to eq({"file" => "routed.csv"})
       expect(s3_client).to have_received(:get_object).with(
         bucket: bucket,
-        key: "#{execution_id}/#{step_name}/input/2/5.json"
+        key: "#{execution_id}/#{step_name}/input/large/items.json"
       )
+    end
+  end
+
+  describe "input format contract" do
+    it "write_inputs produces a file that read_input can consume for each index" do
+      items = [{"id" => 0, "name" => "first"}, {"id" => 1, "name" => "second"}, {"id" => 2, "name" => "third"}]
+
+      written_body = nil
+      allow(s3_client).to receive(:put_object) { |args| written_body = args[:body] }
+
+      described_class.write_inputs(items, **s3_args)
+
+      items.each_with_index do |expected_item, index|
+        s3_body = instance_double(StringIO, read: written_body)
+        s3_response = instance_double(Aws::S3::Types::GetObjectOutput, body: s3_body)
+        allow(s3_client).to receive(:get_object).and_return(s3_response)
+
+        result = described_class.read_input(array_index: index, **s3_args)
+        expect(result).to eq(expected_item)
+      end
+    end
+
+    it "items.json is a flat JSON array of items" do
+      items = [{"a" => 1}, {"b" => 2}]
+      written_body = nil
+      allow(s3_client).to receive(:put_object) { |args| written_body = args[:body] }
+
+      described_class.write_inputs(items, **s3_args)
+
+      parsed = JSON.parse(written_body)
+      expect(parsed).to be_an(Array)
+      expect(parsed.size).to eq(2)
+      expect(parsed[0]).to eq({"a" => 1})
+      expect(parsed[1]).to eq({"b" => 2})
+    end
+
+    it "preserves complex nested item structures through write/read roundtrip" do
+      items = [{"config" => {"nested" => true, "list" => [1, 2, 3]}, "tags" => ["a", "b"]}]
+      written_body = nil
+      allow(s3_client).to receive(:put_object) { |args| written_body = args[:body] }
+
+      described_class.write_inputs(items, **s3_args)
+
+      s3_body = instance_double(StringIO, read: written_body)
+      s3_response = instance_double(Aws::S3::Types::GetObjectOutput, body: s3_body)
+      allow(s3_client).to receive(:get_object).and_return(s3_response)
+
+      result = described_class.read_input(array_index: 0, **s3_args)
+      expect(result).to eq(items[0])
     end
   end
 
@@ -175,51 +234,12 @@ RSpec.describe Turbofan::Runtime::FanOut do
       }.to raise_error(ArgumentError, /count.*chunks/)
     end
 
-    it "propagates errors from threaded work" do
+    it "propagates errors from write_inputs" do
       allow(s3_client).to receive(:put_object).and_raise(RuntimeError, "S3 write failed")
 
       expect {
         described_class.write_inputs([{"id" => 1}], **s3_args)
       }.to raise_error(RuntimeError, "S3 write failed")
-    end
-
-    it "includes count of other errors when multiple threads fail" do
-      mu = Mutex.new
-      call_count = 0
-      allow(s3_client).to receive(:put_object) do
-        n = mu.synchronize { call_count += 1 }
-        raise "S3 write failed" if n <= 3
-      end
-
-      items = Array.new(10) { |i| {"id" => i} }
-
-      expect {
-        described_class.write_inputs(items, **s3_args)
-      }.to raise_error(RuntimeError, /and 2 other error\(s\) in parallel work/)
-    end
-
-    it "raises the first error unchanged when only one thread fails" do
-      allow(s3_client).to receive(:put_object) # default: success
-      allow(s3_client).to receive(:put_object).with(
-        hash_including(key: "#{execution_id}/#{step_name}/input/0.json")
-      ).and_raise(RuntimeError, "single failure")
-
-      items = Array.new(5) { |i| {"id" => i} }
-
-      expect {
-        described_class.write_inputs(items, **s3_args)
-      }.to raise_error(RuntimeError, "single failure")
-    end
-
-    it "joins all threads even when errors occur" do
-      allow(s3_client).to receive(:put_object).and_raise(RuntimeError, "fail")
-
-      expect {
-        described_class.write_inputs(Array.new(5) { |i| {"id" => i} }, **s3_args)
-      }.to raise_error(RuntimeError)
-
-      live = Thread.list.select(&:alive?) - [Thread.current]
-      expect(live).to be_empty
     end
 
     it "returns empty list for zero count" do

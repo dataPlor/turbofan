@@ -425,9 +425,13 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(handler).to include("aws-sdk-s3")
     end
 
-    it "writes chunks to input path (not chunks/)" do
-      expect(handler).to include("'input'")
-      expect(handler).not_to include("chunks/")
+    it "writes a single items.json file per fan-out step" do
+      expect(handler).to include("'items.json'")
+    end
+
+    it "does not write individual indexed input files" do
+      expect(handler).not_to include("'input', \"#{"\#{idx}"}.json\"")
+      expect(handler).not_to include("'input', size_name, \"#{"\#{idx}"}.json\"")
     end
 
     it "reads from S3 when prev_step is present" do

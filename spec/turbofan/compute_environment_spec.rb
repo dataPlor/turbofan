@@ -146,7 +146,7 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
     it "includes tags" do
       template = ce_class.generate_template(stage: "production")
       parsed = YAML.safe_load(template)
-      tags = parsed.dig("Resources", "ComputeEnvironment", "Properties", "ComputeResources", "Tags")
+      tags = parsed.dig("Resources", "ComputeEnvironment", "Properties", "Tags")
       expect(tags["turbofan:managed"]).to eq("true")
       expect(tags["turbofan:compute-environment"]).to eq("house-stark")
     end

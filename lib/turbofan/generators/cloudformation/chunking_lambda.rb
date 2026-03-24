@@ -64,21 +64,16 @@ module Turbofan
               sizes = {}
               groups.each do |size_name, size_items|
                 chunks = chunk(size_items, group_size)
-                chunks.each_with_index do |chunk_data, idx|
-                  key = s3_key(execution_id, step_name, 'input', size_name, "#{idx}.json")
-                  S3.put_object(bucket: bucket, key: key, body: JSON.generate(chunk_data))
-                end
+                key = s3_key(execution_id, step_name, 'input', size_name, 'items.json')
+                S3.put_object(bucket: bucket, key: key, body: JSON.generate(chunks))
                 sizes[size_name] = { 'count' => chunks.size }
               end
 
               { 'sizes' => sizes }
             else
               chunks = chunk(items, group_size)
-
-              chunks.each_with_index do |chunk_data, idx|
-                key = s3_key(execution_id, step_name, 'input', "#{idx}.json")
-                S3.put_object(bucket: bucket, key: key, body: JSON.generate(chunk_data))
-              end
+              key = s3_key(execution_id, step_name, 'input', 'items.json')
+              S3.put_object(bucket: bucket, key: key, body: JSON.generate(chunks))
 
               { 'chunk_count' => chunks.size }
             end

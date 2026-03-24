@@ -14,29 +14,24 @@ module Turbofan
       end
 
       def write_inputs(items, s3_client:, bucket:, execution_id:, step_name:)
-        if items.size > Turbofan::Generators::ASL::MAX_ARRAY_SIZE
-          write_chunked_inputs(items, s3_client:, bucket:, execution_id:, step_name:)
-        else
-          work = items.each_with_index.map { |item, index| [item, index] }
-          threaded_work(work) do |item, index|
-            s3_client.put_object(
-              bucket: bucket,
-              key: s3_key(execution_id, step_name, "input", "#{index}.json"),
-              body: JSON.generate(item)
-            )
-          end
-        end
+        return if items.empty?
+
+        s3_client.put_object(
+          bucket: bucket,
+          key: s3_key(execution_id, step_name, "input", "items.json"),
+          body: JSON.generate(items)
+        )
       end
 
       def read_input(array_index:, s3_client:, bucket:, execution_id:, step_name:, chunk: nil)
         key = if chunk
-          s3_key(execution_id, step_name, "input", chunk.to_s, "#{array_index}.json")
+          s3_key(execution_id, step_name, "input", chunk.to_s, "items.json")
         else
-          s3_key(execution_id, step_name, "input", "#{array_index}.json")
+          s3_key(execution_id, step_name, "input", "items.json")
         end
 
         response = s3_client.get_object(bucket: bucket, key: key)
-        JSON.parse(response.body.read)
+        JSON.parse(response.body.read)[array_index]
       end
 
       def each_output(s3_client:, bucket:, execution_id:, step_name:, count: nil, chunks: nil, &block)
@@ -81,21 +76,6 @@ module Turbofan
           results
         end
       end
-
-      def write_chunked_inputs(items, s3_client:, bucket:, execution_id:, step_name:)
-        max = Turbofan::Generators::ASL::MAX_ARRAY_SIZE
-        work = items.each_with_index.map { |item, index| [item, index] }
-        threaded_work(work) do |item, index|
-          chunk = index / max
-          local_index = index % max
-          s3_client.put_object(
-            bucket: bucket,
-            key: s3_key(execution_id, step_name, "input", chunk.to_s, "#{local_index}.json"),
-            body: JSON.generate(item)
-          )
-        end
-      end
-      private_class_method :write_chunked_inputs
 
       def collect_chunked_outputs(chunks, s3_client:, bucket:, execution_id:, step_name:)
         work = []

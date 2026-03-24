@@ -235,7 +235,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       }
 
       fan_out_input = [{"id" => 5, "data" => "chunk-5"}]
-      s3_body = instance_double("StringIO", read: JSON.generate(fan_out_input)) # rubocop:disable RSpec/VerifiedDoubleReference
+      all_items = Array.new(5, [{"id" => 0}]) + [fan_out_input]
+      s3_body = instance_double("StringIO", read: JSON.generate(all_items)) # rubocop:disable RSpec/VerifiedDoubleReference
       s3_response = instance_double("Aws::S3::Types::GetObjectOutput", body: s3_body) # rubocop:disable RSpec/VerifiedDoubleReference
       allow(s3_client).to receive(:get_object).and_return(s3_response)
 
@@ -249,7 +250,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(received_input).to eq(fan_out_input)
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-fan/process/input/5.json"
+        key: "exec-fan/process/input/items.json"
       )
     end
 
@@ -257,7 +258,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       spy = make_step(name: "FanOutChild") { |input, _ctx| {"result" => input} }
 
       fan_out_input = [{"id" => 3}]
-      s3_body = instance_double("StringIO", read: JSON.generate(fan_out_input)) # rubocop:disable RSpec/VerifiedDoubleReference
+      all_items = Array.new(3, [{"id" => 0}]) + [fan_out_input]
+      s3_body = instance_double("StringIO", read: JSON.generate(all_items)) # rubocop:disable RSpec/VerifiedDoubleReference
       s3_response = instance_double("Aws::S3::Types::GetObjectOutput", body: s3_body) # rubocop:disable RSpec/VerifiedDoubleReference
       allow(s3_client).to receive(:get_object).and_return(s3_response)
 
@@ -312,7 +314,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       }
 
       fan_out_input = [{"id" => 2, "data" => "chunk-m-2"}]
-      s3_body = instance_double("StringIO", read: JSON.generate(fan_out_input)) # rubocop:disable RSpec/VerifiedDoubleReference
+      all_items = Array.new(2, [{"id" => 0}]) + [fan_out_input]
+      s3_body = instance_double("StringIO", read: JSON.generate(all_items)) # rubocop:disable RSpec/VerifiedDoubleReference
       s3_response = instance_double("Aws::S3::Types::GetObjectOutput", body: s3_body) # rubocop:disable RSpec/VerifiedDoubleReference
       allow(s3_client).to receive(:get_object).and_return(s3_response)
 
@@ -327,7 +330,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(received_input).to eq(fan_out_input)
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-fan/process/input/m/2.json"
+        key: "exec-fan/process/input/m/items.json"
       )
     end
 
@@ -335,7 +338,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       spy = make_step(name: "SizedFanOutChild") { |input, _ctx| {"result" => input} }
 
       fan_out_input = [{"id" => 2}]
-      s3_body = instance_double("StringIO", read: JSON.generate(fan_out_input)) # rubocop:disable RSpec/VerifiedDoubleReference
+      all_items = Array.new(2, [{"id" => 0}]) + [fan_out_input]
+      s3_body = instance_double("StringIO", read: JSON.generate(all_items)) # rubocop:disable RSpec/VerifiedDoubleReference
       s3_response = instance_double("Aws::S3::Types::GetObjectOutput", body: s3_body) # rubocop:disable RSpec/VerifiedDoubleReference
       allow(s3_client).to receive(:get_object).and_return(s3_response)
 

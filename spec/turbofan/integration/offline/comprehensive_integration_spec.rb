@@ -470,17 +470,15 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
       expect(s3_store).to have_key("#{bucket}/#{exec_id}/extract/output.json")
 
-      # 2. Simulate what the Lambda does: read output, chunk, write input files
+      # 2. Simulate what the Lambda does: read output, chunk, write single items.json
       raw = s3_store["#{bucket}/#{exec_id}/extract/output.json"]
       items = JSON.parse(raw)
       chunks = items.each_slice(group_size).to_a
 
-      chunks.each_with_index do |chunk_data, idx|
-        key = "#{exec_id}/process/input/#{idx}.json"
-        mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(chunk_data))
-      end
+      key = "#{exec_id}/process/input/items.json"
+      mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(chunks))
 
-      # 3. FanOut.read_input(array_index: 0) reads input/0.json
+      # 3. FanOut.read_input(array_index: 0) reads items.json[0]
       chunk_0 = Turbofan::Runtime::FanOut.read_input(
         array_index: 0,
         s3_client: mock_s3,
@@ -523,15 +521,13 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       sizes = %w[s m l]
       items = (0..8).map { |i| {"id" => i, "_turbofan_size" => sizes[i % 3]} }
 
-      # 2. Simulate routing Lambda: group by _turbofan_size, chunk by group 3
+      # 2. Simulate routing Lambda: group by _turbofan_size, write single items.json per size
       groups = items.group_by { |item| item["_turbofan_size"] }
       size_counts = {}
       groups.each do |size_name, size_items|
         chunks = size_items.each_slice(3).to_a
-        chunks.each_with_index do |chunk_data, idx|
-          key = "#{exec_id}/score_items/input/#{size_name}/#{idx}.json"
-          mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(chunk_data))
-        end
+        key = "#{exec_id}/score_items/input/#{size_name}/items.json"
+        mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(chunks))
         size_counts[size_name] = chunks.size
       end
 
@@ -585,14 +581,12 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       step_names = %w[hello_ruby hello_python hello_node hello_rust]
 
       step_names.each_with_index do |step_name, step_idx|
-        # Simulate chunking Lambda: write input files
-        items.each_with_index do |item, idx|
-          key = "#{exec_id}/#{step_name}/input/#{idx}.json"
-          mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(item))
-        end
+        # Simulate chunking Lambda: write single items.json
+        key = "#{exec_id}/#{step_name}/input/items.json"
+        mock_s3.put_object(bucket: bucket, key: key, body: JSON.generate(items))
 
         # Simulate each fan-out child: read input, append greeting, write output
-        items.each_with_index do |item, idx|
+        items.each_with_index do |_item, idx|
           input = Turbofan::Runtime::FanOut.read_input(
             array_index: idx,
             s3_client: mock_s3,
