@@ -111,6 +111,9 @@ module Turbofan
         lines << "# Schemas injected via BuildKit named context (--build-context schemas=turbofans/schemas)"
         lines << "COPY --from=schemas . schemas/"
         lines << ""
+        lines << "# External deps injected via BuildKit named context (--build-context deps=<tmpdir>)"
+        lines << "COPY --from=deps . lib/"
+        lines << ""
         lines << "ENV TURBOFAN_SCHEMAS_PATH=/app/schemas"
         lines << ""
         lines << 'CMD ["ruby", "entrypoint.rb"]'
