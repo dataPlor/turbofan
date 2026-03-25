@@ -69,7 +69,47 @@ module Turbofan
       tsort.filter_map { |name| step_map[name] }
     end
 
+    # Find the join point where forked branches reconverge.
+    # Returns the DagStep where branches merge, or nil.
+    def find_join_point(fork_children, sorted, fork_index)
+      active_children = fork_children.count { |child| children_of(child).any? }
+      active_children = 1 if active_children == 0
+
+      sorted[(fork_index + 1)..].each do |step|
+        next if fork_children.include?(step.name)
+
+        ancestors = all_ancestors(step.name)
+        fork_ancestor_count = fork_children.count { |child| ancestors.include?(child) }
+        return step if fork_ancestor_count >= active_children
+      end
+      nil
+    end
+
+    # Collect all steps reachable from branch_start up to (but not including) join_point,
+    # returned in topological order.
+    def branch_steps_for(branch_start, join_point, sorted)
+      reachable = Set.new
+      queue = [branch_start]
+      while (step_name = queue.shift)
+        next if reachable.include?(step_name) || step_name == join_point
+        reachable << step_name
+        children_of(step_name).each { |c| queue << c }
+      end
+      sorted.select { |s| reachable.include?(s.name) }
+    end
+
     private
+
+    def all_ancestors(step_name)
+      visited = Set.new
+      queue = parents_of(step_name).dup
+      while (parent = queue.shift)
+        next if visited.include?(parent)
+        visited << parent
+        queue.concat(parents_of(parent))
+      end
+      visited
+    end
 
     def detect_self_cycles!
       @edges.each do |edge|
