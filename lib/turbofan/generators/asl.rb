@@ -32,7 +32,7 @@ module Turbofan
           next unless children.size > 1
 
           forks[step.name] = children
-          join_step = find_join_point(dag, children, sorted, idx)
+          join_step = dag.find_join_point(children, sorted, idx)
           join_info[join_step.name] = children if join_step
         end
 
@@ -47,11 +47,11 @@ module Turbofan
           if forks.key?(step.name)
             # --- Fork step: emit step then a Parallel state ---
             branch_children = forks[step.name]
-            fork_join = find_join_point(dag, branch_children, sorted, index)
+            fork_join = dag.find_join_point(branch_children, sorted, index)
 
             # Mark all steps in all branches as visited
             branch_children.each do |child_name|
-              branch_steps_for(dag, child_name, fork_join&.name, sorted).each { |s| visited << s.name }
+              dag.branch_steps_for(child_name, fork_join&.name, sorted).each { |s| visited << s.name }
             end
 
             parallel_key = "#{step.name}_parallel"
@@ -66,7 +66,7 @@ module Turbofan
 
             # Build Parallel branches
             branches = branch_children.map do |child_name|
-              chain = branch_steps_for(dag, child_name, fork_join&.name, sorted)
+              chain = dag.branch_steps_for(child_name, fork_join&.name, sorted)
               build_branch_chain(pipeline_name, chain, step.name)
             end
 
@@ -188,43 +188,6 @@ module Turbofan
           return sorted[i] unless visited.include?(sorted[i].name)
         end
         nil
-      end
-
-      def find_join_point(dag, fork_children, sorted, fork_index)
-        # Count fork children that have at least one descendant (non-dead-end branches)
-        active_children = fork_children.count { |child| dag.children_of(child).any? }
-        active_children = 1 if active_children == 0
-
-        sorted[(fork_index + 1)..].each do |step|
-          next if fork_children.include?(step.name)
-
-          ancestors = all_ancestors(dag, step.name)
-          fork_ancestor_count = fork_children.count { |child| ancestors.include?(child) }
-          return step if fork_ancestor_count >= active_children
-        end
-        nil
-      end
-
-      def all_ancestors(dag, step_name)
-        visited = Set.new
-        queue = dag.parents_of(step_name).dup
-        while (parent = queue.shift)
-          next if visited.include?(parent)
-          visited << parent
-          queue.concat(dag.parents_of(parent))
-        end
-        visited
-      end
-
-      def branch_steps_for(dag, branch_start, join_point, sorted)
-        reachable = Set.new
-        queue = [branch_start]
-        while (step_name = queue.shift)
-          next if reachable.include?(step_name) || step_name == join_point
-          reachable << step_name
-          dag.children_of(step_name).each { |c| queue << c }
-        end
-        sorted.select { |s| reachable.include?(s.name) }
       end
 
       def build_branch_chain(pipeline_name, chain, fork_step_name)
