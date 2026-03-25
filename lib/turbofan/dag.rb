@@ -149,6 +149,14 @@ module Turbofan
       @trigger_input_override || DagProxy.new(:trigger)
     end
 
+    def with_trigger_override(proxy)
+      previous = @trigger_input_override
+      @trigger_input_override = proxy
+      yield
+    ensure
+      @trigger_input_override = previous
+    end
+
     def fan_out(proxy, batch_size: nil, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)

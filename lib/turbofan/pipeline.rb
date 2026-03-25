@@ -102,16 +102,13 @@ module Turbofan
             sub_block = klass.instance_variable_get(:@turbofan_pipeline_block)
             raise ArgumentError, "Pipeline #{klass} has no pipeline block" unless sub_block
 
-            previous_override = @trigger_input_override
-            @trigger_input_override = input_proxy
-            last_proxy = if sub_block.arity == 0
-              instance_eval(&sub_block)
-            else
-              instance_exec(input_proxy, &sub_block)
+            with_trigger_override(input_proxy) do
+              if sub_block.arity == 0
+                instance_eval(&sub_block)
+              else
+                instance_exec(input_proxy, &sub_block)
+              end
             end
-            @trigger_input_override = previous_override
-
-            last_proxy
           end
         end
       end
