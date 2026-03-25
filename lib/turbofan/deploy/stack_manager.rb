@@ -4,8 +4,9 @@ module Turbofan
   module Deploy
     class StackManager
       UPDATABLE_STATES = %i[create_complete update_complete update_rollback_complete].freeze
-      CHANGESET_TIMEOUT = 300
-      STACK_TIMEOUT = 1800
+      CFN_INLINE_TEMPLATE_LIMIT = 51_200 # bytes; larger templates must be uploaded to S3
+      CHANGESET_TIMEOUT = 300  # seconds to wait for changeset creation
+      STACK_TIMEOUT = 1800     # seconds to wait for stack create/update
 
       def self.backoff_sleep(attempt, base:, max:, jitter: true)
         delay = [base * (2**attempt), max].min
@@ -78,7 +79,7 @@ module Turbofan
 
       def self.create_changeset(cf_client, stack_name:, template_body:, type:, parameters: [], s3_client: nil)
         changeset_name = "turbofan-deploy-#{Time.now.to_i}"
-        template_param = if template_body.bytesize > 51_200
+        template_param = if template_body.bytesize > CFN_INLINE_TEMPLATE_LIMIT
           s3 = s3_client || Aws::S3::Client.new
           bucket = Turbofan.config.bucket
           key = "turbofan-cfn-templates/#{stack_name}/#{changeset_name}.json"
