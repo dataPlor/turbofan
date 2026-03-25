@@ -23,7 +23,7 @@ module Turbofan
         def step_env(step, first:, prev_step_name:, prev_step: nil, prev_step_names: nil)
           env = base_env
 
-          if first
+          if first && !step.fan_out?
             env << {"Name" => "TURBOFAN_INPUT", "Value.$" => "States.JsonToString($.input)"}
           elsif prev_step_names
             env << {"Name" => "TURBOFAN_PREV_STEPS", "Value" => prev_step_names.map(&:to_s).join(",")}
