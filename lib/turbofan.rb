@@ -83,4 +83,13 @@ module Turbofan
       .join("_")
       .to_sym
   end
+
+  # Auto-resolved external deps are staged at <workdir>/lib/ via
+  # COPY --from=deps in the Dockerfile. Add it to $LOAD_PATH so
+  # workers can `require "services/foo"` and it resolves in both
+  # dev (project root on $LOAD_PATH) and Docker (/app/lib on $LOAD_PATH).
+  deps_lib = File.join(Dir.pwd, "lib")
+  if Dir.exist?(deps_lib)
+    $LOAD_PATH.unshift(deps_lib) unless $LOAD_PATH.include?(deps_lib)
+  end
 end
