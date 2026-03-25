@@ -13,8 +13,8 @@ RUN curl -L -o /tmp/duckdb.zip https://github.com/duckdb/duckdb/releases/downloa
 RUN gem update --system --no-document
 
 WORKDIR /app
-COPY turbofan-0.1.0.gem .
-RUN gem install --no-document turbofan-0.1.0.gem json_schemer rexml duckdb && rm turbofan-0.1.0.gem
+COPY turbofan-*.gem .
+RUN gem install --no-document turbofan-*.gem json_schemer rexml duckdb && rm turbofan-*.gem
 
 COPY integration_config.json entrypoint.rb worker.rb ./
 COPY --from=schemas . schemas/

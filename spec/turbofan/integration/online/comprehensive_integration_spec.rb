@@ -69,7 +69,7 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
   after do
     # Clean up built gem files and config from step directories
     step_dirs.each_value do |dir|
-      FileUtils.rm_f(File.join(dir, "turbofan-0.1.0.gem"))
+      FileUtils.rm_f(File.join(dir, "turbofan-#{Turbofan::VERSION}.gem"))
       FileUtils.rm_f(File.join(dir, "integration_config.json"))
     end
 
@@ -136,13 +136,14 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
     skip "CE stack '#{nvme_stack}' not deployed. Run: turbofan ce deploy --stage #{stage} --ce nvme_ce" if nvme_state == :does_not_exist
 
     # Build turbofan gem and copy to Ruby step directories
-    gem_file = File.join(gem_root, "turbofan-0.1.0.gem")
+    gem_name = "turbofan-#{Turbofan::VERSION}.gem"
+    gem_file = File.join(gem_root, gem_name)
     Dir.chdir(gem_root) do
       raise "gem build failed" unless system("gem build turbofan.gemspec -o #{gem_file} --quiet")
     end
     step_dirs.each do |name, dir|
       next if name == :classify # Python step — no gem needed
-      FileUtils.cp(gem_file, File.join(dir, "turbofan-0.1.0.gem"))
+      FileUtils.cp(gem_file, File.join(dir, gem_name))
     end
     FileUtils.rm_f(gem_file)
 
