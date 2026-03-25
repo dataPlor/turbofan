@@ -23,18 +23,7 @@ module Turbofan
         prefix = "turbofan-#{pipeline_name}-#{@stage}"
         topic_arn = "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:#{prefix}-notifications"
 
-        # Detect forks (steps with >1 children) and compute join points
-        forks = {}     # fork_name => [branch_child_names]
-        join_info = {} # join_name => [branch_child_names]
-
-        sorted.each_with_index do |step, idx|
-          children = dag.children_of(step.name)
-          next unless children.size > 1
-
-          forks[step.name] = children
-          join_step = dag.find_join_point(children, sorted, idx)
-          join_info[join_step.name] = children if join_step
-        end
+        forks, join_info = detect_forks(dag, sorted)
 
         visited = Set.new
         states = {}
@@ -180,6 +169,22 @@ module Turbofan
           job_definition: "#{prefix}-jobdef-#{suffix}",
           job_queue: "#{prefix}-queue-#{suffix}"
         }
+      end
+
+      def detect_forks(dag, sorted)
+        forks = {}     # fork_name => [branch_child_names]
+        join_info = {} # join_name => [branch_child_names]
+
+        sorted.each_with_index do |step, idx|
+          children = dag.children_of(step.name)
+          next unless children.size > 1
+
+          forks[step.name] = children
+          join_step = dag.find_join_point(children, sorted, idx)
+          join_info[join_step.name] = children if join_step
+        end
+
+        [forks, join_info]
       end
 
       def find_prev(sorted, index, visited)
