@@ -112,7 +112,7 @@ module Turbofan
         else
           # Subsequent deploy: build/push images first, then update stack
           registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
+          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root)
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
         end
 

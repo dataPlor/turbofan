@@ -123,7 +123,7 @@ module Turbofan
 
       def self.write_entrypoint(step_dir, class_name)
         File.write(File.join(step_dir, "entrypoint.rb"), <<~RUBY)
-          require "turbofan/runtime/wrapper"
+          require "turbofan"
           require_relative "worker"
 
           Turbofan::Runtime::Wrapper.run(#{class_name})

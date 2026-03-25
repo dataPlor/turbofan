@@ -1,6 +1,7 @@
 require "digest"
 require "base64"
 require "open3"
+require "pathname"
 require "aws-sdk-ecr"
 require_relative "dependency_resolver"
 
