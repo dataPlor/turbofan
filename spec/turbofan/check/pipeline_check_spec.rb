@@ -655,6 +655,130 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
       end
     end
 
+    context "when compute_environment symbol does not resolve" do
+      let(:pipeline_class) do
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "my-pipeline"
+        end
+      end
+
+      let(:step_class) do
+        Class.new do
+          include Turbofan::Step
+
+          compute_environment :nonexistent_ce
+          cpu 1
+          ram 2
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        end
+      end
+
+      it "reports an error about unresolvable compute_environment" do
+        result = described_class.run(pipeline: pipeline_class, steps: {my_step: step_class})
+        expect(result.passed?).to be false
+        expect(result.errors.any? { |e| e.include?(":my_step") && e.match?(/could not resolve/i) }).to be true
+      end
+    end
+
+    context "when schema file contains invalid JSON" do
+      let(:schemas_dir) { Dir.mktmpdir("turbofan-bad-schema-test") }
+      let(:pipeline_class) do
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "my-pipeline"
+        end
+      end
+
+      let(:step_class) do
+        ce = ce_class
+        Class.new do
+          include Turbofan::Step
+
+          compute_environment :check_ce
+          cpu 1
+          ram 2
+          input_schema "broken.json"
+          output_schema "passthrough.json"
+        end
+      end
+
+      before do
+        Turbofan.schemas_path = schemas_dir
+        File.write(File.join(schemas_dir, "broken.json"), "{not valid json")
+        File.write(File.join(schemas_dir, "passthrough.json"), '{"type": "object"}')
+      end
+
+      after { FileUtils.rm_rf(schemas_dir) }
+
+      it "reports an error about invalid JSON" do
+        result = described_class.run(pipeline: pipeline_class, steps: {my_step: step_class})
+        expect(result.passed?).to be false
+        expect(result.errors.any? { |e| e.include?(":my_step") && e.include?("not valid JSON") }).to be true
+      end
+    end
+
+    context "with a valid 6-field cron schedule" do
+      let(:pipeline_class) do
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "my-pipeline"
+          schedule "0 12 * * ? *"
+        end
+      end
+
+      let(:step_class) do
+        ce = ce_class
+        Class.new do
+          include Turbofan::Step
+
+          compute_environment :check_ce
+          cpu 1
+          ram 2
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        end
+      end
+
+      it "passes validation" do
+        result = described_class.run(pipeline: pipeline_class, steps: {my_step: step_class})
+        expect(result.errors.select { |e| e.include?("cron") || e.include?("EventBridge") }).to be_empty
+      end
+    end
+
+    context "when pipeline name is whitespace-only" do
+      let(:pipeline_class) do
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "   "
+        end
+      end
+
+      let(:step_class) do
+        ce = ce_class
+        Class.new do
+          include Turbofan::Step
+
+          compute_environment :check_ce
+          cpu 1
+          ram 2
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        end
+      end
+
+      it "fails with a blank name error" do
+        result = described_class.run(pipeline: pipeline_class, steps: {my_step: step_class})
+        expect(result.passed?).to be false
+        expect(result.errors.any? { |e| e.match?(/name.*blank/i) }).to be true
+      end
+    end
+
     context "with an invalid cron field count" do
       let(:pipeline_class) do
         Class.new do
