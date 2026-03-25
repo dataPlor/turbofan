@@ -445,7 +445,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
           cloudwatch_client: cw, pipeline_name: "test", stage: "dev", step_name: "SlowStep"
         )
         allow(context).to receive_messages(metrics: metrics, s3: nil)
-        allow(wrapper).to receive_messages(setup_nvme: nil, build_context: context, deserialize_input: {})
+        allow(wrapper).to receive_messages(setup_nvme: nil, build_context: context)
+        allow(Turbofan::Runtime::InputResolver).to receive(:call).and_return({"inputs" => [{}]})
 
         write_pipe.puts("ready")
         write_pipe.close

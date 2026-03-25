@@ -24,8 +24,7 @@ module Turbofan
         Lineage.emit(Lineage.start_event(context: context, step_class: @step_class), context: context)
 
         start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        raw_input = deserialize_input(context)
-        envelope = normalize_envelope(raw_input)
+        envelope = InputResolver.call(context)
         metadata = envelope.except("inputs")
         context.instance_variable_set(:@envelope, metadata)
         inputs = envelope["inputs"]
@@ -57,22 +56,6 @@ module Turbofan
       end
 
       private
-
-      def s3_key(*parts)
-        FanOut.s3_key(*parts)
-      end
-
-      def normalize_envelope(raw)
-        if raw.is_a?(Array)
-          {"inputs" => raw}
-        elsif raw.is_a?(Hash) && raw.key?("inputs") && raw["inputs"].is_a?(Array)
-          raw
-        elsif raw.is_a?(Hash) && raw.key?("items") && raw["items"].is_a?(Array)
-          {"inputs" => raw["items"]}
-        else
-          {"inputs" => [raw]}
-        end
-      end
 
       def validate_input!(inputs)
         schema = @step_class.turbofan_input_schema
@@ -154,77 +137,12 @@ module Turbofan
         end
       end
 
-      def deserialize_input(context)
-        if context.array_index
-          bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
-          step_name = ENV.fetch("TURBOFAN_STEP_NAME")
-          FanOut.read_input(
-            array_index: context.array_index,
-            s3_client: context.s3,
-            bucket: bucket,
-            execution_id: context.execution_id,
-            step_name: step_name,
-            chunk: context.size
-          )
-        elsif ENV.key?("TURBOFAN_PREV_STEPS")
-          fetch_parallel_outputs(context)
-        elsif ENV.key?("TURBOFAN_PREV_STEP")
-          fetch_previous_step_output(context)
-        else
-          raw = ENV.fetch("TURBOFAN_INPUT", "{}")
-          parsed = JSON.parse(raw)
-          Payload.deserialize(parsed, s3_client: context.s3)
-        end
-      end
-
-      def fetch_previous_step_output(context)
-        prev_step = ENV["TURBOFAN_PREV_STEP"]
-        bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
-
-        if ENV.key?("TURBOFAN_PREV_FAN_OUT_SIZES")
-          size_names = ENV["TURBOFAN_PREV_FAN_OUT_SIZES"].split(",")
-          chunks = size_names.each_with_object({}) do |size, h|
-            h[size] = ENV["TURBOFAN_PREV_FAN_OUT_SIZE_#{size.upcase}"].to_i
-          end
-          FanOut.collect_outputs(
-            s3_client: context.s3,
-            bucket: bucket,
-            execution_id: context.execution_id,
-            step_name: prev_step,
-            chunks: chunks
-          )
-        elsif ENV.key?("TURBOFAN_PREV_FAN_OUT_SIZE")
-          count = ENV["TURBOFAN_PREV_FAN_OUT_SIZE"].to_i
-          FanOut.collect_outputs(
-            count: count,
-            s3_client: context.s3,
-            bucket: bucket,
-            execution_id: context.execution_id,
-            step_name: prev_step
-          )
-        else
-          key = s3_key(context.execution_id, prev_step, "output.json")
-          response = context.s3.get_object(bucket: bucket, key: key)
-          JSON.parse(response.body.read)
-        end
-      end
-
-      def fetch_parallel_outputs(context)
-        prev_steps = ENV["TURBOFAN_PREV_STEPS"].split(",")
-        bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
-        prev_steps.map do |prev_step|
-          key = s3_key(context.execution_id, prev_step, "output.json")
-          response = context.s3.get_object(bucket: bucket, key: key)
-          JSON.parse(response.body.read)
-        end
-      end
-
       def serialize_output(result, context)
         bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
         if context.array_index
           step_name = ENV.fetch("TURBOFAN_STEP_NAME")
           size_segment = context.size ? "#{context.size}/" : ""
-          key = s3_key(context.execution_id, step_name, "output", "#{size_segment}#{context.array_index}.json")
+          key = FanOut.s3_key(context.execution_id, step_name, "output", "#{size_segment}#{context.array_index}.json")
           context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
           JSON.generate(result)
         else
