@@ -122,9 +122,12 @@ module Turbofan
         @turbofan_security_groups || Turbofan.config.security_groups
       end
 
-      def stack_name(stage)
-        slug = name.split("::").last
+      def slug
+        name.split("::").last
           .gsub(/([a-z])([A-Z])/, '\1_\2').downcase.tr("_", "-")
+      end
+
+      def stack_name(stage)
         "turbofan-ce-#{slug}-#{stage}"
       end
 
@@ -135,9 +138,6 @@ module Turbofan
       def generate_template(stage:)
         account_id = Turbofan.config.aws_account_id
         raise "Turbofan.config.aws_account_id is required for CE template generation" unless account_id
-
-        slug = name.split("::").last
-          .gsub(/([a-z])([A-Z])/, '\1_\2').downcase.tr("_", "-")
 
         subnet_list = resolved_subnets
         sg_list = resolved_security_groups
