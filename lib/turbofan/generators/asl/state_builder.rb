@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Turbofan
   module Generators
     class ASL
@@ -155,11 +153,11 @@ module Turbofan
           state
         end
 
-        def build_branch_state(step, fork_step_name)
+        def build_branch_state(step, prev_step_name)
           step_name = step.name
 
           env = base_env + [
-            {"Name" => "TURBOFAN_PREV_STEP", "Value" => fork_step_name.to_s},
+            {"Name" => "TURBOFAN_PREV_STEP", "Value" => prev_step_name.to_s},
             {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s}
           ]
 
