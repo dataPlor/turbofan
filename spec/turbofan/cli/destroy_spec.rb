@@ -17,9 +17,15 @@ RSpec.describe Turbofan::CLI::Destroy do
   before do
     Turbofan::CLI::Prompt.input = input
     Turbofan::CLI::Prompt.output = output
+    allow(cf_client).to receive(:describe_stacks)
+      .and_return(double(stacks: [double(stack_status: "CREATE_COMPLETE")]))
     allow(cf_client).to receive(:describe_stack_resources)
       .and_return(double(stack_resources: stack_resources))
-    allow(cf_client).to receive(:delete_stack)
+    allow(cf_client).to receive(:delete_stack) do
+      # After deletion, describe_stacks should raise (stack gone)
+      allow(cf_client).to receive(:describe_stacks)
+        .and_raise(Aws::CloudFormation::Errors::ValidationError.new(nil, "does not exist"))
+    end
   end
 
   def make_tty
