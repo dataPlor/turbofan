@@ -185,12 +185,12 @@ module Turbofan
           state
         end
 
-        def build_branch_chain(chain, fork_step_name)
+        def build_branch_chain(chain, prev_step_name)
           states = {}
           chain.each_with_index do |step, idx|
             last_in_branch = (idx == chain.size - 1)
-            prev_step_name = (idx == 0) ? fork_step_name : chain[idx - 1].name
-            state = build_branch_state(step, prev_step_name)
+            step_prev = (idx == 0) ? prev_step_name : chain[idx - 1].name
+            state = build_branch_state(step, step_prev)
             if last_in_branch
               state["End"] = true
             else

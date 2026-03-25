@@ -265,6 +265,16 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expected = Digest::SHA256.hexdigest(Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER)[0, 12]
       expect(env_vars["TURBOFAN_CODE_HASH"]).to eq(expected)
     end
+
+    it "TURBOFAN_CODE_HASH changes when handler content changes" do
+      original = Digest::SHA256.hexdigest(
+        Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER
+      )[0, 12]
+      modified = Digest::SHA256.hexdigest(
+        Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER + "\n# changed"
+      )[0, 12]
+      expect(original).not_to eq(modified)
+    end
   end
 
   # "pipeline without group:" tests removed: fan_out now requires group: parameter
