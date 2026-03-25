@@ -61,11 +61,7 @@ module Turbofan
 
             # Determine Next for the Parallel state
             join_step = fork_join || sorted[(index + 1)..].find { |s| !visited.include?(s.name) }
-            parallel_next = if join_step
-              join_step.fan_out? ? "#{join_step.name}_chunk" : join_step.name.to_s
-            else
-              "NotifySuccess"
-            end
+            parallel_next = join_step ? state_name_for(join_step) : "NotifySuccess"
 
             states[parallel_key] = {
               "Type" => "Parallel",
@@ -82,13 +78,7 @@ module Turbofan
             next_step = remaining.first
             last = next_step.nil?
 
-            actual_next = if last
-              nil
-            elsif next_step.fan_out?
-              "#{next_step.name}_chunk"
-            else
-              next_step.name.to_s
-            end
+            actual_next = last ? nil : state_name_for(next_step)
 
             if step.fan_out?
               step_class = @steps[step.name]
@@ -131,7 +121,7 @@ module Turbofan
         states.merge!(notification_states(topic_arn, pipeline_name))
 
         start_step = sorted.first
-        start_at = start_step.fan_out? ? "#{start_step.name}_chunk" : start_step.name.to_s
+        start_at = state_name_for(start_step)
 
         {
           "Comment" => "Turbofan pipeline: #{pipeline_name}",
@@ -169,6 +159,10 @@ module Turbofan
           job_definition: "#{prefix}-jobdef-#{suffix}",
           job_queue: "#{prefix}-queue-#{suffix}"
         }
+      end
+
+      def state_name_for(step)
+        step.fan_out? ? "#{step.name}_chunk" : step.name.to_s
       end
 
       def detect_forks(dag, sorted)
