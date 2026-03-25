@@ -28,9 +28,9 @@ module Turbofan
         metadata = envelope.except("inputs")
         context.instance_variable_set(:@envelope, metadata)
         inputs = envelope["inputs"]
-        validate_input!(inputs)
+        SchemaValidator.validate_input!(@step_class, inputs)
         result = @step_class.new.call(inputs, context)
-        validate_output!(result)
+        SchemaValidator.validate_output!(@step_class, result)
         duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
 
         output = OutputSerializer.call(result, context)
@@ -56,38 +56,6 @@ module Turbofan
       end
 
       private
-
-      def validate_input!(inputs)
-        schema = @step_class.turbofan_input_schema
-        unless schema
-          raise Turbofan::SchemaValidationError,
-            "#{@step_class} has no input_schema declared"
-        end
-
-        schemer = JSONSchemer.schema(schema)
-        inputs.each do |item|
-          errors = schemer.validate(item).to_a
-          next if errors.empty?
-
-          raise Turbofan::SchemaValidationError,
-            "Input validation failed for #{@step_class}: #{errors.map { |e| e["error"] }.join(", ")}"
-        end
-      end
-
-      def validate_output!(output)
-        schema = @step_class.turbofan_output_schema
-        unless schema
-          raise Turbofan::SchemaValidationError,
-            "#{@step_class} has no output_schema declared"
-        end
-
-        schemer = JSONSchemer.schema(schema)
-        errors = schemer.validate(output).to_a
-        return if errors.empty?
-
-        raise Turbofan::SchemaValidationError,
-          "Output validation failed for #{@step_class}: #{errors.map { |e| e["error"] }.join(", ")}"
-      end
 
       def set_tmpdir(nvme_path)
         tmp_dir = File.join(nvme_path, "tmp")
