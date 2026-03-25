@@ -2,6 +2,7 @@ require "digest"
 require "base64"
 require "open3"
 require "aws-sdk-ecr"
+require_relative "dependency_resolver"
 
 module Turbofan
   module Deploy
@@ -34,8 +35,12 @@ module Turbofan
         false
       end
 
-      def self.build(step_dir, schemas_dir, tag:, repository_uri:)
-        cmd = ["docker", "build", "--build-context", "schemas=#{schemas_dir}"]
+      def self.build(step_dir, schemas_dir, tag:, repository_uri:, external_deps: [], project_root: Dir.pwd)
+        deps_dir = DependencyResolver.prepare_build_context(external_deps, project_root)
+
+        cmd = ["docker", "build",
+          "--build-context", "schemas=#{schemas_dir}",
+          "--build-context", "deps=#{deps_dir}"]
         proxy_ca = ENV.fetch("TURBOFAN_PROXY_CA", "/usr/local/share/ca-certificates/proxy-ca.crt")
         if File.exist?(proxy_ca)
           cmd.push("--build-context", "proxy-ca=#{File.dirname(proxy_ca)}")
@@ -45,6 +50,8 @@ module Turbofan
         end
         cmd.push("-t", "#{repository_uri}:#{tag}", step_dir)
         run_cmd(*cmd)
+      ensure
+        DependencyResolver.cleanup_build_context(deps_dir)
       end
 
       def self.push(tag:, repository_uri:)
