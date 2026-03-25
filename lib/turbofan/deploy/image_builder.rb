@@ -77,15 +77,15 @@ module Turbofan
         sha.empty? ? nil : "git-#{sha}"
       end
 
-      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil)
-        tag ||= content_tag(step_dir, schemas_dir)
+      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd)
+        tag ||= content_tag(step_dir, schemas_dir, external_deps: external_deps, project_root: project_root)
 
         if image_exists?(ecr_client, repository_name, tag)
           puts "Image #{repository_name}:#{tag} already exists, skipping build"
           return tag
         end
 
-        build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri)
+        build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri, external_deps: external_deps, project_root: project_root)
         push(tag: tag, repository_uri: repository_uri)
 
         git_tag = git_sha
