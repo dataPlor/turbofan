@@ -3,3 +3,4 @@ vendor/
 .bundle/
 .ruby-lsp/
 spec/turbofan/integration/config.yml
+PLAN-*
