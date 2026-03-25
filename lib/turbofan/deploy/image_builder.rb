@@ -116,6 +116,16 @@ module Turbofan
         results
       end
 
+      def self.empty_repository(ecr_client, repository_name)
+        loop do
+          response = ecr_client.list_images(repository_name: repository_name, max_results: 100)
+          break if response.image_ids.empty?
+          ecr_client.batch_delete_image(repository_name: repository_name, image_ids: response.image_ids)
+        end
+      rescue Aws::ECR::Errors::RepositoryNotFoundException
+        nil
+      end
+
       def self.garbage_collect(ecr_client, repository_name, keep:)
         images = []
         params = {repository_name: repository_name}

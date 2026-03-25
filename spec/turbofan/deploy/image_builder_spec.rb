@@ -332,6 +332,47 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     end
   end
 
+  describe ".empty_repository" do
+    let(:ecr_client) { instance_double(Aws::ECR::Client) }
+    let(:repository_name) { "my-repo" }
+
+    it "deletes all images in batches of 100" do
+      batch1 = Array.new(100) { |i| Aws::ECR::Types::ImageIdentifier.new(image_digest: "sha256:#{i}") }
+      batch2 = Array.new(20) { |i| Aws::ECR::Types::ImageIdentifier.new(image_digest: "sha256:#{100 + i}") }
+
+      call_count = 0
+      allow(ecr_client).to receive(:list_images) do
+        call_count += 1
+        case call_count
+        when 1 then Aws::ECR::Types::ListImagesResponse.new(image_ids: batch1)
+        when 2 then Aws::ECR::Types::ListImagesResponse.new(image_ids: batch2)
+        else Aws::ECR::Types::ListImagesResponse.new(image_ids: [])
+        end
+      end
+      allow(ecr_client).to receive(:batch_delete_image)
+
+      described_class.empty_repository(ecr_client, repository_name)
+
+      expect(ecr_client).to have_received(:batch_delete_image).twice
+    end
+
+    it "handles already-deleted repositories" do
+      allow(ecr_client).to receive(:list_images)
+        .and_raise(Aws::ECR::Errors::RepositoryNotFoundException.new(nil, "not found"))
+
+      expect { described_class.empty_repository(ecr_client, repository_name) }.not_to raise_error
+    end
+
+    it "does nothing for empty repositories" do
+      allow(ecr_client).to receive(:list_images)
+        .and_return(Aws::ECR::Types::ListImagesResponse.new(image_ids: []))
+
+      described_class.empty_repository(ecr_client, repository_name)
+
+      expect(ecr_client).not_to have_received(:batch_delete_image) if ecr_client.respond_to?(:batch_delete_image)
+    end
+  end
+
   describe ".garbage_collect" do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
     let(:repository_name) { "my-repo" }
