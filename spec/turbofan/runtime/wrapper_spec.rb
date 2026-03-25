@@ -754,22 +754,20 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
 
     it "falls back to ps when /proc/self/status doesn't exist" do
-      wrapper = described_class.new(step_class)
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/proc/self/status").and_return(false)
 
-      result = wrapper.send(:peak_memory_mb)
+      result = Turbofan::Runtime::StepMetrics.send(:peak_memory_mb)
       expect(result).to be_a(Float)
       expect(result).to be >= 0
     end
 
     it "returns 0.0 when all methods fail" do
-      wrapper = described_class.new(step_class)
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/proc/self/status").and_return(false)
-      allow(wrapper).to receive(:`).and_raise(StandardError, "ps failed")
+      allow(Turbofan::Runtime::StepMetrics).to receive(:`).and_raise(StandardError, "ps failed")
 
-      result = wrapper.send(:peak_memory_mb)
+      result = Turbofan::Runtime::StepMetrics.send(:peak_memory_mb)
       expect(result).to eq(0.0)
     end
   end
@@ -816,22 +814,17 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
 
   describe "CpuUtilization calculation" do
     it "calculates CPU utilization as (cpu_time / wall_time) * 100" do
-      wrapper = described_class.new(step_class)
-
-      # Access private method for unit testing
-      utilization = wrapper.send(:cpu_utilization, 10.0)
+      utilization = Turbofan::Runtime::StepMetrics.send(:cpu_utilization, 10.0)
       expect(utilization).to be_a(Float)
       expect(utilization).to be >= 0
     end
 
     it "returns 0 when wall time is zero" do
-      wrapper = described_class.new(step_class)
-      expect(wrapper.send(:cpu_utilization, 0.0)).to eq(0.0)
+      expect(Turbofan::Runtime::StepMetrics.send(:cpu_utilization, 0.0)).to eq(0.0)
     end
 
     it "returns 0 when wall time is negative" do
-      wrapper = described_class.new(step_class)
-      expect(wrapper.send(:cpu_utilization, -1.0)).to eq(0.0)
+      expect(Turbofan::Runtime::StepMetrics.send(:cpu_utilization, -1.0)).to eq(0.0)
     end
   end
 
@@ -945,16 +938,13 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
 
   describe "MemoryUtilization calculation" do
     it "calculates memory utilization as (peak_mb / allocated_mb) * 100" do
-      wrapper = described_class.new(step_class)
-
       # 512 MB peak / 4 GB (4096 MB) allocated = 12.5%
-      utilization = wrapper.send(:memory_utilization, 512.0, 4)
+      utilization = Turbofan::Runtime::StepMetrics.send(:memory_utilization, 512.0, 4)
       expect(utilization).to eq(12.5)
     end
 
     it "returns 0 when allocated RAM is zero" do
-      wrapper = described_class.new(step_class)
-      expect(wrapper.send(:memory_utilization, 512.0, 0)).to eq(0.0)
+      expect(Turbofan::Runtime::StepMetrics.send(:memory_utilization, 512.0, 0)).to eq(0.0)
     end
   end
 

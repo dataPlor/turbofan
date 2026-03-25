@@ -34,14 +34,14 @@ module Turbofan
         duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
 
         output = OutputSerializer.call(result, context)
-        emit_success_metrics(context, duration)
+        StepMetrics.emit_success(context, @step_class, duration)
         Lineage.emit(Lineage.complete_event(context: context, step_class: @step_class), context: context)
         $stdout.puts(output)
       rescue => e
         context&.logger&.error("Step failed", error_class: e.class.name, error_message: e.message)
         begin
           Lineage.emit(Lineage.fail_event(context: context, step_class: @step_class, error: e), context: context) if context
-          emit_failure_metrics(context) if context
+          StepMetrics.emit_failure(context) if context
         rescue => metrics_err
           warn("[Turbofan] WARNING: Failed to emit failure metrics: #{metrics_err.message}")
         end
@@ -103,53 +103,6 @@ module Turbofan
           cleanup_nvme(nvme_path)
           exit(143)
         end
-      end
-
-      def emit_success_metrics(context, duration)
-        context.metrics.emit("JobDuration", duration)
-        context.metrics.emit("JobSuccess", 1)
-        context.metrics.emit("PeakMemoryMB", peak_memory_mb)
-        context.metrics.emit("CpuUtilization", cpu_utilization(duration))
-        allocated_ram_gb = if context.size && @step_class.turbofan_sizes.any?
-          @step_class.turbofan_sizes.dig(context.size.to_sym, :ram)
-        else
-          @step_class.turbofan_default_ram
-        end
-        if allocated_ram_gb
-          context.metrics.emit("MemoryUtilization", memory_utilization(peak_memory_mb, allocated_ram_gb))
-        end
-      end
-
-      def emit_failure_metrics(context)
-        context.metrics.emit("JobFailure", 1)
-      end
-
-      def peak_memory_mb
-        if File.exist?("/proc/self/status")
-          status = File.read("/proc/self/status")
-          if (match = status.match(/VmHWM:\s+(\d+)\s+kB/))
-            return match[1].to_i / 1024.0
-          end
-        end
-        `ps -o rss= -p #{Process.pid}`.strip.to_i / 1024.0
-      rescue StandardError
-        0.0
-      end
-
-      def cpu_utilization(wall_time)
-        return 0.0 if wall_time <= 0
-
-        times = Process.times
-        cpu_time = times.utime + times.stime
-        (cpu_time / wall_time * 100).round(1)
-      rescue StandardError
-        0.0
-      end
-
-      def memory_utilization(peak_mb, allocated_ram_gb)
-        allocated_mb = allocated_ram_gb * 1024.0
-        return 0.0 if allocated_mb <= 0
-        (peak_mb / allocated_mb * 100).round(1)
       end
 
       def attach_resources(context)
