@@ -6,7 +6,7 @@ require "aws-sdk-ecr"
 module Turbofan
   module Deploy
     class ImageBuilder
-      def self.content_tag(step_dir, schemas_dir)
+      def self.content_tag(step_dir, schemas_dir, external_deps: [], project_root: Dir.pwd)
         digest = Digest::SHA256.new
         [step_dir, schemas_dir].each do |dir|
           Dir.glob("#{dir}/**/*").select { |f| File.file?(f) }.sort.each do |f|
@@ -14,6 +14,13 @@ module Turbofan
             digest.update(File.binread(f))
           end
         end
+
+        pr = Pathname.new(project_root)
+        external_deps.sort.each do |f|
+          digest.update(Pathname.new(f).relative_path_from(pr).to_s)
+          digest.update(File.binread(f))
+        end
+
         "sha-#{digest.hexdigest[0, 12]}"
       end
 
