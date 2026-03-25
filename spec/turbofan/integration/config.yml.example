@@ -1,0 +1,5 @@
+# Copy to config.yml and fill in your values.
+# config.yml is gitignored — never commit it.
+bucket: your-turbofan-bucket
+secret_arn: arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT:secret:your-secret-AbCdEf
+external_bucket: your-data-bucket

@@ -1,5 +1,7 @@
 require "json"
 
+INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config.json")))
+
 class Aggregate
   include Turbofan::Step
 
@@ -13,7 +15,7 @@ class Aggregate
     # Write summary to external S3
     summary = {"total_scored" => total, "wrote_to_external_s3" => true}
     context.s3.put_object(
-      bucket: "my-data-bucket",
+      bucket: INTEGRATION_CONFIG["external_bucket"],
       key: "turbofan-test/#{context.execution_id}/summary.json",
       body: JSON.generate(summary)
     )

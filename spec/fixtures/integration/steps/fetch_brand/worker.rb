@@ -1,8 +1,12 @@
+require "json"
+
+INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config.json")))
+
 class PlacesRead
   include Turbofan::Postgres
 
   key :places_read
-  secret "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf"
+  secret INTEGRATION_CONFIG["secret_arn"]
   database "places_read"
 end
 

@@ -1,5 +1,7 @@
 require "json"
 
+INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config.json")))
+
 class ControlledStep
   include Turbofan::Step
 
@@ -60,7 +62,7 @@ class ControlledStep
 
   def verify_secret_access(context)
     # inject_secret grants IAM access — verify by reading the secret
-    secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf"
+    secret_arn = INTEGRATION_CONFIG["secret_arn"]
     context.secrets_client.get_secret_value(secret_id: secret_arn)
     true
   rescue StandardError

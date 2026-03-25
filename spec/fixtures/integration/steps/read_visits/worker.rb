@@ -1,3 +1,7 @@
+require "json"
+
+INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config.json")))
+
 class ReadVisits
   include Turbofan::Step
 
@@ -8,7 +12,7 @@ class ReadVisits
     require "csv"
     require "zlib"
     obj = context.s3.get_object(
-      bucket: "my-data-bucket",
+      bucket: INTEGRATION_CONFIG["external_bucket"],
       key: "analytics_data/test/sample_data.csv.gz"
     )
     csv_data = Zlib::GzipReader.new(obj.body).read

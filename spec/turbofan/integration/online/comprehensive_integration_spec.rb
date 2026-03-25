@@ -3,6 +3,7 @@ require "aws-sdk-cloudformation"
 require "aws-sdk-states"
 require "aws-sdk-s3"
 require "aws-sdk-ecr"
+require "aws-sdk-cloudwatch"
 require "aws-sdk-cloudwatchlogs"
 require "fileutils"
 require "json"
@@ -27,7 +28,8 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
   let(:sfn_client) { Aws::States::Client.new }
   let(:s3_client) { Aws::S3::Client.new(http_continue_timeout: 0) }
   let(:ecr_client) { Aws::ECR::Client.new }
-  let(:cw_client) { Aws::CloudWatchLogs::Client.new(region: "us-east-1") }
+  let(:cw_client) { Aws::CloudWatchLogs::Client.new }
+  let(:cloudwatch_client) { Aws::CloudWatch::Client.new }
   let(:stack_name) { Turbofan::Naming.stack_name(pipeline_name, stage) }
 
   let(:gem_root) { File.expand_path("../../../..", __dir__) }
@@ -59,14 +61,16 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
   end
 
   before do
+    ENV["AWS_REGION"] ||= "us-east-1"
     # Re-stub Classify so pipeline DAG discovery finds the non-external version
     stub_const("Classify", deploy_classify_class)
   end
 
   after do
-    # Clean up built gem files from step directories
+    # Clean up built gem files and config from step directories
     step_dirs.each_value do |dir|
       FileUtils.rm_f(File.join(dir, "turbofan-0.1.0.gem"))
+      FileUtils.rm_f(File.join(dir, "integration_config.json"))
     end
 
     cfn_prefix = "turbofan-#{pipeline_name}-#{stage}"
@@ -85,7 +89,7 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
 
     # Clean up external S3 writes from all executions
     @execution_arns&.each do |arn| # rubocop:disable RSpec/InstanceVariable
-      system("aws", "s3", "rm", "s3://my-data-bucket/turbofan-test/#{arn}/", "--recursive", "--quiet", out: File::NULL, err: File::NULL)
+      system("aws", "s3", "rm", "s3://#{INTEGRATION_EXT_BUCKET}/turbofan-test/#{arn}/", "--recursive", "--quiet", out: File::NULL, err: File::NULL)
     end
 
     # Delete the pipeline stack
@@ -142,6 +146,15 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
     end
     FileUtils.rm_f(gem_file)
 
+    # Write integration config into each step dir for Docker builds
+    config_json = JSON.generate({
+      "secret_arn" => INTEGRATION_SECRET_ARN,
+      "external_bucket" => INTEGRATION_EXT_BUCKET
+    })
+    step_dirs.each_value do |dir|
+      File.write(File.join(dir, "integration_config.json"), config_json)
+    end
+
     # Generate CloudFormation template with dashboard enabled
     cfn_generator = Turbofan::Generators::CloudFormation.new(
       pipeline: pipeline_class,
@@ -189,6 +202,15 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
     resources = cf_client.describe_stack_resources(stack_name: stack_name).stack_resources
     dashboard_resource = resources.find { |r| r.resource_type == "AWS::CloudWatch::Dashboard" }
     expect(dashboard_resource).not_to be_nil, "Expected CloudWatch Dashboard resource in stack"
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Phase 2: CloudWatch Log Group naming and retention
+    #   - Each step should have a log group with correct name
+    #   - Retention should match Turbofan.config.log_retention_days
+    # ═══════════════════════════════════════════════════════════════════
+    step_dirs.each_key do |step_name|
+      verify_log_group(cfn_prefix, step_name)
+    end
 
     # ═══════════════════════════════════════════════════════════════════
     # Execution 1: Enhanced happy path
@@ -255,7 +277,7 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
     expect(aggregate_out["chunks_received"]).to eq(6)
 
     external_obj = s3_client.get_object(
-      bucket: "my-data-bucket",
+      bucket: INTEGRATION_EXT_BUCKET,
       key: "turbofan-test/#{exec1_arn}/summary.json"
     )
     external_data = JSON.parse(external_obj.body.read)
@@ -266,6 +288,21 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
 
     # ── Structured logging: verify build_items log entry ──
     verify_structured_log(cfn_prefix, "build_items", "parallel_join_complete")
+
+    # ── CLI Logs: verify turbofan logs with execution + step filter ──
+    logs_output = capture_logs_output(pipeline_name, stage,
+      step: "retry_demo", execution: exec1_arn)
+    expect(logs_output).not_to(be_empty,
+      "Expected turbofan logs --step retry_demo --execution to return output")
+
+    # ── CLI Logs: verify custom query filter ──
+    query_output = capture_logs_output(pipeline_name, stage,
+      step: "build_items", query: 'message like /parallel_join_complete/')
+    expect(query_output).not_to(be_empty,
+      "Expected turbofan logs --query to find parallel_join_complete log entry")
+
+    # ── Custom metrics: verify ItemsBuilt emitted to CloudWatch ──
+    verify_custom_metrics(pipeline_name, stage)
 
     # ═══════════════════════════════════════════════════════════════════
     # Execution 2: SFN retry with error types (B2)
@@ -495,5 +532,66 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
       $stdout = original_stdout
     end
     output.string
+  end
+
+  def capture_logs_output(pipeline_name, stage, step:, execution: nil, query: nil)
+    output = StringIO.new
+    original_stdout = $stdout
+    begin
+      $stdout = output
+      Turbofan::CLI::Logs.call(
+        pipeline_name: pipeline_name,
+        stage: stage,
+        step: step,
+        execution: execution,
+        query: query,
+        logs_client: cw_client
+      )
+    ensure
+      $stdout = original_stdout
+    end
+    output.string
+  end
+
+  def verify_log_group(cfn_prefix, step_name)
+    log_group_name = "#{cfn_prefix}-logs-#{step_name}"
+    log_groups = cw_client.describe_log_groups(
+      log_group_name_prefix: log_group_name
+    ).log_groups
+    log_group = log_groups.find { |lg| lg.log_group_name == log_group_name }
+
+    expect(log_group).not_to(be_nil, "Expected log group #{log_group_name} to exist")
+    expect(log_group.retention_in_days).to(eq(Turbofan.config.log_retention_days),
+      "Expected #{log_group_name} retention to be #{Turbofan.config.log_retention_days} days")
+  end
+
+  def verify_custom_metrics(pipeline_name, stage)
+    # CloudWatch metrics may take 1-2 minutes to become queryable;
+    # by execution 1 completion, build_items metrics should be available,
+    # but retry briefly in case of propagation delay.
+    metric_stats = nil
+    6.times do |attempt|
+      metric_stats = cloudwatch_client.get_metric_statistics(
+        namespace: "Turbofan/#{pipeline_name}",
+        metric_name: "ItemsBuilt",
+        dimensions: [
+          {name: "Pipeline", value: pipeline_name},
+          {name: "Stage", value: stage},
+          {name: "Step", value: "build_items"}
+        ],
+        start_time: Time.now - 3600,
+        end_time: Time.now,
+        period: 3600,
+        statistics: ["Sum"]
+      )
+      break if metric_stats.datapoints.any?
+      sleep(10) if attempt < 5
+    end
+
+    expect(metric_stats.datapoints).not_to(be_empty,
+      "Expected CloudWatch to have ItemsBuilt metric in Turbofan/#{pipeline_name} namespace")
+    total = metric_stats.datapoints.sum(&:sum)
+    expect(total).to(be >= 9.0,
+      "Expected ItemsBuilt Sum >= 9 (got #{total})")
   end
 end

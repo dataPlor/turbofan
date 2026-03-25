@@ -1,3 +1,14 @@
+require "yaml"
+
+INTEGRATION_CONFIG = begin
+  path = File.join(__dir__, "..", "config.yml")
+  File.exist?(path) ? YAML.safe_load_file(path) : {}
+end
+
+INTEGRATION_BUCKET       = INTEGRATION_CONFIG.fetch("bucket", "my-turbofan-bucket")
+INTEGRATION_SECRET_ARN   = INTEGRATION_CONFIG.fetch("secret_arn", "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf")
+INTEGRATION_EXT_BUCKET   = INTEGRATION_CONFIG.fetch("external_bucket", "my-data-bucket")
+
 RSpec.shared_context "when using integration pipeline setup" do
   # ── Compute environments ────────────────────────────────────────────
   let(:ce_class) do
@@ -15,7 +26,7 @@ RSpec.shared_context "when using integration pipeline setup" do
 
       key :places_read
       consumable 100
-      secret "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf"
+      secret INTEGRATION_SECRET_ARN
       database "places_read"
     end
   end
@@ -76,7 +87,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       ram 2
       timeout 60
       retries 2, on: ["States.TaskFailed"]
-      inject_secret :pg_url, from: "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf"
+      inject_secret :pg_url, from: INTEGRATION_SECRET_ARN
       input_schema "passthrough.json"
       output_schema "passthrough.json"
 
@@ -103,7 +114,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       private
 
       def verify_secret_access(context)
-        secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:myapp/DATABASE_URL-AbCdEf"
+        secret_arn = INTEGRATION_SECRET_ARN
         context.secrets_client.get_secret_value(secret_id: secret_arn)
         true
       rescue StandardError
@@ -164,7 +175,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       compute_environment :test_ce
       cpu 1
       ram 2
-      uses "s3://my-data-bucket/analytics_data/test/"
+      uses "s3://#{INTEGRATION_EXT_BUCKET}/analytics_data/test/"
       input_schema "passthrough.json"
       output_schema "passthrough.json"
 
@@ -172,7 +183,7 @@ RSpec.shared_context "when using integration pipeline setup" do
         require "csv"
         require "zlib"
         obj = context.s3.get_object(
-          bucket: "my-data-bucket",
+          bucket: INTEGRATION_EXT_BUCKET,
           key: "analytics_data/test/sample_data.csv.gz"
         )
         csv_data = Zlib::GzipReader.new(obj.body).read
@@ -273,7 +284,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       compute_environment :test_ce
       cpu 1
       ram 2
-      writes_to "s3://my-data-bucket/turbofan-test/"
+      writes_to "s3://#{INTEGRATION_EXT_BUCKET}/turbofan-test/"
       input_schema "passthrough.json"
       output_schema "passthrough.json"
 
@@ -284,7 +295,7 @@ RSpec.shared_context "when using integration pipeline setup" do
         # Write summary to external S3
         summary = {"total_scored" => total, "wrote_to_external_s3" => true}
         context.s3.put_object(
-          bucket: "my-data-bucket",
+          bucket: INTEGRATION_EXT_BUCKET,
           key: "turbofan-test/#{context.execution_id}/summary.json",
           body: JSON.generate(summary)
         )
@@ -348,7 +359,7 @@ RSpec.shared_context "when using integration pipeline setup" do
     stub_const("ScoreItems", score_items_class)
     stub_const("Aggregate", aggregate_class)
     stub_const("IntegrationTest", pipeline_class)
-    Turbofan.config.bucket = "my-turbofan-bucket"
+    Turbofan.config.bucket = INTEGRATION_BUCKET
     Turbofan.schemas_path = FIXTURE_SCHEMAS_DIR
   end
 

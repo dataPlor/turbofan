@@ -252,9 +252,9 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       read_only_statement = s3_statements.find { |s|
         s["Action"].include?("s3:GetObject") &&
           !s["Action"].include?("s3:PutObject") &&
-          s["Resource"].any? { |r| r.is_a?(String) && r.include?("my-data-bucket") }
+          s["Resource"].any? { |r| r.is_a?(String) && r.include?(INTEGRATION_EXT_BUCKET) }
       }
-      expect(read_only_statement).not_to be_nil, "Expected read-only S3 policy for my-data-bucket"
+      expect(read_only_statement).not_to be_nil, "Expected read-only S3 policy for #{INTEGRATION_EXT_BUCKET}"
     end
 
     it "includes S3 write policy for aggregate writes_to dependency" do
@@ -264,7 +264,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
       write_statement = s3_statements.find { |s|
         s["Action"].include?("s3:PutObject") &&
-          s["Resource"].any? { |r| r.is_a?(String) && r.include?("my-data-bucket/turbofan-test") }
+          s["Resource"].any? { |r| r.is_a?(String) && r.include?("#{INTEGRATION_EXT_BUCKET}/turbofan-test") }
       }
       expect(write_statement).not_to be_nil, "Expected write S3 policy for turbofan-test"
     end
@@ -275,7 +275,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(secrets_policy).not_to be_nil, "Expected SecretsAccess policy for places_read"
 
       secret_arns = secrets_policy.dig("PolicyDocument", "Statement", 0, "Resource")
-      expect(secret_arns.any? { |a| a.include?("DATABASE_URL") }).to be true
+      expect(secret_arns.any? { |a| a.include?(INTEGRATION_SECRET_ARN) }).to be true
     end
 
     it "includes a chunking lambda (fan-out with group)" do
@@ -358,7 +358,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
     it "read_visits has S3 dependency" do
       expect(read_visits_class.uses_s3.size).to eq(1)
-      expect(read_visits_class.uses_s3.first[:uri]).to start_with("s3://my-data-bucket")
+      expect(read_visits_class.uses_s3.first[:uri]).to start_with("s3://#{INTEGRATION_EXT_BUCKET}")
     end
 
     it "classify is an external step" do

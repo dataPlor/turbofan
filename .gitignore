@@ -2,3 +2,4 @@ vendor/
 *.gem
 .bundle/
 .ruby-lsp/
+spec/turbofan/integration/config.yml
