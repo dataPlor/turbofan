@@ -7,7 +7,7 @@ module Turbofan
             "Type" => "AWS::Logs::LogGroup",
             "Properties" => {
               "LogGroupName" => "#{prefix}-logs-#{step_name}",
-              "RetentionInDays" => 7,
+              "RetentionInDays" => Turbofan.config.log_retention_days,
               "Tags" => tags
             }
           }
