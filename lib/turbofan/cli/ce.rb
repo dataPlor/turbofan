@@ -22,6 +22,7 @@ module Turbofan
 
       def self.deploy(stage:)
         require "aws-sdk-cloudformation"
+        require "aws-sdk-batch"
         load_all_definitions
         cf_client = Aws::CloudFormation::Client.new
         Turbofan::ComputeEnvironment.discover.each do |ce_class|
@@ -33,8 +34,29 @@ module Turbofan
             template_body: template_body,
             parameters: []
           )
+
+          if ce_class.turbofan_container_insights
+            enable_container_insights(cf_client, stack_name)
+          end
         end
       end
+
+      def self.enable_container_insights(cf_client, stack_name)
+        require "aws-sdk-ecs"
+        ce_arn = Turbofan::Deploy::StackManager.stack_output(cf_client, stack_name, "ComputeEnvironmentArn")
+        batch_client = Aws::Batch::Client.new
+        ce_desc = batch_client.describe_compute_environments(compute_environments: [ce_arn])
+        ecs_cluster_arn = ce_desc.compute_environments.first.ecs_cluster_arn
+
+        ecs_client = Aws::ECS::Client.new
+        ecs_client.update_cluster_settings(
+          cluster: ecs_cluster_arn,
+          settings: [{name: "containerInsights", value: "enabled"}]
+        )
+        puts "  Container insights enabled on #{ecs_cluster_arn}"
+      end
+
+      private_class_method :enable_container_insights
 
       def self.list
         load_all_definitions
@@ -44,6 +66,9 @@ module Turbofan
       end
 
       def self.load_all_definitions
+        config_file = File.join("turbofans", "config", "turbofan.rb")
+        Kernel.load(File.expand_path(config_file)) if File.exist?(config_file)
+
         Dir.glob(File.join("turbofans", "compute_environments", "*.rb")).each do |path|
           Kernel.load(File.expand_path(path))
         end

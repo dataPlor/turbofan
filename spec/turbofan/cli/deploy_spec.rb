@@ -155,7 +155,8 @@ RSpec.describe Turbofan::CLI::Deploy do
           double(resource_change: double(
             action: "Modify",
             resource_type: "AWS::Batch::JobDefinition",
-            logical_resource_id: "ProcessJobDef"
+            logical_resource_id: "ProcessJobDef",
+            replacement: "False"
           ))
         ]
       )
@@ -220,7 +221,8 @@ RSpec.describe Turbofan::CLI::Deploy do
           double(resource_change: double(
             action: "Add",
             resource_type: "AWS::StepFunctions::StateMachine",
-            logical_resource_id: "StateMachine"
+            logical_resource_id: "StateMachine",
+            replacement: nil
           ))
         ]
       )

@@ -42,4 +42,13 @@ RSpec.configure do |config|
   ensure
     $stdout = original
   end
+
+  def capture_stderr
+    original = $stderr
+    $stderr = StringIO.new
+    yield
+    $stderr.string
+  ensure
+    $stderr = original
+  end
 end

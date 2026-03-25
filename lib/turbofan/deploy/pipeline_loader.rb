@@ -14,7 +14,7 @@ module Turbofan
         before = Set.new
         ObjectSpace.each_object(Class) do |c|
           class_name = Turbofan::GET_CLASS_NAME.bind_call(c)
-          before << c if class_name && c < Pipeline
+          before << c if class_name && begin; c < Pipeline; rescue NoMethodError; false; end
         end
 
         Kernel.load(File.expand_path(pipeline_file))

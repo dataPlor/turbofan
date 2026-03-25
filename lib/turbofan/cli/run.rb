@@ -29,7 +29,10 @@ module Turbofan
           input: exec_input
         )
 
+        region = sfn.config.region
+        console_url = "https://#{region}.console.aws.amazon.com/states/home?region=#{region}#/executions/details/#{execution_arn}"
         puts "Execution started: #{execution_arn}"
+        puts "Console: #{console_url}"
       end
     end
   end

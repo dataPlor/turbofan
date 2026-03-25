@@ -27,6 +27,10 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
     it "has nil subnets by default (falls back to config)" do
       expect(ce_class.turbofan_subnets).to be_nil
     end
+
+    it "has container_insights enabled by default" do
+      expect(ce_class.turbofan_container_insights).to be true
+    end
   end
 
   describe "DSL setters" do
@@ -67,6 +71,21 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
 
     it "sets security_groups" do
       expect(ce_class.turbofan_security_groups).to eq(%w[sg-xxx])
+    end
+  end
+
+  describe "container_insights opt-out" do
+    let(:ce_class) do
+      klass = Class.new do
+        include Turbofan::ComputeEnvironment
+        container_insights false
+      end
+      stub_const("ComputeEnvironments::NoInsights", klass)
+      klass
+    end
+
+    it "can be disabled" do
+      expect(ce_class.turbofan_container_insights).to be false
     end
   end
 
@@ -114,6 +133,13 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
       parsed = YAML.safe_load(template)
       expect(parsed).to be_a(Hash)
       expect(parsed["AWSTemplateFormatVersion"]).to eq("2010-09-09")
+    end
+
+    it "includes ComputeEnvironmentName with turbofan convention" do
+      template = ce_class.generate_template(stage: "production")
+      parsed = YAML.safe_load(template)
+      name = parsed.dig("Resources", "ComputeEnvironment", "Properties", "ComputeEnvironmentName")
+      expect(name).to eq("turbofan-ce-house-stark-production")
     end
 
     it "includes instance types" do

@@ -71,6 +71,7 @@ RSpec.describe "turbofan ce" do # rubocop:disable RSpec/DescribeClass
         max_vcpus 512
         subnets %w[subnet-aaa]
         security_groups %w[sg-xxx]
+        container_insights false
       end
       stub_const("ComputeEnvironments::HouseStark", ce_class)
 
@@ -90,12 +91,48 @@ RSpec.describe "turbofan ce" do # rubocop:disable RSpec/DescribeClass
       )
     end
 
+    it "enables container insights when container_insights is true" do
+      require "aws-sdk-ecs"
+
+      ce_class = Class.new do
+        include Turbofan::ComputeEnvironment
+        instance_types %w[c7gd.large]
+        subnets %w[subnet-aaa]
+        security_groups %w[sg-xxx]
+      end
+      stub_const("ComputeEnvironments::InsightsTest", ce_class)
+
+      allow(Turbofan::ComputeEnvironment).to receive(:discover).and_return([ce_class])
+      allow(Turbofan::Deploy::StackManager).to receive(:deploy)
+      allow(Turbofan::Deploy::StackManager).to receive(:stack_output).and_return("arn:aws:batch:us-east-1:123:compute-environment/test")
+
+      batch_client = instance_double(Aws::Batch::Client)
+      allow(Aws::Batch::Client).to receive(:new).and_return(batch_client)
+      allow(batch_client).to receive(:describe_compute_environments).and_return(
+        double(compute_environments: [double(ecs_cluster_arn: "arn:aws:ecs:us-east-1:123:cluster/test")])
+      )
+
+      ecs_client = instance_double(Aws::ECS::Client)
+      allow(Aws::ECS::Client).to receive(:new).and_return(ecs_client)
+      allow(ecs_client).to receive(:update_cluster_settings)
+
+      Dir.chdir(tmpdir) do
+        Turbofan::CLI.start(["ce", "deploy", "production"])
+      end
+
+      expect(ecs_client).to have_received(:update_cluster_settings).with(
+        cluster: "arn:aws:ecs:us-east-1:123:cluster/test",
+        settings: [{name: "containerInsights", value: "enabled"}]
+      )
+    end
+
     it "passes generated template body to StackManager" do
       ce_class = Class.new do
         include Turbofan::ComputeEnvironment
         instance_types %w[c7gd.large]
         subnets %w[subnet-aaa]
         security_groups %w[sg-xxx]
+        container_insights false
       end
       stub_const("ComputeEnvironments::DeployTest", ce_class)
 

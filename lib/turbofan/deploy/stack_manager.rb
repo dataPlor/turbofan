@@ -167,9 +167,19 @@ module Turbofan
 
       def self.describe_changes(cf_client, stack_name:, changeset_name:)
         response = cf_client.describe_change_set(stack_name: stack_name, change_set_name: changeset_name)
+        has_replacement = false
         response.changes.each do |change|
           rc = change.resource_change
-          puts "  #{rc.action}  #{rc.resource_type}  #{rc.logical_resource_id}"
+          replacement = rc.replacement
+          line = "  #{rc.action}  #{rc.resource_type}  #{rc.logical_resource_id}"
+          line += "  [REPLACEMENT: #{replacement}]" if replacement && replacement != "False"
+          puts line
+          has_replacement = true if replacement == "True" || replacement == "Conditional"
+        end
+
+        if has_replacement
+          warn "  WARNING: This changeset replaces resources. Dependent stacks using ImportValue may break."
+          warn "  Review the changes above before proceeding."
         end
       end
 

@@ -69,10 +69,14 @@ module Turbofan
         nil
       end
       next unless live_const == c
-      if c < Step
-        steps[snake_case(class_name)] = c
-      elsif c < Pipeline
-        pipelines[snake_case(class_name)] = c
+      begin
+        if c < Step
+          steps[snake_case(class_name)] = c
+        elsif c < Pipeline
+          pipelines[snake_case(class_name)] = c
+        end
+      rescue NoMethodError
+        next
       end
       if c.ancestors.include?(Resource) && c.respond_to?(:turbofan_key) && c.turbofan_key
         resources[c.turbofan_key] = c

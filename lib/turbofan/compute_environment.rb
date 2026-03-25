@@ -78,11 +78,13 @@ module Turbofan
       base.instance_variable_set(:@turbofan_allocation_strategy, "SPOT_PRICE_CAPACITY_OPTIMIZED")
       base.instance_variable_set(:@turbofan_subnets, nil)
       base.instance_variable_set(:@turbofan_security_groups, nil)
+      base.instance_variable_set(:@turbofan_container_insights, true)
     end
 
     module ClassMethods
       attr_reader :turbofan_instance_types, :turbofan_max_vcpus, :turbofan_min_vcpus,
-        :turbofan_allocation_strategy, :turbofan_subnets, :turbofan_security_groups
+        :turbofan_allocation_strategy, :turbofan_subnets, :turbofan_security_groups,
+        :turbofan_container_insights
 
       def instance_types(types)
         @turbofan_instance_types = Array(types)
@@ -106,6 +108,10 @@ module Turbofan
 
       def security_groups(value)
         @turbofan_security_groups = Array(value)
+      end
+
+      def container_insights(value)
+        @turbofan_container_insights = value
       end
 
       def resolved_subnets
@@ -161,6 +167,7 @@ module Turbofan
             ComputeEnvironment:
               Type: AWS::Batch::ComputeEnvironment
               Properties:
+                ComputeEnvironmentName: turbofan-ce-#{slug}-#{stage}
                 Type: MANAGED
                 State: ENABLED
                 ComputeResources:

@@ -186,6 +186,18 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     end
   end
 
+  describe ".git_sha" do
+    it "returns a tag prefixed with 'git-'" do
+      allow(described_class).to receive(:`).and_return("abc1234\n")
+      expect(described_class.git_sha).to eq("git-abc1234")
+    end
+
+    it "returns nil outside a git repo" do
+      allow(described_class).to receive(:`).and_return("")
+      expect(described_class.git_sha).to be_nil
+    end
+  end
+
   describe ".build_and_push" do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
     let(:step_dir) { File.join(tmpdir, "step") }
@@ -234,6 +246,25 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
 
         # Should have called system at least twice (build + push)
         expect(described_class).to have_received(:system).at_least(:twice)
+      end
+
+      it "also tags and pushes with git commit SHA" do
+        allow(described_class).to receive(:git_sha).and_return("git-abc1234")
+
+        described_class.build_and_push(
+          step_dir: step_dir,
+          schemas_dir: schemas_dir,
+          ecr_client: ecr_client,
+          repository_name: "my-repo",
+          repository_uri: repository_uri
+        )
+
+        expect(described_class).to have_received(:system).with(
+          "docker", "tag", /#{Regexp.escape(repository_uri)}:sha-/, "#{repository_uri}:git-abc1234"
+        )
+        expect(described_class).to have_received(:system).with(
+          "docker", "push", "#{repository_uri}:git-abc1234"
+        )
       end
     end
   end

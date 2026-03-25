@@ -58,6 +58,11 @@ module Turbofan
         registry.sub(%r{\Ahttps?://}, "")
       end
 
+      def self.git_sha
+        sha = `git rev-parse --short HEAD 2>/dev/null`.strip
+        sha.empty? ? nil : "git-#{sha}"
+      end
+
       def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil)
         tag ||= content_tag(step_dir, schemas_dir)
 
@@ -68,6 +73,13 @@ module Turbofan
 
         build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri)
         push(tag: tag, repository_uri: repository_uri)
+
+        git_tag = git_sha
+        if git_tag
+          run_cmd("docker", "tag", "#{repository_uri}:#{tag}", "#{repository_uri}:#{git_tag}")
+          push(tag: git_tag, repository_uri: repository_uri)
+        end
+
         tag
       end
 

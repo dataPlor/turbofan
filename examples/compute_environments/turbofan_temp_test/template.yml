@@ -1,46 +1,118 @@
+# This is an example of what generate_template(stage: "staging") produces
+# for the TurbofanTempTest definition with default settings.
+#
+# Config assumptions:
+#   Turbofan.config.aws_account_id = "123456789012"
+#   Turbofan.config.subnets = ["subnet-0123456789abcdef0"]
+#   Turbofan.config.security_groups = ["sg-0abcdef1234567890"]
+
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Turbofan Compute Environment: TurbofanTempTest (hello_polyglot integration test)'
-
-Parameters:
-  Stage:
-    Type: String
-
-Mappings:
-  NetworkConfig:
-    production:
-      Subnets: subnet-0123456789abcdef0
-      SecurityGroups: sg-0abcdef1234567890
-    staging:
-      Subnets: subnet-0123456789abcdef0
-      SecurityGroups: sg-0abcdef1234567890
+Description: 'Turbofan Compute Environment: TurbofanTempTest'
 
 Resources:
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: turbofan-ce-turbofan-temp-test-launchtemplate
+      LaunchTemplateData:
+        UserData:
+          Fn::Base64: |
+            Content-Type: multipart/mixed; boundary="MIMEBOUNDARY"
+            MIME-Version: 1.0
+
+            --MIMEBOUNDARY
+            Content-Type: text/x-shellscript; charset="us-ascii"
+
+            #!/bin/bash
+            exec > >(tee /var/log/nvme-setup.log) 2>&1
+            echo "=== NVMe Setup Script Starting ==="
+            echo "Date: $(date)"
+            echo "Instance type: $(curl -s http://169.254.169.254/latest/meta-data/instance-type)"
+
+            set -x
+
+            # Install required tools
+            yum install -y nvme-cli mdadm xfsprogs 2>/dev/null || dnf install -y nvme-cli mdadm xfsprogs 2>/dev/null || true
+
+            echo "=== All NVMe devices ==="
+            nvme list || echo "nvme list failed"
+            lsblk || echo "lsblk failed"
+
+            # Identify instance-store NVMe devices (exclude EBS)
+            mapfile -t DEVICES < <(nvme list 2>/dev/null | awk '/Amazon EC2 NVMe Instance Storage/ {print $1}')
+
+            echo "=== Found ${#DEVICES[@]} instance-store NVMe devices ==="
+
+            if [ "${#DEVICES[@]}" -eq 0 ]; then
+              echo "WARNING: No instance-store NVMe devices found"
+              echo "Creating /mnt/nvme as regular directory on root filesystem"
+              mkdir -p /mnt/nvme
+              chmod 1777 /mnt/nvme
+              echo "=== NVMe Setup Completed (fallback mode) ==="
+              exit 0
+            fi
+
+            # Wipe existing signatures
+            for d in "${DEVICES[@]}"; do
+              echo "Wiping $d"
+              wipefs -fa "$d" || true
+            done
+
+            # Create RAID0 if multiple devices, otherwise use single device
+            if [ "${#DEVICES[@]}" -gt 1 ]; then
+              echo "Creating RAID0 with ${#DEVICES[@]} devices"
+              mdadm --create /dev/md0 --level=0 --raid-devices="${#DEVICES[@]}" "${DEVICES[@]}"
+              TARGET=/dev/md0
+            else
+              TARGET="${DEVICES[0]}"
+            fi
+
+            echo "Formatting $TARGET with XFS"
+            mkfs.xfs -f "$TARGET"
+
+            echo "Mounting to /mnt/nvme"
+            mkdir -p /mnt/nvme
+            echo "$TARGET /mnt/nvme xfs defaults,noatime,nofail 0 2" >> /etc/fstab
+            mount -a
+            chmod 1777 /mnt/nvme
+
+            echo "=== NVMe Setup Completed Successfully ==="
+            df -h /mnt/nvme
+
+            --MIMEBOUNDARY--
+
   ComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
+      ComputeEnvironmentName: turbofan-ce-turbofan-temp-test-staging
       Type: MANAGED
       State: ENABLED
       ComputeResources:
         Type: SPOT
         AllocationStrategy: SPOT_PRICE_CAPACITY_OPTIMIZED
         MinvCpus: 0
-        MaxvCpus: 12
-        InstanceTypes:
-          - c7g
+        MaxvCpus: 256
         InstanceRole: arn:aws:iam::123456789012:instance-profile/ecsInstanceRole
         SpotIamFleetRole: arn:aws:iam::123456789012:role/AmazonEC2SpotFleetTaggingRole
-        Subnets: !Split
-          - ','
-          - !FindInMap [NetworkConfig, !Ref Stage, Subnets]
-        SecurityGroupIds: !Split
-          - ','
-          - !FindInMap [NetworkConfig, !Ref Stage, SecurityGroups]
+        InstanceTypes:
+          - optimal
+        Subnets:
+          - subnet-0123456789abcdef0
+        SecurityGroupIds:
+          - sg-0abcdef1234567890
+        Ec2Configuration:
+          - ImageType: ECS_AL2023
+        LaunchTemplate:
+          LaunchTemplateId:
+            Ref: LaunchTemplate
+          Version: "$Latest"
       Tags:
         turbofan:managed: 'true'
         turbofan:compute-environment: turbofan-temp-test
 
 Outputs:
   ComputeEnvironmentArn:
-    Value: !Ref ComputeEnvironment
+    Value:
+      Ref: ComputeEnvironment
     Export:
-      Name: !Sub "turbofan-ce-turbofan-temp-test-${Stage}-arn"
+      Name: turbofan-ce-turbofan-temp-test-staging-arn

@@ -71,7 +71,7 @@ module Turbofan
         end
         ObjectSpace.each_object(Class).each do |c|
           class_name = Turbofan::GET_CLASS_NAME.bind_call(c)
-          next unless class_name && c < Turbofan::Router
+          next unless class_name && begin; c < Turbofan::Router; rescue NoMethodError; false; end
           live = begin; Object.const_get(class_name); rescue NameError; nil; end
           next unless live == c
           key = Turbofan.snake_case(class_name).to_s.delete_suffix("_router").to_sym

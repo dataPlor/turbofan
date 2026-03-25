@@ -24,6 +24,7 @@ RSpec.describe Turbofan::CLI::Run do
     )
 
     allow(Turbofan::Deploy::Execution).to receive(:start).and_return(execution_arn)
+    allow(sfn_client).to receive(:config).and_return(double(region: "us-east-1"))
   end
 
   describe ".call" do
@@ -90,6 +91,12 @@ RSpec.describe Turbofan::CLI::Run do
       expect {
         described_class.call(pipeline_name: pipeline_name, stage: stage)
       }.to output(/#{Regexp.escape(execution_arn)}/).to_stdout
+    end
+
+    it "prints the Step Functions console URL" do
+      expect {
+        described_class.call(pipeline_name: pipeline_name, stage: stage)
+      }.to output(%r{Console: https://us-east-1\.console\.aws\.amazon\.com/states/home\?region=us-east-1#/executions/details/#{Regexp.escape(execution_arn)}}).to_stdout
     end
 
     # -------------------------------------------------------------------------

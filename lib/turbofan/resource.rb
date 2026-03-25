@@ -29,7 +29,7 @@ module Turbofan
 
     def self.discover
       ObjectSpace.each_object(Class).select { |c|
-        next false unless c < self
+        next false unless begin; c < self; rescue NoMethodError; false; end
         class_name = Turbofan::GET_CLASS_NAME.bind_call(c)
         next false unless class_name
         live = begin

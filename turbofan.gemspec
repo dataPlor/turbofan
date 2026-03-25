@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "aws-sdk-ecr", "~> 1"
   spec.add_dependency "aws-sdk-states", "~> 1"
   spec.add_dependency "aws-sdk-sts", "~> 1"
+  spec.add_dependency "aws-sdk-ecs", "~> 1"
   spec.add_dependency "aws-sdk-cloudwatch", "~> 1"
   spec.add_dependency "aws-sdk-cloudwatchlogs", "~> 1"
   spec.add_dependency "aws-sdk-secretsmanager", "~> 1"

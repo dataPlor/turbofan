@@ -256,6 +256,85 @@ RSpec.describe Turbofan::Deploy::StackManager do
     end
   end
 
+  describe ".describe_changes (private, tested via send)" do
+    it "shows replacement status when a resource will be replaced" do
+      changes = [
+        double(resource_change: double(
+          action: "Modify", resource_type: "AWS::Batch::ComputeEnvironment",
+          logical_resource_id: "ComputeEnvironment", replacement: "True"
+        ))
+      ]
+      allow(cf_client).to receive(:describe_change_set).and_return(
+        double(changes: changes)
+      )
+
+      output = capture_stdout do
+        described_class.send(:describe_changes, cf_client, stack_name: stack_name, changeset_name: "cs-1")
+      end
+
+      expect(output).to include("[REPLACEMENT: True]")
+    end
+
+    it "warns about dependent stacks when replacement is detected" do
+      changes = [
+        double(resource_change: double(
+          action: "Modify", resource_type: "AWS::Batch::ComputeEnvironment",
+          logical_resource_id: "ComputeEnvironment", replacement: "True"
+        ))
+      ]
+      allow(cf_client).to receive(:describe_change_set).and_return(
+        double(changes: changes)
+      )
+
+      stderr = capture_stderr do
+        capture_stdout do
+          described_class.send(:describe_changes, cf_client, stack_name: stack_name, changeset_name: "cs-1")
+        end
+      end
+
+      expect(stderr).to include("WARNING")
+      expect(stderr).to include("ImportValue")
+    end
+
+    it "warns when replacement is Conditional" do
+      changes = [
+        double(resource_change: double(
+          action: "Modify", resource_type: "AWS::Batch::ComputeEnvironment",
+          logical_resource_id: "ComputeEnvironment", replacement: "Conditional"
+        ))
+      ]
+      allow(cf_client).to receive(:describe_change_set).and_return(
+        double(changes: changes)
+      )
+
+      stderr = capture_stderr do
+        capture_stdout do
+          described_class.send(:describe_changes, cf_client, stack_name: stack_name, changeset_name: "cs-1")
+        end
+      end
+
+      expect(stderr).to include("WARNING")
+    end
+
+    it "does not show replacement for normal updates" do
+      changes = [
+        double(resource_change: double(
+          action: "Modify", resource_type: "AWS::Batch::ComputeEnvironment",
+          logical_resource_id: "ComputeEnvironment", replacement: "False"
+        ))
+      ]
+      allow(cf_client).to receive(:describe_change_set).and_return(
+        double(changes: changes)
+      )
+
+      output = capture_stdout do
+        described_class.send(:describe_changes, cf_client, stack_name: stack_name, changeset_name: "cs-1")
+      end
+
+      expect(output).not_to include("REPLACEMENT")
+    end
+  end
+
   describe ".backoff_sleep" do
     it "starts at base delay" do
       allow(described_class).to receive(:sleep)
