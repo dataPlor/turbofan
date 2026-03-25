@@ -369,10 +369,7 @@ module Turbofan
         }
       end
 
-      def build_state(pipeline_name, step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
-        step_name = step.name
-
+      def step_env(pipeline_name, step, first:, prev_step_name:, prev_step: nil, prev_step_names: nil)
         env = base_env(pipeline_name)
 
         if first
@@ -383,7 +380,7 @@ module Turbofan
           env << {"Name" => "TURBOFAN_PREV_STEP", "Value" => prev_step_name.to_s}
         end
 
-        env << {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s}
+        env << {"Name" => "TURBOFAN_STEP_NAME", "Value" => step.name.to_s}
 
         if prev_step&.fan_out?
           if routed_fan_out?(prev_step)
@@ -402,6 +399,17 @@ module Turbofan
             }
           end
         end
+
+        env
+      end
+
+      def build_state(pipeline_name, step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
+        prefix = "turbofan-#{pipeline_name}-#{@stage}"
+        step_name = step.name
+
+        env = step_env(pipeline_name, step,
+          first: first, prev_step_name: prev_step_name,
+          prev_step: prev_step, prev_step_names: prev_step_names)
 
         refs = resolve_job_refs(prefix, step_name)
 
