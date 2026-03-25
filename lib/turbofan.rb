@@ -1,4 +1,5 @@
 require_relative "turbofan/configuration"
+require_relative "turbofan/discovery"
 require_relative "turbofan/extensions"
 require_relative "turbofan/version"
 require_relative "turbofan/naming"
