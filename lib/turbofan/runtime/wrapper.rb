@@ -33,7 +33,7 @@ module Turbofan
         validate_output!(result)
         duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
 
-        output = serialize_output(result, context)
+        output = OutputSerializer.call(result, context)
         emit_success_metrics(context, duration)
         Lineage.emit(Lineage.complete_event(context: context, step_class: @step_class), context: context)
         $stdout.puts(output)
@@ -134,25 +134,6 @@ module Turbofan
           context.logger.info("SIGTERM received, shutting down")
           cleanup_nvme(nvme_path)
           exit(143)
-        end
-      end
-
-      def serialize_output(result, context)
-        bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
-        if context.array_index
-          step_name = ENV.fetch("TURBOFAN_STEP_NAME")
-          size_segment = context.size ? "#{context.size}/" : ""
-          key = FanOut.s3_key(context.execution_id, step_name, "output", "#{size_segment}#{context.array_index}.json")
-          context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
-          JSON.generate(result)
-        else
-          Payload.serialize(
-            result,
-            s3_client: context.s3,
-            bucket: bucket,
-            execution_id: context.execution_id,
-            step_name: context.step_name
-          )
         end
       end
 
