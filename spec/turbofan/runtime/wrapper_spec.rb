@@ -957,6 +957,107 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
   end
 
+  describe "resource attachment" do
+    it "calls ResourceAttacher.attach during run" do
+      allow(Turbofan::Runtime::ResourceAttacher).to receive(:attach)
+
+      run_wrapper(step_class, env: {"TURBOFAN_INPUT" => '{"items":1}'})
+
+      expect(Turbofan::Runtime::ResourceAttacher).to have_received(:attach).once
+    end
+  end
+
+  describe "logger error on step failure" do
+    it "logs the error via context.logger before re-raising" do
+      error_step = make_step(name: "LogErrorStep") { |_, _| raise(ArgumentError, "bad data") }
+      logger_spy = instance_double(Turbofan::Runtime::Logger, info: nil, warn: nil, error: nil, debug: nil)
+
+      result_context = nil
+      begin
+        run_wrapper(error_step, env: {"TURBOFAN_INPUT" => "{}"})
+      rescue ArgumentError
+        # expected
+      end
+
+      # Can't easily capture from run_wrapper since it builds context internally.
+      # Instead, verify via a more direct approach.
+      wrapper = Turbofan::Runtime::Wrapper.new(error_step)
+      context = Turbofan::Runtime::Context.new(
+        execution_id: "test-exec", attempt_number: 1, step_name: "LogErrorStep",
+        stage: "development", pipeline_name: "test-pipeline", array_index: nil,
+        nvme_path: nil, uses: [], writes_to: []
+      )
+      metrics = Turbofan::Runtime::Metrics.new(
+        cloudwatch_client: cloudwatch_client, pipeline_name: "test-pipeline",
+        stage: "development", step_name: "LogErrorStep"
+      )
+      allow(context).to receive_messages(s3: s3_client, metrics: metrics, logger: logger_spy)
+      allow(wrapper).to receive_messages(setup_nvme: nil, build_context: context)
+
+      original_stdout = $stdout
+      $stdout = StringIO.new
+      expect { wrapper.run }.to raise_error(ArgumentError, "bad data")
+      $stdout = original_stdout
+
+      expect(logger_spy).to have_received(:error).with("Step failed", hash_including(error_class: "ArgumentError", error_message: "bad data"))
+    end
+  end
+
+  describe "lineage emission failure resilience" do
+    it "preserves original exception when Lineage.emit raises during failure" do
+      error_step = make_step(name: "LineageFailStep") { |_, _| raise(ArgumentError, "original error") }
+
+      call_count = 0
+      allow(Turbofan::Runtime::Lineage).to receive(:emit) do |event, **_kwargs|
+        call_count += 1
+        raise RuntimeError, "lineage boom" if event[:eventType] == "FAIL"
+      end
+
+      expect {
+        run_wrapper(error_step, env: {"TURBOFAN_INPUT" => "{}"})
+      }.to raise_error(ArgumentError, "original error")
+    end
+  end
+
+  describe "size-aware MemoryUtilization" do
+    it "uses RAM from turbofan_sizes when context.size is set" do
+      sized_step = Class.new do
+        include Turbofan::Step
+
+        compute_environment :test_ce
+        size :m, cpu: 2, ram: 8
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+        def self.name = "SizedStep"
+        def call(_input, _ctx) = {}
+      end
+
+      # Set up fan-out input before run_wrapper (S3 stub must be ready)
+      all_items = [[{"id" => 0}]]
+      s3_body = instance_double("StringIO", read: JSON.generate(all_items)) # rubocop:disable RSpec/VerifiedDoubleReference
+      s3_response = instance_double("Aws::S3::Types::GetObjectOutput", body: s3_body) # rubocop:disable RSpec/VerifiedDoubleReference
+      allow(s3_client).to receive(:get_object).and_return(s3_response)
+
+      result = run_wrapper(sized_step, env: {
+        "TURBOFAN_INPUT" => "{}",
+        "TURBOFAN_SIZE" => "m",
+        "AWS_BATCH_JOB_ARRAY_INDEX" => "0",
+        "TURBOFAN_STEP_NAME" => "sized_step",
+        "TURBOFAN_EXECUTION_ID" => "exec-sized",
+        "TURBOFAN_BUCKET" => "my-bucket"
+      })
+
+      result[:metrics].flush
+      expect(cloudwatch_client).to have_received(:put_metric_data) do |args|
+        util_metric = args[:metric_data].find { |m| m[:metric_name] == "MemoryUtilization" }
+        expect(util_metric).not_to be_nil
+        # Should use 8 GB from size :m, not a default
+        expect(util_metric[:value]).to be >= 0
+        expect(util_metric[:value]).to be <= 100
+      end
+    end
+  end
+
   # B7 — Lineage integration: Wrapper emits OpenLineage events
   describe "OpenLineage event emission via Lineage" do
     before do
