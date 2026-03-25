@@ -66,6 +66,18 @@ module Turbofan
         pid = fork do
           reader.close
           $LOAD_PATH.unshift(project_root_expanded) unless $LOAD_PATH.include?(project_root_expanded)
+
+          # Clear external .rb files from $LOADED_FEATURES inherited from the
+          # parent. PipelineLoader.load may have already loaded the worker and
+          # its deps — if so, require would be a no-op and the before/after
+          # diff would be empty. Clearing forces require to re-load them.
+          $LOADED_FEATURES.reject! { |f|
+            f.end_with?(".rb") &&
+              !f.start_with?(step_dir_expanded) &&
+              !gem_prefixes.any? { |gp| f.start_with?(gp) } &&
+              !STDLIB_PREFIXES.any? { |sp| f.start_with?(sp) }
+          }
+
           before = $LOADED_FEATURES.dup
           begin
             Kernel.load(File.expand_path(worker_file))

@@ -64,6 +64,22 @@ RSpec.describe Turbofan::Deploy::DependencyResolver do
       expect(result[:broken_step]).to eq([])
     end
 
+    it "detects deps even when parent already loaded them" do
+      # Simulate PipelineLoader having already loaded the worker (and its deps)
+      shared_service = File.expand_path("services/shared_service.rb", project_root)
+      helper = File.expand_path("services/nested/helper.rb", project_root)
+      $LOADED_FEATURES.push(shared_service, helper)
+
+      step_dirs = {my_step: File.join(steps_root, "my_step")}
+      result = described_class.resolve(step_dirs, project_root: project_root)
+
+      expect(result[:my_step]).to include(shared_service)
+      expect(result[:my_step]).to include(helper)
+    ensure
+      $LOADED_FEATURES.delete(shared_service)
+      $LOADED_FEATURES.delete(helper)
+    end
+
     it "does not pollute parent $LOADED_FEATURES with step deps" do
       step_dirs = {my_step: File.join(steps_root, "my_step")}
       described_class.resolve(step_dirs, project_root: project_root)
