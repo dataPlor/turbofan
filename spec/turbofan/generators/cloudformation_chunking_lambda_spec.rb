@@ -256,6 +256,15 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       env_vars = template["Resources"][lambda_key].dig("Properties", "Environment", "Variables")
       expect(env_vars["TURBOFAN_BUCKET_PREFIX"]).to eq("env-pipeline-production")
     end
+
+    it "includes TURBOFAN_CODE_HASH derived from handler source" do
+      lambda_key = template["Resources"].keys.find { |k|
+        template["Resources"][k]["Type"] == "AWS::Lambda::Function"
+      }
+      env_vars = template["Resources"][lambda_key].dig("Properties", "Environment", "Variables")
+      expected = Digest::SHA256.hexdigest(Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER)[0, 12]
+      expect(env_vars["TURBOFAN_CODE_HASH"]).to eq(expected)
+    end
   end
 
   # "pipeline without group:" tests removed: fan_out now requires group: parameter

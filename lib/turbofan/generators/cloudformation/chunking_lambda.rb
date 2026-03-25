@@ -1,3 +1,4 @@
+require "digest"
 require "zlib"
 require "stringio"
 
@@ -141,7 +142,8 @@ module Turbofan
                 "Environment" => {
                   "Variables" => {
                     "TURBOFAN_BUCKET" => Turbofan.config.bucket,
-                    "TURBOFAN_BUCKET_PREFIX" => bucket_prefix
+                    "TURBOFAN_BUCKET_PREFIX" => bucket_prefix,
+                    "TURBOFAN_CODE_HASH" => Digest::SHA256.hexdigest(HANDLER)[0, 12]
                   }
                 },
                 "Tags" => tags
