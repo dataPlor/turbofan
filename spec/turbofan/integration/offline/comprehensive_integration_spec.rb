@@ -422,8 +422,8 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       Turbofan::Generators::ASL.new(pipeline: chained_pipeline_class, stage: "production").generate
     end
 
-    it "produces states in correct order: step_a_chunk, step_a, step_b_chunk, step_b, step_c, NotifySuccess, NotifyFailure" do
-      expected_keys = %w[step_a_chunk step_a step_b_chunk step_b step_c NotifySuccess NotifyFailure]
+    it "produces states in correct order: step_a_chunk, step_a, step_b_chunk, step_b, step_c, NotifySuccess, NotifyFailure, FailExecution" do
+      expected_keys = %w[step_a_chunk step_a step_b_chunk step_b step_c NotifySuccess NotifyFailure FailExecution]
       expect(chained_asl["States"].keys).to eq(expected_keys)
     end
   end

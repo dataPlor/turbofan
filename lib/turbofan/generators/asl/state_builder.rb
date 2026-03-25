@@ -91,7 +91,12 @@ module Turbofan
                 "TopicArn" => topic_arn,
                 "Message" => "Pipeline #{@pipeline_name} failed."
               },
-              "End" => true
+              "Next" => "FailExecution"
+            },
+            "FailExecution" => {
+              "Type" => "Fail",
+              "Error" => "PipelineExecutionFailed",
+              "Cause" => "One or more steps failed during pipeline execution."
             }
           }
         end

@@ -12,8 +12,9 @@ RSpec.shared_examples "valid ASL structure" do
       "StartAt '#{asl["StartAt"]}' does not exist in States: #{asl["States"].keys}"
   end
 
-  it "every state has either End:true or a Next field" do
+  it "every state has either End:true, a Next field, or is a Fail state" do
     asl["States"].each do |state_name, state|
+      next if state["Type"] == "Fail" # Fail states are terminal by definition
       has_end = state["End"] == true
       has_next = state.key?("Next")
       expect(has_end || has_next).to be(true),

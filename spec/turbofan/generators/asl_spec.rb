@@ -38,8 +38,8 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(asl["States"]).to be_a(Hash)
     end
 
-    it "creates states for the step plus notification states" do
-      expect(asl["States"].size).to eq(3)
+    it "creates states for the step plus notification and failure states" do
+      expect(asl["States"].size).to eq(4)
     end
 
     it "creates a Task state type" do
@@ -116,8 +116,8 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(asl["StartAt"]).to eq("extract")
     end
 
-    it "creates states for steps plus notification states" do
-      expect(asl["States"].size).to eq(4)
+    it "creates states for steps plus notification and failure states" do
+      expect(asl["States"].size).to eq(5)
     end
 
     it "chains the first step to the second via Next" do
