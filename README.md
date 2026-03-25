@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://gist.github.com/user-attachments/assets/e4720df6-4902-4d10-98ad-f04b258dc319" alt="Turbofan" width="600" />
+  <img src="assets/engine.png" alt="Turbofan" width="600" />
 </p>
 
 # Turbofan
@@ -112,7 +112,7 @@ A chunking Lambda packs N items per array child (see `dag.rb`, `cloudformation/c
 
 #### 6. Content-addressed builds
 
-Docker image tags are SHA256 hashes of step source (see `deploy/image_builder.rb`). Only changed steps rebuild and redeploy. This enables idempotent builds and deterministic rollbacks.
+Docker image tags are SHA256 hashes of step source, schemas, and external dependencies (see `deploy/image_builder.rb`). Only changed steps rebuild and redeploy. This enables idempotent builds and deterministic rollbacks. When a shared service file changes, only the steps that depend on it are rebuilt.
 
 #### 7. Resource abstraction
 
@@ -276,6 +276,7 @@ Steps with multiple size profiles (`:s`, `:m`, `:l`, etc.) use a router to class
 - **Instance selection** — Automatic EC2 instance type selection based on CPU/RAM requirements with bin-packing waste analysis
 - **SNS notifications** — Success/failure notifications per pipeline execution
 - **Large template support** — CloudFormation templates exceeding 51,200 bytes are automatically uploaded to S3
+- **Auto-dependency resolution** — External `.rb` files required by workers are automatically detected at deploy time (via `$LOADED_FEATURES` diffing in a forked process) and staged into the Docker build via BuildKit named contexts. No manual file copying.
 
 ## Testing Strategy
 
@@ -460,8 +461,8 @@ turbofans/
 ├── steps/
 │   ├── extract_places/
 │   │   ├── worker.rb                   # Step class
-│   │   ├── entrypoint.rb              # Loads wrapper + worker
-│   │   ├── Dockerfile
+│   │   ├── entrypoint.rb              # $LOAD_PATH + require turbofan + worker
+│   │   ├── Dockerfile                 # Includes COPY --from=deps . .
 │   │   └── Gemfile
 │   └── validate_places/
 │       ├── worker.rb
@@ -521,7 +522,7 @@ end
 | `pipeline(&block)` | Yes | — | Block defining the step DAG. Receives `trigger_input` as argument (or use the zero-arity form). |
 | `schedule(cron_string)` | No | `nil` | 6-field EventBridge cron expression (min hour day month dow year). Creates an EventBridge rule with a guard Lambda that prevents concurrent executions. |
 | `bucket(name)` | No | `Turbofan.config.bucket` | Shared S3 interchange bucket name (externally managed). Overrides the global config for this pipeline. |
-| `compute_environment(klass)` | No | `nil` | Default CE for all steps in this pipeline. Steps can override with their own `compute_environment`. |
+| `compute_environment(symbol)` | No | `nil` | Default CE for all steps in this pipeline (e.g., `:compute_bound`). Steps can override with their own `compute_environment`. Resolved to a class via `ComputeEnvironment.resolve(sym)` at check/deploy time. |
 | `tags(hash)` | No | `{}` | Custom tags applied to all AWS resources in the pipeline stack. Keys are converted to strings. |
 | `metric(name, stat:, display:, unit:, step:)` | No | `[]` | CloudWatch metric definition for the auto-generated dashboard. `stat`: `:sum`, `:average`, `:max`, `:min`. `display`: `:line`, `:number`, `:stacked`. |
 
@@ -573,7 +574,7 @@ Include this module in a class to define a step.
 class ValidatePlaces
   include Turbofan::Step
 
-  compute_environment ComputeEnvironments::ComputeBoundWithNVME
+  compute_environment :compute_bound_with_nvme
   cpu 2
   ram 4096
   timeout 7200
@@ -604,7 +605,7 @@ end
 
 | Method | Required | Default | Description |
 |--------|----------|---------|-------------|
-| `compute_environment(klass)` | Yes | — | Must be a class including `Turbofan::ComputeEnvironment`. Can be declared in any order relative to other DSL methods. |
+| `compute_environment(symbol)` | Yes | — | Symbol referencing a compute environment (e.g., `:compute_bound_with_nvme`). Resolved to a class via `ComputeEnvironment.resolve(sym)` at check/deploy time. |
 | `cpu(value)` | Yes* | — | vCPU count. Required unless `size` is used. Must be a positive number. |
 | `ram(value)` | Yes* | — | Memory in MB. Required unless `size` is used. Must be a positive number. |
 | `input_schema(filename)` | Yes | — | JSON Schema filename relative to `turbofans/schemas/`. |
@@ -637,7 +638,7 @@ class RunSentimentModel
   include Turbofan::Step
 
   docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment-model:latest"
-  compute_environment ComputeEnvironments::GpuBound
+  compute_environment :gpu_bound
   cpu 4
   ram 16384
   input_schema "sentiment_input.json"
@@ -804,7 +805,7 @@ The corresponding step must define matching sizes:
 class ValidatePlaces
   include Turbofan::Step
 
-  compute_environment ComputeEnvironments::ComputeBound
+  compute_environment :compute_bound
   size :small,  cpu: 1,  ram: 2048
   size :medium, cpu: 2,  ram: 4096
   size :large,  cpu: 8,  ram: 16384
@@ -965,12 +966,15 @@ The wrapper automatically emits these metrics per job:
 Entry point for step Docker containers. Not called directly by step authors — it's invoked from the entrypoint file.
 
 ```ruby
-# entrypoint.rb
-require "turbofan/runtime/wrapper"
+# entrypoint.rb (generated by turbofan step new)
+$LOAD_PATH.unshift(__dir__) unless $LOAD_PATH.include?(__dir__)
+require "turbofan"
 require_relative "worker"
 
 Turbofan::Runtime::Wrapper.run(ValidatePlaces)
 ```
+
+The `$LOAD_PATH.unshift(__dir__)` line makes the step's working directory a load path root, so external dependencies staged by Turbofan's [auto-dependency resolution](#external-dependencies) can be found via `require`.
 
 `Wrapper.run(step_class)` performs the following sequence:
 
@@ -1268,9 +1272,11 @@ Generated states:
 - **`{step_name}`** — Batch `submitJob.sync` task
 - **`{step_name}_routed`** — Parallel state with one branch per size (only for routed fan-out steps). Each branch targets the correctly-sized job definition and queue, and sets `TURBOFAN_SIZE` env var. Array size for each branch is derived from the chunking Lambda result (e.g., `$.chunking.{step}.sizes.s.count`).
 - **`Parallel`** — Parallel state for DAG forks (steps with the same parent that can execute concurrently)
-- **`NotifySuccess`** / **`NotifyFailure`** — SNS publish tasks
+- **`NotifySuccess`** — SNS publish task (ends execution as SUCCEEDED)
+- **`NotifyFailure`** — SNS publish task, then transitions to `FailExecution`
+- **`FailExecution`** — Fail state that terminates execution with FAILED status
 
-All Batch tasks include a `Catch` clause routing to `NotifyFailure`.
+All Batch tasks include a `Catch` clause routing to `NotifyFailure`. When a step fails, the SNS notification is sent, then the execution terminates with `FAILED` status — ensuring the Step Functions console accurately reflects pipeline failures.
 
 ---
 
@@ -1325,12 +1331,12 @@ Handles Docker image building and ECR management.
 
 | Method | Description |
 |--------|-------------|
-| `content_tag(step_dir, schemas_dir)` | Computes `sha-{12hex}` from SHA256 of all files in the step directory and referenced schemas. |
+| `content_tag(step_dir, schemas_dir, external_deps: [], project_root: Dir.pwd)` | Computes `sha-{12hex}` from SHA256 of all files in the step directory, referenced schemas, and external dependencies. Uses project-relative paths for external deps so tags are machine-independent. |
 | `image_exists?(ecr_client, repository_name, image_tag)` | Checks if an image tag already exists in ECR. |
-| `build(step_dir, schemas_dir, tag:, repository_uri:)` | Runs `docker build` with proxy CA support. |
+| `build(step_dir, schemas_dir, tag:, repository_uri:, external_deps: [], project_root: Dir.pwd)` | Runs `docker build` with BuildKit named contexts for schemas and external deps (`--build-context deps=<tmpdir>`). Cleans up the deps tmpdir after build. |
 | `push(tag:, repository_uri:)` | Pushes to ECR. |
 | `authenticate_ecr(ecr_client)` | Gets an ECR auth token and runs `docker login`. |
-| `build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil)` | Full build/push cycle. Skips if the content-addressed tag already exists. |
+| `build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd)` | Full build/push cycle. Skips if the content-addressed tag already exists. |
 | `build_and_push_all(step_configs:)` | Multi-threaded build for all steps. |
 | `garbage_collect(ecr_client, repository_name, keep:)` | Deletes old `sha-*` tagged images, keeping the most recent N. |
 
@@ -1374,6 +1380,59 @@ result.pipeline   # => MyPipeline (class)
 result.steps      # => {extract: ExtractStep, validate: ValidateStep}
 result.step_dirs  # => {extract: "turbofans/steps/extract", validate: "turbofans/steps/validate"}
 ```
+
+---
+
+### `Turbofan::Deploy::DependencyResolver`
+
+Automatically detects external `.rb` dependencies of step workers and stages them for Docker builds. See [External Dependencies](#external-dependencies) for the full guide.
+
+| Method | Description |
+|--------|-------------|
+| `resolve(step_dirs, project_root: Dir.pwd)` | Loads each step's `worker.rb` in a forked process, diffs `$LOADED_FEATURES` before/after, and returns a hash of step name → external dependency paths. Filters out gems, stdlib, and files within the step directory. |
+| `prepare_build_context(external_deps, project_root)` | Stages external deps into a `Dir.mktmpdir` preserving their project-relative paths. Returns the tmpdir path. Always returns a directory (empty if no deps) so callers can unconditionally pass `--build-context deps=<dir>`. |
+| `cleanup_build_context(tmpdir)` | Removes the temporary directory. Safe to call with `nil`. |
+
+---
+
+## External Dependencies
+
+When your step depends on shared code outside the step directory (e.g., services), Turbofan automatically detects and stages those files into the Docker build.
+
+### Setup
+
+**1. Add the project root to `$LOAD_PATH`** in your turbofan config:
+
+```ruby
+# turbofans/config/turbofan.rb
+$LOAD_PATH.unshift(File.expand_path("../..", __dir__))
+
+Turbofan.configure do |c|
+  c.bucket = "my-bucket"
+end
+```
+
+**2. Use `require` (not `require_relative`) for external deps:**
+
+```ruby
+# worker.rb
+require "services/device_catalog_service"  # resolved via $LOAD_PATH
+
+class ProcessDevicePartition
+  include Turbofan::Step
+  # ...
+end
+```
+
+Use `require_relative` only for files within the step directory. External deps must use `require` so `$LOAD_PATH` can resolve them in both dev and Docker environments.
+
+**3. The generated Dockerfile and entrypoint handle the rest.** `COPY --from=deps . .` stages external deps at the step root. `$LOAD_PATH.unshift(__dir__)` in the entrypoint makes them findable via `require`.
+
+### How it works
+
+At deploy time, Turbofan forks a child process per step, loads the worker, and diffs `$LOADED_FEATURES` to find which files were loaded from outside the step directory. Those files are staged into a temporary directory (preserving project-relative paths) and injected into the Docker build via BuildKit's `--build-context deps=<tmpdir>`. External deps are also included in the content-based image tag, so images rebuild when a dependency changes.
+
+See [docs/external-dependencies.md](docs/external-dependencies.md) for the full migration guide.
 
 ---
 
