@@ -13,15 +13,15 @@ module Turbofan
         @pipeline = pipeline
         @stage = stage
         @steps = steps
+        @pipeline_name = pipeline.turbofan_name
+        @prefix = "turbofan-#{@pipeline_name}-#{stage}"
       end
 
       def generate
         dag = @pipeline.turbofan_dag
         sorted = dag.sorted_steps
-        pipeline_name = @pipeline.turbofan_name
 
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
-        topic_arn = "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:#{prefix}-notifications"
+        topic_arn = "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:#{@prefix}-notifications"
 
         forks, join_info = detect_forks(dag, sorted)
 
@@ -48,7 +48,7 @@ module Turbofan
             # Emit fork step pointing to the Parallel state
             prev_step = find_prev(sorted, index, visited)
             states[step.name.to_s] = build_state(
-              pipeline_name, step, parallel_key,
+              step, parallel_key,
               first: first, last: false,
               prev_step_name: prev_step&.name, prev_step: prev_step
             )
@@ -56,7 +56,7 @@ module Turbofan
             # Build Parallel branches
             branches = branch_children.map do |child_name|
               chain = dag.branch_steps_for(child_name, fork_join&.name, sorted)
-              build_branch_chain(pipeline_name, chain, step.name)
+              build_branch_chain(chain, step.name)
             end
 
             # Determine Next for the Parallel state
@@ -86,13 +86,13 @@ module Turbofan
               chunk_prev = is_join ? nil : find_prev(sorted, index, visited)
 
               states["#{step.name}_chunk"] = build_chunk_state(
-                pipeline_name, step, chunk_prev&.name, first: first, routed: routed
+                step, chunk_prev&.name, first: first, routed: routed
               )
 
               if routed
                 routed_next = last ? "NotifySuccess" : actual_next
                 states["#{step.name}_routed"] = build_routed_parallel_state(
-                  pipeline_name, step, routed_next
+                  step, routed_next
                 )
                 next
               end
@@ -100,7 +100,7 @@ module Turbofan
 
             if is_join
               state = build_state(
-                pipeline_name, step, actual_next,
+                step, actual_next,
                 first: false, last: last,
                 prev_step_name: nil, prev_step: nil,
                 prev_step_names: join_info[step.name]
@@ -108,7 +108,7 @@ module Turbofan
             else
               prev_step = find_prev(sorted, index, visited)
               state = build_state(
-                pipeline_name, step, actual_next,
+                step, actual_next,
                 first: first, last: last,
                 prev_step_name: prev_step&.name, prev_step: prev_step
               )
@@ -118,13 +118,13 @@ module Turbofan
           end
         end
 
-        states.merge!(notification_states(topic_arn, pipeline_name))
+        states.merge!(notification_states(topic_arn))
 
         start_step = sorted.first
         start_at = state_name_for(start_step)
 
         {
-          "Comment" => "Turbofan pipeline: #{pipeline_name}",
+          "Comment" => "Turbofan pipeline: #{@pipeline_name}",
           "StartAt" => start_at,
           "States" => states
         }
@@ -136,19 +136,19 @@ module Turbofan
 
       private
 
-      def base_env(pipeline_name)
+      def base_env
         [
           {"Name" => "TURBOFAN_EXECUTION_ID", "Value.$" => "$$.Execution.Id"},
           {"Name" => "TURBOFAN_STAGE", "Value" => @stage},
-          {"Name" => "TURBOFAN_PIPELINE", "Value" => pipeline_name},
+          {"Name" => "TURBOFAN_PIPELINE", "Value" => @pipeline_name},
           {"Name" => "TURBOFAN_BUCKET", "Value" => Turbofan.config.bucket},
-          {"Name" => "TURBOFAN_BUCKET_PREFIX", "Value" => Naming.bucket_prefix(pipeline_name, @stage)},
+          {"Name" => "TURBOFAN_BUCKET_PREFIX", "Value" => Naming.bucket_prefix(@pipeline_name, @stage)},
           {"Name" => "AWS_REGION", "Value" => "${AWS::Region}"},
           {"Name" => "AWS_DEFAULT_REGION", "Value" => "${AWS::Region}"}
         ]
       end
 
-      def resolve_job_refs(prefix, step_name)
+      def resolve_job_refs(step_name)
         step_class = @steps[step_name]
         suffix = if step_class&.turbofan_sizes&.any?
           "#{step_name}-#{step_class.turbofan_sizes.keys.first}"
@@ -156,8 +156,8 @@ module Turbofan
           step_name
         end
         {
-          job_definition: "#{prefix}-jobdef-#{suffix}",
-          job_queue: "#{prefix}-queue-#{suffix}"
+          job_definition: "#{@prefix}-jobdef-#{suffix}",
+          job_queue: "#{@prefix}-queue-#{suffix}"
         }
       end
 
@@ -189,12 +189,12 @@ module Turbofan
         nil
       end
 
-      def build_branch_chain(pipeline_name, chain, fork_step_name)
+      def build_branch_chain(chain, fork_step_name)
         states = {}
         chain.each_with_index do |step, idx|
           last_in_branch = (idx == chain.size - 1)
           prev_step_name = (idx == 0) ? fork_step_name : chain[idx - 1].name
-          state = build_branch_state(pipeline_name, step, prev_step_name)
+          state = build_branch_state(step, prev_step_name)
           if last_in_branch
             state["End"] = true
           else
@@ -215,14 +215,14 @@ module Turbofan
         }
       end
 
-      def notification_states(topic_arn, pipeline_name)
+      def notification_states(topic_arn)
         {
           "NotifySuccess" => {
             "Type" => "Task",
             "Resource" => SNS_RESOURCE,
             "Parameters" => {
               "TopicArn" => topic_arn,
-              "Message" => "Pipeline #{pipeline_name} completed successfully."
+              "Message" => "Pipeline #{@pipeline_name} completed successfully."
             },
             "End" => true
           },
@@ -231,15 +231,14 @@ module Turbofan
             "Resource" => SNS_RESOURCE,
             "Parameters" => {
               "TopicArn" => topic_arn,
-              "Message" => "Pipeline #{pipeline_name} failed."
+              "Message" => "Pipeline #{@pipeline_name} failed."
             },
             "End" => true
           }
         }
       end
 
-      def build_chunk_state(pipeline_name, step, prev_step_name, first:, routed: false)
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
+      def build_chunk_state(step, prev_step_name, first:, routed: false)
         payload = {
           "step_name" => step.name.to_s,
           "group_size" => step.batch_size,
@@ -269,7 +268,7 @@ module Turbofan
           "Type" => "Task",
           "Resource" => "arn:aws:states:::lambda:invoke",
           "Parameters" => {
-            "FunctionName" => "#{prefix}-chunking",
+            "FunctionName" => "#{@prefix}-chunking",
             "Payload" => payload
           },
           "ResultSelector" => result_selector,
@@ -285,20 +284,19 @@ module Turbofan
         }
       end
 
-      def build_branch_state(pipeline_name, step, fork_step_name)
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
+      def build_branch_state(step, fork_step_name)
         step_name = step.name
 
-        env = base_env(pipeline_name) + [
+        env = base_env + [
           {"Name" => "TURBOFAN_PREV_STEP", "Value" => fork_step_name.to_s},
           {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s}
         ]
 
-        refs = resolve_job_refs(prefix, step_name)
+        refs = resolve_job_refs(step_name)
 
         params = {
           "JobDefinition" => refs[:job_definition],
-          "JobName" => "#{prefix}-#{step_name}",
+          "JobName" => "#{@prefix}-#{step_name}",
           "JobQueue" => refs[:job_queue],
           "ContainerOverrides" => {
             "Environment" => env
@@ -324,15 +322,14 @@ module Turbofan
         step_class&.turbofan_sizes&.any?
       end
 
-      def build_routed_parallel_state(pipeline_name, step, next_step_name)
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
+      def build_routed_parallel_state(step, next_step_name)
         step_name = step.name
         step_class = @steps[step_name]
         sizes = step_class.turbofan_sizes
 
         branches = sizes.map do |size_name, _size_config|
           branch_state_name = "#{step_name}_#{size_name}"
-          env = base_env(pipeline_name) + [
+          env = base_env + [
             {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s},
             {"Name" => "TURBOFAN_SIZE", "Value" => size_name.to_s}
           ]
@@ -344,9 +341,9 @@ module Turbofan
                 "Type" => "Task",
                 "Resource" => BATCH_RESOURCE,
                 "Parameters" => {
-                  "JobDefinition" => "#{prefix}-jobdef-#{step_name}-#{size_name}",
-                  "JobName" => "#{prefix}-#{step_name}-#{size_name}",
-                  "JobQueue" => "#{prefix}-queue-#{step_name}-#{size_name}",
+                  "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}",
+                  "JobName" => "#{@prefix}-#{step_name}-#{size_name}",
+                  "JobQueue" => "#{@prefix}-queue-#{step_name}-#{size_name}",
                   "ContainerOverrides" => {"Environment" => env},
                   "ArrayProperties" => {
                     "Size.$" => "$.chunking.#{step_name}.sizes.#{size_name}.count"
@@ -369,8 +366,8 @@ module Turbofan
         }
       end
 
-      def step_env(pipeline_name, step, first:, prev_step_name:, prev_step: nil, prev_step_names: nil)
-        env = base_env(pipeline_name)
+      def step_env(step, first:, prev_step_name:, prev_step: nil, prev_step_names: nil)
+        env = base_env
 
         if first
           env << {"Name" => "TURBOFAN_INPUT", "Value.$" => "States.JsonToString($.input)"}
@@ -403,19 +400,18 @@ module Turbofan
         env
       end
 
-      def build_state(pipeline_name, step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
-        prefix = "turbofan-#{pipeline_name}-#{@stage}"
+      def build_state(step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
         step_name = step.name
 
-        env = step_env(pipeline_name, step,
+        env = step_env(step,
           first: first, prev_step_name: prev_step_name,
           prev_step: prev_step, prev_step_names: prev_step_names)
 
-        refs = resolve_job_refs(prefix, step_name)
+        refs = resolve_job_refs(step_name)
 
         params = {
           "JobDefinition" => refs[:job_definition],
-          "JobName" => "#{prefix}-#{step_name}",
+          "JobName" => "#{@prefix}-#{step_name}",
           "JobQueue" => refs[:job_queue],
           "ContainerOverrides" => {
             "Environment" => env
