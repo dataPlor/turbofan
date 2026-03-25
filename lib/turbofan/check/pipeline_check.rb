@@ -5,11 +5,7 @@ module Turbofan
         errors = []
         warnings = []
 
-        # 1. Pipeline name must be present
-        name = pipeline.turbofan_name
-        if name.nil? || name.to_s.strip.empty?
-          errors << "Pipeline name is not set (turbofan_name is blank)"
-        end
+        validate_pipeline_name(pipeline, errors)
 
         # 2. Validate schedule cron field count (EventBridge requires 6 fields)
         if pipeline.turbofan_schedule
@@ -119,6 +115,14 @@ module Turbofan
 
         Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
       end
+
+      def self.validate_pipeline_name(pipeline, errors)
+        name = pipeline.turbofan_name
+        if name.nil? || name.to_s.strip.empty?
+          errors << "Pipeline name is not set (turbofan_name is blank)"
+        end
+      end
+      private_class_method :validate_pipeline_name
     end
   end
 end
