@@ -159,7 +159,7 @@ module Turbofan
             LaunchTemplate:
               Type: AWS::EC2::LaunchTemplate
               Properties:
-                LaunchTemplateName: turbofan-ce-#{slug}-launchtemplate
+                LaunchTemplateName: turbofan-ce-#{slug}-#{stage}-launchtemplate
                 LaunchTemplateData:
                   UserData:
                     Fn::Base64: |
