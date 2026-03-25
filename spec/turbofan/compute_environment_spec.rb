@@ -135,11 +135,30 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
       expect(parsed["AWSTemplateFormatVersion"]).to eq("2010-09-09")
     end
 
-    it "includes ComputeEnvironmentName with turbofan convention" do
+    it "includes ComputeEnvironmentName with stage" do
       template = ce_class.generate_template(stage: "production")
       parsed = YAML.safe_load(template)
       name = parsed.dig("Resources", "ComputeEnvironment", "Properties", "ComputeEnvironmentName")
       expect(name).to eq("turbofan-ce-house-stark-production")
+    end
+
+    it "includes LaunchTemplateName with stage" do
+      template = ce_class.generate_template(stage: "production")
+      parsed = YAML.safe_load(template)
+      name = parsed.dig("Resources", "LaunchTemplate", "Properties", "LaunchTemplateName")
+      expect(name).to eq("turbofan-ce-house-stark-production-launchtemplate")
+    end
+
+    it "uses different LaunchTemplateNames per stage" do
+      staging = YAML.safe_load(ce_class.generate_template(stage: "staging"))
+      production = YAML.safe_load(ce_class.generate_template(stage: "production"))
+
+      staging_lt = staging.dig("Resources", "LaunchTemplate", "Properties", "LaunchTemplateName")
+      production_lt = production.dig("Resources", "LaunchTemplate", "Properties", "LaunchTemplateName")
+
+      expect(staging_lt).not_to eq(production_lt)
+      expect(staging_lt).to eq("turbofan-ce-house-stark-staging-launchtemplate")
+      expect(production_lt).to eq("turbofan-ce-house-stark-production-launchtemplate")
     end
 
     it "includes instance types" do
