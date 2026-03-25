@@ -28,10 +28,18 @@ module Turbofan
         end
         CLI::Check.call(pipeline_name: pipeline_name, stage: stage, load_result: load_result)
 
-        # Compute image tags per step
+        # Resolve per-step external dependencies
+        project_root = Dir.pwd
+        step_deps = Turbofan::Deploy::DependencyResolver.resolve(step_dirs, project_root: project_root)
+
+        # Compute image tags per step (includes external deps in hash)
         image_tags = {}
         step_dirs.each do |step_name, step_dir|
-          image_tags[step_name] = Turbofan::Deploy::ImageBuilder.content_tag(step_dir, schemas_dir)
+          image_tags[step_name] = Turbofan::Deploy::ImageBuilder.content_tag(
+            step_dir, schemas_dir,
+            external_deps: step_deps.fetch(step_name, []),
+            project_root: project_root
+          )
         end
 
         cf_client = Aws::CloudFormation::Client.new
@@ -93,7 +101,7 @@ module Turbofan
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
           begin
             registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags)
+            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root)
           rescue => e
             warn("Image build/push failed: #{e.message}")
             warn("Rolling back stack #{stack_name}...")
@@ -111,7 +119,7 @@ module Turbofan
         puts "Deploy complete: #{stack_name}"
       end
 
-      def self.build_and_push_all(step_dirs:, schemas_dir:, stack_name:, registry:, ecr_client:, image_tags:)
+      def self.build_and_push_all(step_dirs:, schemas_dir:, stack_name:, registry:, ecr_client:, image_tags:, step_deps: {}, project_root: Dir.pwd)
         configs = step_dirs.map do |step_name, step_dir|
           {
             step_dir: step_dir,
@@ -119,7 +127,9 @@ module Turbofan
             ecr_client: ecr_client,
             repository_name: "#{stack_name}-ecr-#{step_name}",
             repository_uri: "#{registry}/#{stack_name}-ecr-#{step_name}",
-            tag: image_tags[step_name]
+            tag: image_tags[step_name],
+            external_deps: step_deps.fetch(step_name, []),
+            project_root: project_root
           }
         end
         Turbofan::Deploy::ImageBuilder.build_and_push_all(step_configs: configs)
