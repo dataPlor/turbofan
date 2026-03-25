@@ -9,36 +9,33 @@ module Turbofan
         validate_schedule(pipeline, errors)
         validate_steps(steps, errors)
         validate_schema_files(steps, errors)
+        validate_dag_consistency(pipeline, steps, errors)
 
-        # 5. DAG step names must match loaded Step class names
-        # Note: turbofan_dag also validates schema edge compatibility at build time.
-        # This section only cross-checks the steps hash passed by the caller (CLI path)
-        # against the DAG's own step list.
+        Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
+      end
+
+      def self.validate_dag_consistency(pipeline, steps, errors)
         begin
           dag = pipeline.turbofan_dag
         rescue ArgumentError
-          # No pipeline block defined - skip DAG checks
-          return Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
+          return
         rescue Turbofan::SchemaIncompatibleError => e
           errors << "DAG schema edge validation failed: #{e.message}"
-          return Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
+          return
         end
 
         dag_step_names = dag.steps.map(&:name).to_set
         step_keys = steps.keys.to_set
 
-        missing_steps = dag_step_names - step_keys
-        missing_steps.each do |name|
+        (dag_step_names - step_keys).each do |name|
           errors << "DAG references step :#{name} but no Step class was loaded for it"
         end
 
-        extra_steps = step_keys - dag_step_names
-        extra_steps.each do |name|
+        (step_keys - dag_step_names).each do |name|
           errors << "Step class :#{name} is loaded but not referenced in the DAG"
         end
-
-        Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
       end
+      private_class_method :validate_dag_consistency
 
       def self.validate_steps(steps, errors)
         steps.each do |step_name, step_class|
