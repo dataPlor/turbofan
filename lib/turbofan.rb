@@ -59,30 +59,20 @@ module Turbofan
 
   def self.discover_components
     steps = {}
-    pipelines = {}
-    resources = {}
-    ObjectSpace.each_object(Class) do |c|
-      class_name = GET_CLASS_NAME.bind_call(c)
-      next unless class_name
-      live_const = begin
-        Object.const_get(class_name)
-      rescue NameError
-        nil
-      end
-      next unless live_const == c
-      begin
-        if c < Step
-          steps[snake_case(class_name)] = c
-        elsif c < Pipeline
-          pipelines[snake_case(class_name)] = c
-        end
-      rescue NoMethodError
-        next
-      end
-      if c.ancestors.include?(Resource) && c.respond_to?(:turbofan_key) && c.turbofan_key
-        resources[c.turbofan_key] = c
-      end
+    Discovery.subclasses_of(Step).each do |c|
+      steps[snake_case(GET_CLASS_NAME.bind_call(c))] = c
     end
+
+    pipelines = {}
+    Discovery.subclasses_of(Pipeline).each do |c|
+      pipelines[snake_case(GET_CLASS_NAME.bind_call(c))] = c
+    end
+
+    resources = {}
+    Discovery.subclasses_of(Resource).each do |c|
+      resources[c.turbofan_key] = c if c.respond_to?(:turbofan_key) && c.turbofan_key
+    end
+
     {steps: steps, pipelines: pipelines, resources: resources}
   end
 
