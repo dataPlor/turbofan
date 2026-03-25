@@ -6,14 +6,7 @@ module Turbofan
         warnings = []
 
         validate_pipeline_name(pipeline, errors)
-
-        # 2. Validate schedule cron field count (EventBridge requires 6 fields)
-        if pipeline.turbofan_schedule
-          field_count = pipeline.turbofan_schedule.strip.split(/\s+/).size
-          unless field_count == 6
-            errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
-          end
-        end
+        validate_schedule(pipeline, errors)
 
         # 3. Per-step validation
         steps.each do |step_name, step_class|
@@ -115,6 +108,16 @@ module Turbofan
 
         Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
       end
+
+      def self.validate_schedule(pipeline, errors)
+        return unless pipeline.turbofan_schedule
+
+        field_count = pipeline.turbofan_schedule.strip.split(/\s+/).size
+        unless field_count == 6
+          errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
+        end
+      end
+      private_class_method :validate_schedule
 
       def self.validate_pipeline_name(pipeline, errors)
         name = pipeline.turbofan_name
