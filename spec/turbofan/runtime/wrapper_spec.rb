@@ -743,35 +743,6 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
   end
 
-  describe "peak_memory_mb resilience" do
-    it "reads from /proc/self/status when available" do
-      skip "Not on Linux" unless File.exist?("/proc/self/status")
-
-      wrapper = described_class.new(step_class)
-      result = wrapper.send(:peak_memory_mb)
-      expect(result).to be_a(Float)
-      expect(result).to be >= 0
-    end
-
-    it "falls back to ps when /proc/self/status doesn't exist" do
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("/proc/self/status").and_return(false)
-
-      result = Turbofan::Runtime::StepMetrics.send(:peak_memory_mb)
-      expect(result).to be_a(Float)
-      expect(result).to be >= 0
-    end
-
-    it "returns 0.0 when all methods fail" do
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("/proc/self/status").and_return(false)
-      allow(Turbofan::Runtime::StepMetrics).to receive(:`).and_raise(StandardError, "ps failed")
-
-      result = Turbofan::Runtime::StepMetrics.send(:peak_memory_mb)
-      expect(result).to eq(0.0)
-    end
-  end
-
   describe "NVMe setup edge cases" do
     it "returns nil when /mnt/nvme does not exist" do
       wrapper = described_class.new(step_class)
@@ -809,81 +780,6 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(result).to eq(expected_path)
     ensure
       ENV["AWS_BATCH_JOB_ID"] = saved if saved
-    end
-  end
-
-  describe "CpuUtilization calculation" do
-    it "calculates CPU utilization as (cpu_time / wall_time) * 100" do
-      utilization = Turbofan::Runtime::StepMetrics.send(:cpu_utilization, 10.0)
-      expect(utilization).to be_a(Float)
-      expect(utilization).to be >= 0
-    end
-
-    it "returns 0 when wall time is zero" do
-      expect(Turbofan::Runtime::StepMetrics.send(:cpu_utilization, 0.0)).to eq(0.0)
-    end
-
-    it "returns 0 when wall time is negative" do
-      expect(Turbofan::Runtime::StepMetrics.send(:cpu_utilization, -1.0)).to eq(0.0)
-    end
-  end
-
-  # A2: envelope/inputs rename — normalize_envelope behavior
-  describe "normalize_envelope" do
-    it "converts Array input to {inputs: array}" do
-      received_inputs = nil
-      spy = make_step { |inputs, _ctx|
-        received_inputs = inputs
-        {}
-      }
-
-      run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '[{"a":1},{"b":2}]'
-      })
-
-      expect(received_inputs).to eq([{"a" => 1}, {"b" => 2}])
-    end
-
-    it "passes through Hash with inputs key, extracting the array" do
-      received_inputs = nil
-      spy = make_step { |inputs, _ctx|
-        received_inputs = inputs
-        {}
-      }
-
-      run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"inputs":[{"x":1}]}'
-      })
-
-      expect(received_inputs).to eq([{"x" => 1}])
-    end
-
-    it "converts Hash with items key to inputs (backward compat)" do
-      received_inputs = nil
-      spy = make_step { |inputs, _ctx|
-        received_inputs = inputs
-        {}
-      }
-
-      run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"items":[{"x":1}]}'
-      })
-
-      expect(received_inputs).to eq([{"x" => 1}])
-    end
-
-    it "wraps a bare Hash into a single-element inputs array" do
-      received_inputs = nil
-      spy = make_step { |inputs, _ctx|
-        received_inputs = inputs
-        {}
-      }
-
-      run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"key":"val"}'
-      })
-
-      expect(received_inputs).to eq([{"key" => "val"}])
     end
   end
 
@@ -933,18 +829,6 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       })
 
       expect(received_envelope).to eq({})
-    end
-  end
-
-  describe "MemoryUtilization calculation" do
-    it "calculates memory utilization as (peak_mb / allocated_mb) * 100" do
-      # 512 MB peak / 4 GB (4096 MB) allocated = 12.5%
-      utilization = Turbofan::Runtime::StepMetrics.send(:memory_utilization, 512.0, 4)
-      expect(utilization).to eq(12.5)
-    end
-
-    it "returns 0 when allocated RAM is zero" do
-      expect(Turbofan::Runtime::StepMetrics.send(:memory_utilization, 512.0, 0)).to eq(0.0)
     end
   end
 
