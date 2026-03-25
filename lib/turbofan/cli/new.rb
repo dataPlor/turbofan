@@ -112,7 +112,7 @@ module Turbofan
         lines << "COPY --from=schemas . schemas/"
         lines << ""
         lines << "# External deps injected via BuildKit named context (--build-context deps=<tmpdir>)"
-        lines << "COPY --from=deps . lib/"
+        lines << "COPY --from=deps . ."
         lines << ""
         lines << "ENV TURBOFAN_SCHEMAS_PATH=/app/schemas"
         lines << ""
@@ -123,6 +123,7 @@ module Turbofan
 
       def self.write_entrypoint(step_dir, class_name)
         File.write(File.join(step_dir, "entrypoint.rb"), <<~RUBY)
+          $LOAD_PATH.unshift(__dir__) unless $LOAD_PATH.include?(__dir__)
           require "turbofan"
           require_relative "worker"
 
