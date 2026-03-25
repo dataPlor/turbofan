@@ -120,6 +120,12 @@ module Turbofan
       def list
         Turbofan::CLI::Ce.list
       end
+
+      desc "destroy STAGE", "Destroy all compute environment stacks"
+      option :force, type: :boolean, default: false
+      def destroy(stage)
+        Turbofan::CLI::Ce.destroy(stage: stage, force: options[:force])
+      end
     }
 
     desc "resources SUBCOMMAND", "Manage resources"

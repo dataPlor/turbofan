@@ -28,6 +28,10 @@ module Turbofan
         Turbofan::ComputeEnvironment.discover.each do |ce_class|
           template_body = ce_class.generate_template(stage: stage)
           stack_name = ce_class.stack_name(stage)
+
+          # Clean up orphaned launch template from a previous failed deploy
+          cleanup_launch_template(ce_class, stage)
+
           Turbofan::Deploy::StackManager.deploy(
             cf_client,
             stack_name: stack_name,
@@ -38,6 +42,36 @@ module Turbofan
           if ce_class.turbofan_container_insights
             enable_container_insights(cf_client, stack_name)
           end
+        end
+      end
+
+      def self.destroy(stage:, force: false)
+        require "aws-sdk-cloudformation"
+        load_all_definitions
+        cf_client = Aws::CloudFormation::Client.new
+        Turbofan::ComputeEnvironment.discover.each do |ce_class|
+          stack_name = ce_class.stack_name(stage)
+          state = Turbofan::Deploy::StackManager.detect_state(cf_client, stack_name)
+
+          if state == :does_not_exist
+            $stdout.puts "  #{stack_name}: does not exist, skipping"
+            next
+          end
+
+          $stdout.puts "  #{stack_name}: #{state}"
+
+          unless force
+            next unless Turbofan::CLI::Prompt.yes?("Delete #{stack_name}?", default: false)
+          end
+
+          cleanup_launch_template(ce_class, stage)
+
+          cf_client.delete_stack(stack_name: stack_name)
+          $stdout.puts "  Waiting for deletion..."
+          Turbofan::Deploy::StackManager.wait_for_stack(
+            cf_client, stack_name: stack_name, target_states: ["DELETE_COMPLETE"]
+          )
+          $stdout.puts "  #{stack_name} deleted."
         end
       end
 
@@ -56,7 +90,19 @@ module Turbofan
         puts "  Container insights enabled on #{ecs_cluster_arn}"
       end
 
-      private_class_method :enable_container_insights
+      def self.cleanup_launch_template(ce_class, stage)
+        require "aws-sdk-ec2"
+        ec2 = Aws::EC2::Client.new
+        lt_name = "turbofan-ce-#{ce_class.slug}-#{stage}-launchtemplate"
+        ec2.delete_launch_template(launch_template_name: lt_name)
+        $stdout.puts "  Cleaned up orphaned launch template: #{lt_name}"
+      rescue Aws::EC2::Errors::InvalidLaunchTemplateNameNotFound
+        nil # no orphan — CloudFormation manages it
+      rescue Aws::Errors::MissingRegionError, Aws::Errors::MissingCredentialsError
+        nil # skip cleanup when AWS is not configured (e.g., tests)
+      end
+
+      private_class_method :enable_container_insights, :cleanup_launch_template
 
       def self.list
         load_all_definitions
