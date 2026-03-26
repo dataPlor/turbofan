@@ -2,7 +2,8 @@ module Turbofan
   class Configuration
     attr_accessor :bucket, :schemas_path, :default_region,
       :log_retention_days, :notification_topic_arn, :docker_registry,
-      :duckdb_version, :aws_account_id, :subnets, :security_groups
+      :duckdb_version, :aws_account_id, :subnets, :security_groups,
+      :cur_s3_uri
 
     def initialize
       @bucket = nil
@@ -15,6 +16,7 @@ module Turbofan
       @aws_account_id = nil
       @subnets = []
       @security_groups = []
+      @cur_s3_uri = nil
     end
   end
 

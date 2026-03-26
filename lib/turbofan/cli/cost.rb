@@ -1,10 +1,9 @@
 require "time"
+require "date"
 
 begin
   require "duckdb"
 rescue LoadError
-  # DuckDB gem not available — define a minimal shim so .open is public
-  # (Kernel#open is private and RSpec partial doubles cannot intercept it).
   unless defined?(DuckDB::Database)
     module DuckDB
       class Database
@@ -19,168 +18,141 @@ end
 module Turbofan
   class CLI < Thor
     module Cost
-      def self.call(pipeline_name:, stage:)
+      def self.call(pipeline_name:, stage:, days: 60, period: "day")
+        cur_uri = Turbofan.config.cur_s3_uri
+        unless cur_uri
+          print_missing_config
+          return
+        end
+
         dash_name = pipeline_name.tr("_", "-")
-        now = Time.now
-        billing_period = now.strftime("%Y-%m")
+        end_date = Date.today
+        start_date = end_date - days
 
         db = DuckDB::Database.open
         conn = db.connect
+        conn.query("INSTALL httpfs; LOAD httpfs;")
+        conn.query("CREATE SECRET (TYPE s3, PROVIDER credential_chain);")
 
-        exec_rows = query_executions(conn, dash_name, billing_period)
-        step_rows = query_steps(conn, dash_name, billing_period)
-        total_rows = query_total(conn, dash_name, billing_period)
+        parquet_glob = parquet_glob_sql(cur_uri, start_date, end_date)
+        trunc = period_trunc(period)
 
-        if exec_rows.empty? && step_rows.empty?
+        step_rows = conn.query(<<~SQL).to_a
+          SELECT
+            resource_tags['user_turbofan_step'] AS step,
+            #{trunc} AS period_start,
+            SUM(line_item_unblended_cost) AS cost
+          FROM read_parquet(#{parquet_glob}, hive_partitioning=true)
+          WHERE resource_tags['user_turbofan_managed'] = 'true'
+            AND resource_tags['user_turbofan_pipeline'] = '#{dash_name}'
+            AND resource_tags['user_turbofan_stage'] = '#{stage}'
+            AND line_item_usage_start_date >= '#{start_date}'
+            AND line_item_usage_start_date < '#{end_date + 1}'
+            AND line_item_unblended_cost > 0
+          GROUP BY step, period_start
+          ORDER BY period_start DESC, cost DESC
+        SQL
+
+        total_rows = conn.query(<<~SQL).to_a
+          SELECT
+            #{trunc} AS period_start,
+            SUM(line_item_unblended_cost) AS cost
+          FROM read_parquet(#{parquet_glob}, hive_partitioning=true)
+          WHERE resource_tags['user_turbofan_managed'] = 'true'
+            AND resource_tags['user_turbofan_pipeline'] = '#{dash_name}'
+            AND resource_tags['user_turbofan_stage'] = '#{stage}'
+            AND line_item_usage_start_date >= '#{start_date}'
+            AND line_item_usage_start_date < '#{end_date + 1}'
+            AND line_item_unblended_cost > 0
+          GROUP BY period_start
+          ORDER BY period_start DESC
+        SQL
+
+        if step_rows.empty?
           $stdout.puts "No cost data found for #{dash_name} (#{stage})."
           return
         end
 
-        print_header(dash_name, stage, now, billing_period)
-        print_executions(exec_rows)
-        print_steps(step_rows, total_rows)
-        print_total(total_rows, now)
-        export_parquet(conn, dash_name, billing_period, now)
+        print_results(dash_name, stage, start_date, end_date, period, step_rows, total_rows)
       rescue DuckDB::Error => e
-        warn e.message
+        warn "[Turbofan] DuckDB error: #{e.message}"
         $stdout.puts "No cost data found for #{dash_name} (#{stage})."
       ensure
         conn&.close if conn.respond_to?(:close)
       end
 
-      def self.query_executions(conn, pipeline_name, billing_period)
-        conn.query(<<~SQL, pipeline_name, billing_period).to_a
-          SELECT
-            resource_tags_turbofan_pipeline AS pipeline,
-            resource_tags_turbofan_execution AS execution,
-            SUM(line_item_unblended_cost) AS cost,
-            MIN(line_item_usage_start_date) AS min_time,
-            MAX(line_item_usage_end_date) AS max_time
-          FROM 'cur/*.parquet'
-          WHERE resource_tags_turbofan_managed = 'true'
-            AND resource_tags_turbofan_pipeline = $1
-            AND billing_period = $2
-          GROUP BY resource_tags_turbofan_pipeline, resource_tags_turbofan_execution
-          ORDER BY min_time DESC
-          LIMIT 10
-        SQL
+      def self.period_trunc(period)
+        case period
+        when "hour"  then "date_trunc('hour', line_item_usage_start_date)"
+        when "day"   then "date_trunc('day', line_item_usage_start_date)"
+        when "week"  then "date_trunc('week', line_item_usage_start_date)"
+        when "month" then "date_trunc('month', line_item_usage_start_date)"
+        else "date_trunc('day', line_item_usage_start_date)"
+        end
       end
-      private_class_method :query_executions
+      private_class_method :period_trunc
 
-      def self.query_steps(conn, pipeline_name, billing_period)
-        conn.query(<<~SQL, pipeline_name, billing_period).to_a
-          SELECT
-            resource_tags_turbofan_step AS step,
-            SUM(line_item_unblended_cost) AS cost
-          FROM 'cur/*.parquet'
-          WHERE resource_tags_turbofan_managed = 'true'
-            AND resource_tags_turbofan_pipeline = $1
-            AND resource_tags_turbofan_execution IS NOT NULL
-            AND billing_period = $2
-          GROUP BY resource_tags_turbofan_step
-          ORDER BY cost DESC
-        SQL
+      def self.billing_periods(start_date, end_date)
+        periods = []
+        current = Date.new(start_date.year, start_date.month, 1)
+        last = Date.new(end_date.year, end_date.month, 1)
+        while current <= last
+          periods << current.strftime("%Y-%m")
+          current = current.next_month
+        end
+        periods
       end
-      private_class_method :query_steps
+      private_class_method :billing_periods
 
-      def self.query_total(conn, pipeline_name, billing_period)
-        conn.query(<<~SQL, pipeline_name, billing_period).to_a
-          SELECT
-            SUM(line_item_unblended_cost) AS cost
-          FROM 'cur/*.parquet'
-          WHERE resource_tags_turbofan_managed = 'true'
-            AND resource_tags_turbofan_pipeline = $1
-            AND resource_tags_turbofan_step IS NOT NULL
-            AND resource_tags_turbofan_execution IS NOT NULL
-            AND billing_period = $2
-        SQL
+      def self.parquet_glob_sql(cur_uri, start_date, end_date)
+        # Use a single glob with hive partitioning — DuckDB filters by
+        # BILLING_PERIOD partition without failing on missing months.
+        "'#{cur_uri}/**/*.parquet'"
       end
-      private_class_method :query_total
+      private_class_method :parquet_glob_sql
 
-      def self.print_header(pipeline_name, stage, now, billing_period)
-        period_start = "#{billing_period}-01"
-        period_end = now.strftime("%Y-%m-%d")
-        $stdout.puts "Pipeline: #{pipeline_name} (#{stage})"
-        $stdout.puts "Period: #{period_start} to #{period_end}"
+      def self.print_missing_config
+        $stdout.puts <<~MSG
+          No CUR data configured. Set the S3 URI for your AWS Cost and Usage Report:
+
+            Turbofan.configure do |c|
+              c.cur_s3_uri = "s3://your-billing-bucket/cur-exports/your-export/data"
+            end
+
+          The URI should point to the directory containing BILLING_PERIOD=YYYY-MM/ partitions.
+          CUR 2.0 must be enabled with resource-level data and cost allocation tags.
+          See: https://docs.aws.amazon.com/cur/latest/userguide/dataexports-create-standard.html
+        MSG
+      end
+      private_class_method :print_missing_config
+
+      def self.print_results(pipeline, stage, start_date, end_date, period, step_rows, total_rows)
+        $stdout.puts "Pipeline: #{pipeline} (#{stage})"
+        $stdout.puts "Period: #{start_date} to #{end_date} (#{period}ly)"
         $stdout.puts ""
-      end
-      private_class_method :print_header
 
-      def self.print_executions(rows)
-        $stdout.puts "Recent Executions:"
-        rows.each do |row|
-          execution = row["execution"]
-          cost = format("%.2f", row["cost"])
-          min_time = row["min_time"].to_s
-          max_time = row["max_time"].to_s
-          duration = format_duration(min_time, max_time)
-          date_part = min_time[0, 16]
-          $stdout.puts "  #{date_part}  #{execution}  $#{cost}  (#{duration})"
+        grand_total = total_rows.sum { |r| r["cost"].to_f }
+
+        steps = step_rows.group_by { |r| r["step"] }
+        $stdout.puts "By Step:"
+        steps.sort_by { |_, rows| -rows.sum { |r| r["cost"].to_f } }.each do |step, rows|
+          cost = rows.sum { |r| r["cost"].to_f }
+          pct = grand_total > 0 ? (cost / grand_total * 100).round : 0
+          $stdout.puts "  %-30s $%8.2f  (%d%%)" % [step, cost, pct]
         end
         $stdout.puts ""
-      end
-      private_class_method :print_executions
 
-      def self.print_steps(rows, total_rows)
-        total_cost = total_rows.first&.fetch("cost", 0).to_f
-        $stdout.puts "By Step (current month):"
-        rows.each do |row|
-          step_name = row["step"]
-          cost = row["cost"].to_f
-          cost_str = format("%.2f", cost)
-          pct = (total_cost > 0) ? (cost / total_cost * 100).round : 0
-          $stdout.puts "  #{step_name}    $#{cost_str}  (#{pct}%)"
+        $stdout.puts "By #{period.capitalize}:"
+        total_rows.first(14).each do |row|
+          date_str = row["period_start"].to_s[0, period == "hour" ? 16 : 10]
+          $stdout.puts "  %-16s $%8.2f" % [date_str, row["cost"].to_f]
         end
+        $stdout.puts "  ..." if total_rows.size > 14
         $stdout.puts ""
-      end
-      private_class_method :print_steps
 
-      def self.print_total(total_rows, now)
-        total_cost = total_rows.first&.fetch("cost", 0).to_f
-        month_name = now.strftime("%b %Y")
-        $stdout.puts "Total (#{month_name}):     $#{format("%.2f", total_cost)}"
+        $stdout.puts "Total:  $#{"%.2f" % grand_total}"
       end
-      private_class_method :print_total
-
-      def self.export_parquet(conn, pipeline_name, billing_period, now)
-        filename = "cost-#{now.strftime("%Y-%m-%dT%H%M%S")}.parquet"
-        conn.query(<<~SQL, pipeline_name, billing_period)
-          CREATE OR REPLACE TEMP VIEW cost_export AS
-          SELECT
-            resource_tags_turbofan_pipeline AS pipeline,
-            resource_tags_turbofan_step AS step,
-            resource_tags_turbofan_execution AS execution,
-            SUM(line_item_unblended_cost) AS cost
-          FROM 'cur/*.parquet'
-          WHERE resource_tags_turbofan_managed = 'true'
-            AND resource_tags_turbofan_pipeline = $1
-            AND billing_period = $2
-          GROUP BY ALL
-          ORDER BY cost DESC
-        SQL
-        # COPY TO does not support parameterized filenames; sanitize instead
-        safe_filename = filename.gsub(/[^a-zA-Z0-9._\-\/]/, "_")
-        conn.query("COPY cost_export TO '#{safe_filename}' (FORMAT PARQUET)")
-        $stdout.puts "Saved to #{filename}"
-      end
-      private_class_method :export_parquet
-
-      def self.format_duration(min_time_str, max_time_str)
-        return "0m" if min_time_str.empty? || max_time_str.empty?
-        min_t = Time.parse(min_time_str)
-        max_t = Time.parse(max_time_str)
-        seconds = (max_t - min_t).to_i
-        hours = seconds / 3600
-        minutes = (seconds % 3600) / 60
-        if hours > 0
-          "#{hours}h #{minutes.to_s.rjust(2, "0")}m"
-        else
-          "#{minutes}m"
-        end
-      rescue ArgumentError, TypeError
-        "unknown"
-      end
-      private_class_method :format_duration
+      private_class_method :print_results
     end
   end
 end

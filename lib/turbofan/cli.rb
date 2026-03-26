@@ -86,11 +86,15 @@ module Turbofan
       )
     end
 
-    desc "cost PIPELINE STAGE", "Query CUR cost data for a pipeline"
+    desc "cost PIPELINE STAGE", "Query CUR cost data from S3"
+    option :days, type: :numeric, default: 60, desc: "Number of days to query (default: 60)"
+    option :period, type: :string, default: "day", desc: "Time period: hour, day, week, month"
     def cost(pipeline_name, stage)
       Turbofan::CLI::Cost.call(
         pipeline_name: pipeline_name,
-        stage: stage
+        stage: stage,
+        days: options[:days],
+        period: options[:period]
       )
     end
 
