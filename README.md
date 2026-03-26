@@ -409,6 +409,16 @@ turbofan start my_pipeline staging --input_file trigger.json
 
 `turbofan run` is an alias for `turbofan start`.
 
+**Trigger inputs must be small.** The trigger input flows through Step Functions state and AWS Batch container overrides, both of which have size limits (256KB and 8KB respectively). Pass metadata and S3 pointers — not raw data arrays. If your pipeline processes a large dataset, the trigger should reference where the data lives, and the first step reads it:
+
+```ruby
+# Good: small trigger with S3 pointer
+turbofan start my_pipeline staging --input '{"data_uri": "s3://bucket/items.json", "date": "2026-03-25"}'
+
+# Bad: raw data as trigger (will fail at ~100+ items)
+turbofan start my_pipeline staging --input_file giant_array_of_65536_items.json
+```
+
 ### Monitoring
 
 Watch execution progress:
