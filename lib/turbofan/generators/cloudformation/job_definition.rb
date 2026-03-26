@@ -43,9 +43,7 @@ module Turbofan
             "Type" => "container",
             "PlatformCapabilities" => ["EC2"],
             "PropagateTags" => true,
-            "Tags" => CloudFormation.tags_hash(tags + [
-              {"Key" => "turbofan:retry-budget", "Value" => INFRASTRUCTURE_RETRIES.to_s}
-            ]),
+            "Tags" => CloudFormation.tags_hash(tags),
             "ContainerProperties" => container,
             "RetryStrategy" => retry_strategy(step_class),
             "Timeout" => {"AttemptDurationSeconds" => step_class.turbofan_timeout}
@@ -74,11 +72,8 @@ module Turbofan
           {
             "Attempts" => INFRASTRUCTURE_RETRIES,
             "EvaluateOnExit" => [
-              {"OnStatusReason" => "Host EC2*", "Action" => "RETRY"},
-              {"OnExitCode" => "137", "Action" => "RETRY"},
-              {"OnExitCode" => "143", "Action" => "RETRY"},
-              {"OnStatusReason" => "Task failed to start*", "Action" => "RETRY"},
-              {"OnReason" => "*", "Action" => "EXIT"}
+              {"OnExitCode" => "0", "Action" => "EXIT"},
+              {"OnReason" => "*", "Action" => "RETRY"}
             ]
           }
         end
