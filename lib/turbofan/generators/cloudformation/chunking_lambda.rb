@@ -118,9 +118,12 @@ module Turbofan
 
         LAMBDA_RUNTIME = "ruby3.3"
 
-        # Returns the S3 key where the handler zip should be uploaded
+        # Returns the S3 key where the handler zip should be uploaded.
+        # Includes the code hash so CloudFormation detects code changes
+        # (S3Key change forces Lambda to re-download the zip).
         def self.handler_s3_key(bucket_prefix)
-          "#{bucket_prefix}/chunking-lambda/handler.zip"
+          code_hash = Digest::SHA256.hexdigest(HANDLER)[0, 12]
+          "#{bucket_prefix}/chunking-lambda/handler-#{code_hash}.zip"
         end
 
         # Builds a minimal zip file containing index.rb with the handler code

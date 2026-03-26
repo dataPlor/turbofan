@@ -89,7 +89,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(code).to have_key("S3Bucket")
       expect(code).to have_key("S3Key")
       expect(code["S3Bucket"]).to eq("turbofan-shared-bucket")
-      expect(code["S3Key"]).to include("chunking-lambda/handler.zip")
+      expect(code["S3Key"]).to match(%r{chunking-lambda/handler-[0-9a-f]+\.zip})
     end
 
     it "sets a Timeout on the Lambda function" do
@@ -469,9 +469,17 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(zip_bytes).to include("aws-sdk-s3")
     end
 
-    it "handler_s3_key includes bucket prefix and handler.zip" do
+    it "handler_s3_key includes bucket prefix and code hash" do
       key = Turbofan::Generators::CloudFormation::ChunkingLambda.handler_s3_key("my-pipeline-staging")
-      expect(key).to eq("my-pipeline-staging/chunking-lambda/handler.zip")
+      expect(key).to match(%r{\Amy-pipeline-staging/chunking-lambda/handler-[0-9a-f]{12}\.zip\z})
+    end
+
+    it "handler_s3_key changes when handler code changes" do
+      key1 = Turbofan::Generators::CloudFormation::ChunkingLambda.handler_s3_key("prefix")
+      # The key includes a hash of the HANDLER constant, so it's stable
+      # but would change if the handler code changed
+      key2 = Turbofan::Generators::CloudFormation::ChunkingLambda.handler_s3_key("prefix")
+      expect(key1).to eq(key2)
     end
   end
 

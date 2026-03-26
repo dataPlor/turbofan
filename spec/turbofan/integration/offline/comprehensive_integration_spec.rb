@@ -297,7 +297,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       code = cfn.dig("Resources", "ChunkingLambda", "Properties", "Code")
       expect(code).to have_key("S3Bucket")
       expect(code).to have_key("S3Key")
-      expect(code["S3Key"]).to include("chunking-lambda/handler.zip")
+      expect(code["S3Key"]).to match(%r{chunking-lambda/handler-[0-9a-f]+\.zip})
     end
 
     it "includes SNS notification topic" do
