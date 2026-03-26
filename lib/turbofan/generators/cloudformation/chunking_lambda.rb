@@ -30,23 +30,31 @@ module Turbofan
                 all_items = []
                 parents.each do |parent|
                   parent['size'].times do |idx|
-                    key = s3_key(execution_id, prev_step, 'output', "parent#{parent['index']}", "#{idx}.json")
-                    response = S3.get_object(bucket: bucket, key: key)
-                    data = JSON.parse(response.body.read)
-                    all_items << data if data
+                    begin
+                      key = s3_key(execution_id, prev_step, 'output', "parent#{parent['index']}", "#{idx}.json")
+                      response = S3.get_object(bucket: bucket, key: key)
+                      all_items << JSON.parse(response.body.read)
+                    rescue Aws::S3::Errors::NoSuchKey
+                      nil # sentinel chunk — no output written, skip
+                    end
                   end
                 end
                 all_items
-              elsif event.key?('prev_fan_out_size')
-                count = event['prev_fan_out_size'].to_i
-                threads = (0...count).map do |i|
-                  Thread.new(i) do |idx|
-                    key = s3_key(execution_id, prev_step, 'output', "#{idx}.json")
-                    response = S3.get_object(bucket: bucket, key: key)
-                    JSON.parse(response.body.read)
+              elsif event.key?('prev_fan_out_sizes')
+                sizes = event['prev_fan_out_sizes']
+                all_items = []
+                sizes.each do |size_name, size_info|
+                  size_info['count'].times do |idx|
+                    begin
+                      key = s3_key(execution_id, prev_step, 'output', size_name, "#{idx}.json")
+                      response = S3.get_object(bucket: bucket, key: key)
+                      all_items << JSON.parse(response.body.read)
+                    rescue Aws::S3::Errors::NoSuchKey
+                      nil # sentinel — skip
+                    end
                   end
                 end
-                threads.map(&:value)
+                all_items
               else
                 key = s3_key(execution_id, prev_step, 'output.json')
                 response = S3.get_object(bucket: bucket, key: key)

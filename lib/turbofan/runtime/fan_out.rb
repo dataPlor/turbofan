@@ -47,9 +47,13 @@ module Turbofan
         if chunks
           chunks.each do |chunk_key, chunk_count|
             chunk_count.times do |index|
-              key = s3_key(execution_id, step_name, "output", chunk_key.to_s, "#{index}.json")
-              response = s3_client.get_object(bucket: bucket, key: key)
-              yield JSON.parse(response.body.read)
+              begin
+                key = s3_key(execution_id, step_name, "output", chunk_key.to_s, "#{index}.json")
+                response = s3_client.get_object(bucket: bucket, key: key)
+                yield JSON.parse(response.body.read)
+              rescue Aws::S3::Errors::NoSuchKey
+                nil # sentinel chunk — no output written, skip
+              end
             end
           end
         else

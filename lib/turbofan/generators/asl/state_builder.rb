@@ -119,10 +119,6 @@ module Turbofan
             }
           }
 
-          if step.fan_out?
-            params["ArrayProperties"] = {"Size.$" => "$.chunking.#{step_name}.chunk_count"}
-          end
-
           state = {
             "Type" => "Task",
             "Resource" => BATCH_RESOURCE,
@@ -278,7 +274,8 @@ module Turbofan
             prev_step_obj = @pipeline.turbofan_dag.sorted_steps.find { |s| s.name.to_s == prev_step_name.to_s }
             if prev_step_obj&.fan_out?
               if routed_fan_out?(prev_step_obj)
-                payload["prev_fan_out_size.$"] = "States.JsonToString($.chunking.#{prev_step_name}.chunk_count)"
+                sizes = @steps[prev_step_obj.name].turbofan_sizes
+                payload["prev_fan_out_sizes.$"] = "States.JsonToString($.chunking.#{prev_step_name}.sizes)"
               else
                 payload["prev_fan_out_parents.$"] = "States.JsonToString($.chunking.#{prev_step_name}.parents)"
               end
