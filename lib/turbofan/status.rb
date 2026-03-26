@@ -7,18 +7,19 @@ module Turbofan
 
     def self.fetch(sfn_client:, batch_client:, execution_arn:, pipeline_name:, stage:, steps:)
       execution = sfn_client.describe_execution(execution_arn: execution_arn)
+      started_at = execution.start_date
 
       step_results = steps_entries(steps).map do |step_name, step_class|
         if step_class&.respond_to?(:turbofan_sizes) && step_class.turbofan_sizes.any?
           counts = {pending: 0, running: 0, succeeded: 0, failed: 0}
           step_class.turbofan_sizes.each_key do |size|
             job_queue = "turbofan-#{pipeline_name}-#{stage}-queue-#{step_name}-#{size}"
-            size_counts = count_jobs(batch_client, job_queue)
+            size_counts = count_jobs(batch_client, job_queue, after: started_at)
             counts.each_key { |k| counts[k] += size_counts[k] }
           end
         else
           job_queue = "turbofan-#{pipeline_name}-#{stage}-queue-#{step_name}"
-          counts = count_jobs(batch_client, job_queue)
+          counts = count_jobs(batch_client, job_queue, after: started_at)
         end
         {
           name: step_name.to_s,
@@ -37,17 +38,20 @@ module Turbofan
       }
     end
 
-    def self.count_jobs(batch_client, job_queue)
+    def self.count_jobs(batch_client, job_queue, after: nil)
       counts = {pending: 0, running: 0, succeeded: 0, failed: 0}
+
+      filters = []
+      if after
+        filters << {name: "AFTER_CREATED_AT", values: [(after.to_i * 1000).to_s]}
+      end
 
       BATCH_STATUSES.each do |batch_status|
         next_token = nil
         loop do
-          response = batch_client.list_jobs(
-            job_queue: job_queue,
-            job_status: batch_status,
-            next_token: next_token
-          )
+          params = {job_queue: job_queue, job_status: batch_status, next_token: next_token}
+          params[:filters] = filters if filters.any?
+          response = batch_client.list_jobs(**params)
           job_count = response.job_summary_list.sum do |job|
             if job.array_properties
               if job.array_properties.index

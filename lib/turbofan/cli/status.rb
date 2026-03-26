@@ -84,11 +84,12 @@ module Turbofan
           jobs = step[:jobs]
           total = jobs.values.sum
           parts = []
-          parts << "#{jobs[:succeeded]}/#{total} succeeded" if jobs[:succeeded] > 0 || step[:status] == "SUCCEEDED"
+          parts << "#{jobs[:succeeded]} succeeded" if jobs[:succeeded] > 0
           parts << "#{jobs[:running]} running" if jobs[:running] > 0
           parts << "#{jobs[:failed]} failed" if jobs[:failed] > 0
           parts << "#{jobs[:pending]} pending" if jobs[:pending] > 0
-          job_str = parts.empty? ? "" : "  #{parts.join("  ")}"
+          parts << "#{total} total" if total > 0
+          job_str = parts.empty? ? "" : "  #{parts.join(", ")}"
           $stdout.puts "  #{indicator} #{step[:name]} #{step[:status]}#{job_str}"
         end
         $stdout.puts ""
