@@ -285,6 +285,22 @@ The S3 file must be `{"items": [...]}`:
 
 The `items_s3_uri` must point to the pipeline's S3 bucket (`Turbofan.config.bucket`). The chunking Lambda validates both the URI prefix and the file shape — clear errors on any mismatch.
 
+#### Scaling beyond 10,000 items
+
+AWS Batch array jobs are capped at 10,000 children. When a fan-out produces more than 10,000 chunks, Turbofan automatically splits them across **multiple parent array jobs**, balanced evenly:
+
+```
+256 items   → 1 parent  × 256 children
+64,256 items → 7 parents × ~9,180 children each
+```
+
+The chunking Lambda handles the splitting. A Step Functions **Map state** submits each parent as a separate Batch array job in parallel. This is transparent to step authors — your `call(inputs, context)` method sees the same single-item input regardless of how many parents were used.
+
+**Limits:**
+- Inline Map supports up to 40 iterations (400,000 items with `batch_size=1`, or 40M items with `batch_size=100`)
+- When one parent's Batch job fails, all other parents are cancelled (fail-fast behavior)
+- Routed fan-outs with >10,000 items in a single size are not supported (the Lambda raises a validation error)
+
 When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own Batch array job with the appropriate CPU/RAM allocation. See the [Routers](#turbofanrouter) section for details.
 
 ### Schemas
