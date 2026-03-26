@@ -67,6 +67,7 @@ module Turbofan
             "Attempts" => step_class.turbofan_retries,
             "EvaluateOnExit" => [
               {"OnStatusReason" => "Host EC2*", "Action" => "RETRY"},
+              {"OnExitCode" => "137", "Action" => "RETRY"},
               {"OnExitCode" => "143", "Action" => "RETRY"},
               {"OnExitCode" => "0", "Action" => "EXIT"},
               {"OnStatusReason" => "Task failed to start*", "Action" => "RETRY"},

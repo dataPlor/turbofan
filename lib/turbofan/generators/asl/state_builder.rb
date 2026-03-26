@@ -134,7 +134,10 @@ module Turbofan
           step_class = @steps[step_name]
           state["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
 
-          if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan_retry_on
+          if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan_retry_on && !step.fan_out?
+            # SFN Retry only for non-fan-out steps. Fan-out steps use Batch-level
+            # retries per child (retryStrategy.attempts in the job definition).
+            # SFN Retry on a fan-out step would re-submit the entire array job.
             state["Retry"] = [{
               "ErrorEquals" => step_class.turbofan_retry_on,
               "MaxAttempts" => step_class.turbofan_retries,
