@@ -7,8 +7,15 @@ module Turbofan
         bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
         if context.array_index
           step_name = ENV.fetch("TURBOFAN_STEP_NAME")
-          size_segment = context.size ? "#{context.size}/" : ""
-          key = FanOut.s3_key(context.execution_id, step_name, "output", "#{size_segment}#{context.array_index}.json")
+          parent_index = ENV["TURBOFAN_PARENT_INDEX"]
+          segment = if context.size
+            "#{context.size}/"
+          elsif parent_index
+            "parent#{parent_index}/"
+          else
+            ""
+          end
+          key = FanOut.s3_key(context.execution_id, step_name, "output", "#{segment}#{context.array_index}.json")
           context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
           JSON.generate(result)
         else

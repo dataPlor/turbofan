@@ -28,6 +28,15 @@ module Turbofan
         metadata = envelope.except("inputs")
         context.instance_variable_set(:@envelope, metadata)
         inputs = envelope["inputs"]
+
+        # Sentinel chunk from padding (Batch minimum array size 2).
+        # The chunking lambda pads with null; exit cleanly, no work to do.
+        if inputs == [nil]
+          context.logger.info("Sentinel chunk, no work")
+          Lineage.emit(Lineage.complete_event(context: context, step_class: @step_class), context: context)
+          return
+        end
+
         SchemaValidator.validate_input!(@step_class, inputs)
         result = @step_class.new.call(inputs, context)
         SchemaValidator.validate_output!(@step_class, result)

@@ -18,7 +18,8 @@ module Turbofan
             bucket: bucket,
             execution_id: context.execution_id,
             step_name: step_name,
-            chunk: context.size
+            chunk: context.size,
+            parent_index: ENV["TURBOFAN_PARENT_INDEX"]
           )
         elsif ENV.key?("TURBOFAN_PREV_STEPS")
           fetch_parallel_outputs(context)

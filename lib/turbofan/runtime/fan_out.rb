@@ -23,9 +23,11 @@ module Turbofan
         )
       end
 
-      def read_input(array_index:, s3_client:, bucket:, execution_id:, step_name:, chunk: nil)
+      def read_input(array_index:, s3_client:, bucket:, execution_id:, step_name:, chunk: nil, parent_index: nil)
         key = if chunk
           s3_key(execution_id, step_name, "input", chunk.to_s, "items.json")
+        elsif parent_index
+          s3_key(execution_id, step_name, "input", "parent#{parent_index}", "items.json")
         else
           s3_key(execution_id, step_name, "input", "items.json")
         end
@@ -90,10 +92,15 @@ module Turbofan
         results = Array.new(work.size)
         threaded_work(work) do |chunk, index, ri|
           key = s3_key(execution_id, step_name, "output", chunk.to_s, "#{index}.json")
-          response = s3_client.get_object(bucket: bucket, key: key)
-          results[ri] = JSON.parse(response.body.read)
+          begin
+            response = s3_client.get_object(bucket: bucket, key: key)
+            results[ri] = JSON.parse(response.body.read)
+          rescue Aws::S3::Errors::NoSuchKey
+            # Sentinel chunk (padding for Batch minimum array size) — no output written
+            results[ri] = nil
+          end
         end
-        results
+        results.compact
       end
       private_class_method :collect_chunked_outputs
 
