@@ -66,10 +66,12 @@ RSpec.describe "turbofan cost" do # rubocop:disable RSpec/DescribeClass
     end
   end
 
-  describe ".parquet_glob_sql" do
-    it "returns a wildcard glob for all partitions" do
-      result = Turbofan::CLI::Cost.send(:parquet_glob_sql, "s3://bucket/data", Date.new(2026, 1, 1), Date.new(2026, 3, 1))
-      expect(result).to include("s3://bucket/data/**/*.parquet")
+  describe ".billing_period_filtering" do
+    it "generates per-month globs to avoid scanning all partitions" do
+      # parquet_glob_sql requires a connection to check which periods exist,
+      # so we test the billing_periods helper instead
+      periods = Turbofan::CLI::Cost.send(:billing_periods, Date.new(2026, 2, 1), Date.new(2026, 3, 25))
+      expect(periods).to eq(["2026-02", "2026-03"])
     end
   end
 

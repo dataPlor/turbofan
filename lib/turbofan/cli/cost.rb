@@ -34,7 +34,7 @@ module Turbofan
         conn.query("INSTALL httpfs; LOAD httpfs;")
         conn.query("CREATE SECRET (TYPE s3, PROVIDER credential_chain);")
 
-        parquet_glob = parquet_glob_sql(cur_uri, start_date, end_date)
+        parquet_glob = parquet_glob_sql(conn, cur_uri, start_date, end_date)
         trunc = period_trunc(period)
 
         step_rows = conn.query(<<~SQL).to_a
@@ -104,10 +104,20 @@ module Turbofan
       end
       private_class_method :billing_periods
 
-      def self.parquet_glob_sql(cur_uri, start_date, end_date)
-        # Use a single glob with hive partitioning — DuckDB filters by
-        # BILLING_PERIOD partition without failing on missing months.
-        "'#{cur_uri}/**/*.parquet'"
+      def self.parquet_glob_sql(conn, cur_uri, start_date, end_date)
+        # Check which billing periods actually exist on S3 to avoid
+        # DuckDB failing on missing partitions.
+        globs = billing_periods(start_date, end_date).filter_map do |bp|
+          glob = "#{cur_uri}/BILLING_PERIOD=#{bp}/*.parquet"
+          begin
+            conn.query("SELECT 1 FROM read_parquet('#{glob}') LIMIT 0")
+            glob
+          rescue DuckDB::Error
+            nil # billing period doesn't exist yet
+          end
+        end
+        raise DuckDB::Error, "No CUR data found for the requested period" if globs.empty?
+        "[#{globs.map { |g| "'#{g}'" }.join(", ")}]"
       end
       private_class_method :parquet_glob_sql
 
