@@ -284,9 +284,7 @@ The S3 file must be `{"items": [...]}`:
 {"items": [{"prefix": "aa"}, {"prefix": "ab"}, {"prefix": "ac"}]}
 ```
 
-The chunking Lambda validates this shape — if the file doesn't have an `items` array, the Lambda fails with a clear error.
-
-The chunking Lambda reads from the S3 URI, splits the items into chunks of `batch_size`, and writes each chunk to S3 for the Batch array job.
+The `items_s3_uri` must point to the pipeline's S3 bucket (`Turbofan.config.bucket`). The chunking Lambda validates both the URI prefix and the file shape — clear errors on any mismatch.
 
 When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own Batch array job with the appropriate CPU/RAM allocation. See the [Routers](#turbofanrouter) section for details.
 

@@ -60,8 +60,17 @@ module Turbofan
             end
 
             uri = input['items_s3_uri']
-            parts = uri.sub('s3://', '').split('/', 2)
-            response = S3.get_object(bucket: parts[0], key: parts[1])
+            unless uri.is_a?(String) && uri.start_with?('s3://')
+              raise "Invalid items_s3_uri: expected s3:// URI, got: #{uri.inspect}"
+            end
+
+            key = uri.sub("s3://#{bucket}/", '')
+            if key == uri
+              raise "items_s3_uri must reference the pipeline bucket (s3://#{bucket}/...). " \
+                    "Got: #{uri}"
+            end
+
+            response = S3.get_object(bucket: bucket, key: key)
             data = JSON.parse(response.body.read)
 
             unless data.is_a?(Hash) && data.key?('items') && data['items'].is_a?(Array)
