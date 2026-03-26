@@ -97,8 +97,12 @@ module Turbofan
                 states["#{step.name}_routed"] = build_routed_parallel_state(
                   step, routed_next
                 )
-                next
+              else
+                states[step.name.to_s] = build_fan_out_map_state(
+                  step, actual_next, last: last
+                )
               end
+              next
             end
 
             if is_join

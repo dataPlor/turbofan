@@ -79,9 +79,9 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(payload).not_to have_key("items")
       end
 
-      it "chunk state has ResultSelector for chunk_count" do
+      it "chunk state has ResultSelector for parents" do
         chunk_state = asl["States"]["process_chunk"]
-        expect(chunk_state["ResultSelector"]).to eq({"chunk_count.$" => "$.Payload.chunk_count"})
+        expect(chunk_state["ResultSelector"]).to eq({"parents.$" => "$.Payload.parents"})
       end
 
       it "chunk state stores result in $.chunking.process" do
@@ -94,10 +94,25 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(chunk_state["Catch"]).to eq([{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}])
       end
 
-      it "generates a Batch state with dynamic ArrayProperties for the fan_out step" do
+      it "generates a Map state for the fan_out step" do
         process_state = asl["States"]["process"]
-        array_props = process_state.dig("Parameters", "ArrayProperties")
-        expect(array_props).to eq({"Size.$" => "$.chunking.process.chunk_count"})
+        expect(process_state["Type"]).to eq("Map")
+        expect(process_state["ItemsPath"]).to eq("$.chunking.process.parents")
+      end
+
+      it "Map inner task has dynamic ArrayProperties from parent size" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        array_props = inner_task.dig("Parameters", "ArrayProperties")
+        expect(array_props).to eq({"Size.$" => "$.size"})
+      end
+
+      it "Map inner task has ResultSelector to trim Batch response" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        expect(inner_task["ResultSelector"]).to eq({
+          "JobId.$" => "$.JobId",
+          "JobName.$" => "$.JobName",
+          "Status.$" => "$.Status"
+        })
       end
 
       it "aggregate step has TURBOFAN_PREV_FAN_OUT_SIZE env var" do
@@ -108,15 +123,15 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(fan_out_size_var["Value.$"]).to eq("States.JsonToString($.chunking.process.chunk_count)")
       end
 
-      it "references the correct job definition for the fan_out step" do
-        process_state = asl["States"]["process"]
-        job_def = process_state.dig("Parameters", "JobDefinition")
+      it "references the correct job definition in Map inner task" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        job_def = inner_task.dig("Parameters", "JobDefinition")
         expect(job_def).to include("process")
       end
 
-      it "references the correct job queue for the fan_out step" do
-        process_state = asl["States"]["process"]
-        job_queue = process_state.dig("Parameters", "JobQueue")
+      it "references the correct job queue in Map inner task" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        job_queue = inner_task.dig("Parameters", "JobQueue")
         expect(job_queue).to include("process")
       end
     end
@@ -230,10 +245,11 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       let(:generator) { described_class.new(pipeline: pipeline_class, stage: "production") }
       let(:asl) { generator.generate }
 
-      it "generates a valid fan_out state with dynamic ArrayProperties" do
+      it "generates a Map state with inner Batch task" do
         process_state = asl["States"]["process"]
-        expect(process_state["Type"]).to eq("Task")
-        expect(process_state.dig("Parameters", "ArrayProperties", "Size.$")).to eq("$.chunking.process.chunk_count")
+        expect(process_state["Type"]).to eq("Map")
+        inner_task = process_state.dig("ItemProcessor", "States", "process_batch")
+        expect(inner_task.dig("Parameters", "ArrayProperties", "Size.$")).to eq("$.size")
       end
 
       it "chunk state has group_size of 50" do
@@ -278,22 +294,23 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(payload).not_to have_key("input.$")
       end
 
-      it "generates a Task state with dynamic ArrayProperties" do
+      it "generates a Map state with inner Batch task" do
         process_state = asl["States"]["process"]
-        expect(process_state["Type"]).to eq("Task")
-        expect(process_state.dig("Parameters", "ArrayProperties", "Size.$")).to eq("$.chunking.process.chunk_count")
+        expect(process_state["Type"]).to eq("Map")
+        inner_task = process_state.dig("ItemProcessor", "States", "process_batch")
+        expect(inner_task.dig("Parameters", "ArrayProperties", "Size.$")).to eq("$.size")
       end
 
       it "each chunk is capped at 10,000 items" do
         expect(Turbofan::Generators::ASL::MAX_ARRAY_SIZE).to eq(10_000)
       end
 
-      it "does NOT set TURBOFAN_INPUT on the fan-out batch step" do
-        process_state = asl["States"]["process"]
-        env = process_state.dig("Parameters", "ContainerOverrides", "Environment")
+      it "does NOT set TURBOFAN_INPUT on the fan-out Map inner task" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
         input_var = env.find { |e| e["Name"] == "TURBOFAN_INPUT" }
         expect(input_var).to be_nil,
-          "Fan-out first steps should not set TURBOFAN_INPUT (raw data hits 8KB Batch limit)"
+          "Fan-out steps should not set TURBOFAN_INPUT (raw data hits 8KB Batch limit)"
       end
     end
 
@@ -401,24 +418,24 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       let(:generator) { described_class.new(pipeline: pipeline_class, stage: "production") }
       let(:asl) { generator.generate }
 
-      it "fan_out step sets TURBOFAN_STEP_NAME for S3 path construction" do
-        process_state = asl["States"]["process"]
-        env = process_state.dig("Parameters", "ContainerOverrides", "Environment")
+      it "fan_out Map inner task sets TURBOFAN_STEP_NAME for S3 path construction" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
         step_name_var = env&.find { |e| e["Name"] == "TURBOFAN_STEP_NAME" }
         expect(step_name_var).not_to be_nil,
-          "expected fan_out step to set TURBOFAN_STEP_NAME for S3 path construction"
+          "expected fan_out Map inner task to set TURBOFAN_STEP_NAME for S3 path construction"
       end
 
-      it "fan_out step sets TURBOFAN_EXECUTION_ID for S3 path construction" do
-        process_state = asl["States"]["process"]
-        env = process_state.dig("Parameters", "ContainerOverrides", "Environment")
+      it "fan_out Map inner task sets TURBOFAN_EXECUTION_ID for S3 path construction" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
         exec_id_var = env&.find { |e| e["Name"] == "TURBOFAN_EXECUTION_ID" }
         expect(exec_id_var).not_to be_nil
       end
 
-      it "fan_out step sets TURBOFAN_BUCKET for S3 access" do
-        process_state = asl["States"]["process"]
-        env = process_state.dig("Parameters", "ContainerOverrides", "Environment")
+      it "fan_out Map inner task sets TURBOFAN_BUCKET for S3 access" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
         bucket_var = env&.find { |e| e["Name"] == "TURBOFAN_BUCKET" }
         expect(bucket_var).not_to be_nil
       end
@@ -624,9 +641,9 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(asl["States"]["process_chunk"]["Next"]).to eq("process")
       end
 
-      it "batch state chains to success notification" do
+      it "Map state chains to success notification" do
         process_state = asl["States"]["process"]
-        expect(process_state["Type"]).to eq("Task")
+        expect(process_state["Type"]).to eq("Map")
         expect(process_state["Next"]).to match(/success/i)
       end
     end

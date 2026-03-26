@@ -161,6 +161,52 @@ module Turbofan
           state
         end
 
+        def build_fan_out_map_state(step, next_step_name, last:)
+          step_name = step.name
+          refs = resolve_job_refs(step_name)
+          env = base_env + [
+            {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s},
+            {"Name" => "TURBOFAN_PARENT_INDEX", "Value.$" => "States.Format('{}', $.index)"}
+          ]
+
+          inner_task = {
+            "Type" => "Task",
+            "Resource" => BATCH_RESOURCE,
+            "Parameters" => {
+              "JobDefinition" => refs[:job_definition],
+              "JobName.$" => "States.Format('#{@prefix}-#{step_name}-parent{}', $.index)",
+              "JobQueue" => refs[:job_queue],
+              "ContainerOverrides" => {"Environment" => env},
+              "ArrayProperties" => {"Size.$" => "$.size"}
+            },
+            "ResultSelector" => {
+              "JobId.$" => "$.JobId",
+              "JobName.$" => "$.JobName",
+              "Status.$" => "$.Status"
+            },
+            "End" => true
+          }
+
+          step_class = @steps[step_name]
+          inner_task["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
+
+          map_state = {
+            "Type" => "Map",
+            "ItemsPath" => "$.chunking.#{step_name}.parents",
+            "MaxConcurrency" => 0,
+            "ItemProcessor" => {
+              "ProcessorConfig" => {"Mode" => "INLINE"},
+              "StartAt" => "#{step_name}_batch",
+              "States" => {"#{step_name}_batch" => inner_task}
+            },
+            "ResultPath" => "$.steps.#{step_name}",
+            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+          }
+
+          map_state["Next"] = last ? "NotifySuccess" : next_step_name.to_s
+          map_state
+        end
+
         def build_branch_state(step, prev_step_name)
           step_name = step.name
 
@@ -240,7 +286,7 @@ module Turbofan
           result_selector = if routed
             {"sizes.$" => "$.Payload.sizes"}
           else
-            {"chunk_count.$" => "$.Payload.chunk_count"}
+            {"parents.$" => "$.Payload.parents"}
           end
 
           next_state = routed ? "#{step.name}_routed" : step.name.to_s

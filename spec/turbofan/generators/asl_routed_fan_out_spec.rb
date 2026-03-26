@@ -275,11 +275,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(payload).not_to have_key("routed")
     end
 
-    it "generates a regular Batch state (not Parallel)" do
+    it "generates a Map state (not Parallel) for non-routed fan-out" do
       process_state = asl["States"]["process"]
       expect(process_state).not_to be_nil
-      expect(process_state["Type"]).to eq("Task")
-      expect(process_state["Resource"]).to eq("arn:aws:states:::batch:submitJob.sync")
+      expect(process_state["Type"]).to eq("Map")
+      inner_task = process_state.dig("ItemProcessor", "States", "process_batch")
+      expect(inner_task["Resource"]).to eq("arn:aws:states:::batch:submitJob.sync")
       expect(asl["States"]).not_to have_key("process_routed")
     end
 
