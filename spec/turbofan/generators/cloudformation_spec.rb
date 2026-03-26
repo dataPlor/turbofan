@@ -178,10 +178,12 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(jd["Properties"]["Timeout"]["AttemptDurationSeconds"]).to eq(3600)
     end
 
-    it "includes a retry strategy" do
+    it "includes a retry strategy with infrastructure retry budget" do
       retry_strategy = jd["Properties"]["RetryStrategy"]
       expect(retry_strategy).not_to be_nil
-      expect(retry_strategy["Attempts"]).to eq(3)
+      expect(retry_strategy["Attempts"]).to eq(
+        Turbofan::Generators::CloudFormation::JobDefinition::INFRASTRUCTURE_RETRIES
+      )
     end
 
     it "includes EvaluateOnExit chain within AWS 5-condition limit" do

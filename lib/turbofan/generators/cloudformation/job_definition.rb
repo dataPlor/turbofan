@@ -62,9 +62,15 @@ module Turbofan
           {"JobDef#{Naming.pascal_case(step_name)}#{resource_suffix}" => resource}
         end
 
+        # Batch retry attempts for infrastructure failures (spot termination,
+        # OOM, placement failures). Application failures EXIT immediately via
+        # the catch-all rule, so these attempts are purely for infrastructure.
+        # Set high enough to absorb spot kills without exhausting the budget.
+        INFRASTRUCTURE_RETRIES = 10
+
         def self.retry_strategy(step_class)
           {
-            "Attempts" => step_class.turbofan_retries,
+            "Attempts" => INFRASTRUCTURE_RETRIES,
             "EvaluateOnExit" => [
               {"OnStatusReason" => "Host EC2*", "Action" => "RETRY"},
               {"OnExitCode" => "137", "Action" => "RETRY"},

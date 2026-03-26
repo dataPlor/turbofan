@@ -320,9 +320,11 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(entry["ConsumableResource"]).to have_key("Fn::ImportValue")
     end
 
-    it "controlled_step has retries 2 in its job definition" do
+    it "controlled_step has infrastructure retry budget in its job definition" do
       retry_strategy = cfn.dig("Resources", "JobDefControlledStep", "Properties", "RetryStrategy")
-      expect(retry_strategy["Attempts"]).to eq(2)
+      expect(retry_strategy["Attempts"]).to eq(
+        Turbofan::Generators::CloudFormation::JobDefinition::INFRASTRUCTURE_RETRIES
+      )
     end
 
     it "controlled_step has timeout 60 in its job definition" do
@@ -330,9 +332,11 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(timeout).to eq(60)
     end
 
-    it "retry_demo has retries 2 in its job definition" do
+    it "retry_demo has infrastructure retry budget in its job definition" do
       retry_strategy = cfn.dig("Resources", "JobDefRetryDemo", "Properties", "RetryStrategy")
-      expect(retry_strategy["Attempts"]).to eq(2)
+      expect(retry_strategy["Attempts"]).to eq(
+        Turbofan::Generators::CloudFormation::JobDefinition::INFRASTRUCTURE_RETRIES
+      )
     end
 
     it "score_items has timeout 300 in its sized job definitions" do
