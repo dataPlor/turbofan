@@ -45,10 +45,10 @@ module Turbofan
                 end
                 data['items']
               end
-            elsif event.key?('input')
-              read_trigger_input(event['input'], bucket)
+            elsif event.key?('trigger')
+              read_trigger_input(event['trigger'], bucket)
             else
-              raise "No input source: expected 'prev_step' or 'input' in event"
+              raise "No input source: expected 'prev_step' or 'trigger' in event"
             end
           end
 

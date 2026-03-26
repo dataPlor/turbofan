@@ -271,10 +271,11 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(asl["StartAt"]).to eq("process_chunk")
       end
 
-      it "chunk state passes trigger input for first step" do
+      it "chunk state passes entire trigger payload for first step" do
         payload = asl["States"]["process_chunk"].dig("Parameters", "Payload")
-        expect(payload["input.$"]).to eq("$.input")
+        expect(payload["trigger.$"]).to eq("$")
         expect(payload).not_to have_key("prev_step")
+        expect(payload).not_to have_key("input.$")
       end
 
       it "generates a Task state with dynamic ArrayProperties" do

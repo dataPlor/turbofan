@@ -223,7 +223,7 @@ module Turbofan
             "execution_id.$" => "$$.Execution.Id"
           }
           if first
-            payload["input.$"] = "$.input"
+            payload["trigger.$"] = "$"
           else
             payload["prev_step"] = prev_step_name.to_s
             prev_step_obj = @pipeline.turbofan_dag.sorted_steps.find { |s| s.name.to_s == prev_step_name.to_s }
