@@ -38,8 +38,16 @@ module Turbofan
           suffix = size_name ? "-#{size_name}" : ""
           resource_suffix = size_name ? Naming.pascal_case(size_name) : ""
 
+          retry_cfg = retry_strategy(step_class)
+          timeout_val = step_class.turbofan_timeout
+
+          # Hash retry+timeout config into the name so CloudFormation triggers
+          # REPLACEMENT when they change. Without this, CFN applies a "No
+          # interruption" update which Batch silently ignores (immutable revisions).
+          config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_val}")[0, 6]
+
           properties = {
-            "JobDefinitionName" => "#{prefix}-jobdef-#{step_name}#{suffix}",
+            "JobDefinitionName" => "#{prefix}-jobdef-#{step_name}#{suffix}-#{config_hash}",
             "Type" => "container",
             "PlatformCapabilities" => ["EC2"],
             "PropagateTags" => true,

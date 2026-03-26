@@ -68,15 +68,15 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         jd_keys = template["Resources"].keys.select { |k| k.start_with?("JobDef") }
         jd_names = jd_keys.map { |k| template["Resources"][k]["Properties"]["JobDefinitionName"] }
 
-        expect(jd_names).to include("turbofan-multi-size-production-jobdef-process-s")
-        expect(jd_names).to include("turbofan-multi-size-production-jobdef-process-m")
-        expect(jd_names).to include("turbofan-multi-size-production-jobdef-process-l")
+        expect(jd_names.any? { |n| n.start_with?("turbofan-multi-size-production-jobdef-process-s-") }).to be true
+        expect(jd_names.any? { |n| n.start_with?("turbofan-multi-size-production-jobdef-process-m-") }).to be true
+        expect(jd_names.any? { |n| n.start_with?("turbofan-multi-size-production-jobdef-process-l-") }).to be true
       end
 
       it "sets correct CPU for small size" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-s")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-s-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         vcpu = container["ResourceRequirements"].find { |r| r["Type"] == "VCPU" }
@@ -86,7 +86,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct CPU for medium size" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-m")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-m-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         vcpu = container["ResourceRequirements"].find { |r| r["Type"] == "VCPU" }
@@ -96,7 +96,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct CPU for large size" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-l")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-l-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         vcpu = container["ResourceRequirements"].find { |r| r["Type"] == "VCPU" }
@@ -106,7 +106,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct RAM for small size (derived from c-family: 1 CPU * 2 GB = 2048 MB)" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-s")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-s-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
@@ -116,7 +116,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct RAM for medium size (derived from c-family: 2 CPU * 2 GB = 4096 MB)" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-m")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-m-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
@@ -126,7 +126,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct RAM for large size (derived from c-family: 4 CPU * 2 GB = 8192 MB)" do
         jd_key = template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-l")
+            template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-l-")
         }
         container = template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
@@ -174,7 +174,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
         jd_keys.each do |key|
           name = template["Resources"][key]["Properties"]["JobDefinitionName"]
-          expect(name).to match(/\Aturbofan-multi-size-production-jobdef-process-(s|m|l)\z/)
+          expect(name).to match(/\Aturbofan-multi-size-production-jobdef-process-(s|m|l)-[0-9a-f]{6}\z/)
         end
 
         queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
@@ -228,8 +228,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "does not include a size suffix in the job definition name" do
         jd_key = single_template["Resources"].keys.find { |k| k.start_with?("JobDef") }
         name = single_template["Resources"][jd_key]["Properties"]["JobDefinitionName"]
-        expect(name).to eq("turbofan-single-size-production-jobdef-process")
-        expect(name).not_to match(/-[sml]\z/)
+        expect(name).to start_with("turbofan-single-size-production-jobdef-process-")
+        expect(name).not_to match(/-[sml]-[0-9a-f]+\z/)
       end
 
       it "generates exactly one queue for a single-size step" do
@@ -288,7 +288,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct RAM for small size (8 GB = 8192 MB)" do
         jd_key = r_template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-s")
+            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-s-")
         }
         container = r_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
@@ -298,7 +298,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "sets correct RAM for large size (32 GB = 32768 MB)" do
         jd_key = r_template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-l")
+            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-l-")
         }
         container = r_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
@@ -308,7 +308,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "derives correct CPU for small size (8 GB / 8 GB per vCPU = 1)" do
         jd_key = r_template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-s")
+            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-s-")
         }
         container = r_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         vcpu = container["ResourceRequirements"].find { |r| r["Type"] == "VCPU" }
@@ -318,7 +318,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "derives correct CPU for large size (32 GB / 8 GB per vCPU = 4)" do
         jd_key = r_template["Resources"].keys.find { |k|
           k.start_with?("JobDef") &&
-            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.end_with?("-l")
+            r_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("-process-l-")
         }
         container = r_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
         vcpu = container["ResourceRequirements"].find { |r| r["Type"] == "VCPU" }
@@ -390,7 +390,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           mixed_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("discover")
         }
         name = mixed_template["Resources"][discover_jd]["Properties"]["JobDefinitionName"]
-        expect(name).to eq("turbofan-mixed-production-jobdef-discover")
+        expect(name).to start_with("turbofan-mixed-production-jobdef-discover-")
       end
 
       it "multi-size step job defs have size suffixes" do
@@ -399,8 +399,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           mixed_template["Resources"][k]["Properties"]["JobDefinitionName"]&.include?("process")
         }
         names = process_jds.map { |k| mixed_template["Resources"][k]["Properties"]["JobDefinitionName"] }
-        expect(names).to include("turbofan-mixed-production-jobdef-process-s")
-        expect(names).to include("turbofan-mixed-production-jobdef-process-l")
+        expect(names.any? { |n| n.start_with?("turbofan-mixed-production-jobdef-process-s-") }).to be true
+        expect(names.any? { |n| n.start_with?("turbofan-mixed-production-jobdef-process-l-") }).to be true
       end
     end
   end

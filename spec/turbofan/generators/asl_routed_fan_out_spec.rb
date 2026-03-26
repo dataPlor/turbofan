@@ -97,11 +97,10 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       job_defs = routed_state["Branches"].map { |b|
         b["States"].values.first.dig("Parameters", "JobDefinition")
       }
-      expect(job_defs).to contain_exactly(
-        "#{prefix}-jobdef-process-s",
-        "#{prefix}-jobdef-process-m",
-        "#{prefix}-jobdef-process-l"
-      )
+      expect(job_defs.size).to eq(3)
+      expect(job_defs.any? { |d| d.include?("-process-s-") }).to be true
+      expect(job_defs.any? { |d| d.include?("-process-m-") }).to be true
+      expect(job_defs.any? { |d| d.include?("-process-l-") }).to be true
     end
 
     it "each branch references the correct sized job queue" do

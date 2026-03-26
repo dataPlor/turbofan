@@ -61,8 +61,13 @@ module Turbofan
           else
             step_name
           end
+          step_class ||= @steps[step_name]
+          retry_cfg = Generators::CloudFormation::JobDefinition.send(:retry_strategy, step_class)
+          timeout_cfg = step_class&.turbofan_timeout || 3600
+          config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_cfg}")[0, 6]
+
           {
-            job_definition: "#{@prefix}-jobdef-#{suffix}",
+            job_definition: "#{@prefix}-jobdef-#{suffix}-#{config_hash}",
             job_queue: "#{@prefix}-queue-#{suffix}"
           }
         end
@@ -316,6 +321,9 @@ module Turbofan
           step_name = step.name
           step_class = @steps[step_name]
           sizes = step_class.turbofan_sizes
+          retry_cfg = Generators::CloudFormation::JobDefinition.send(:retry_strategy, step_class)
+          timeout_cfg = step_class&.turbofan_timeout || 3600
+          config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_cfg}")[0, 6]
 
           branches = sizes.map do |size_name, _size_config|
             branch_state_name = "#{step_name}_#{size_name}"
@@ -331,7 +339,7 @@ module Turbofan
                   "Type" => "Task",
                   "Resource" => BATCH_RESOURCE,
                   "Parameters" => {
-                    "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}",
+                    "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}-#{config_hash}",
                     "JobName" => "#{@prefix}-#{step_name}-#{size_name}",
                     "JobQueue" => "#{@prefix}-queue-#{step_name}-#{size_name}",
                     "ContainerOverrides" => {"Environment" => env},

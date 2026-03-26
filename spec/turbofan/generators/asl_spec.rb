@@ -239,11 +239,10 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       job_defs = routed_state["Branches"].map { |b|
         b["States"].values.first.dig("Parameters", "JobDefinition")
       }
-      expect(job_defs).to contain_exactly(
-        "turbofan-multi-size-asl-production-jobdef-process-s",
-        "turbofan-multi-size-asl-production-jobdef-process-m",
-        "turbofan-multi-size-asl-production-jobdef-process-l"
-      )
+      expect(job_defs.size).to eq(3)
+      expect(job_defs.any? { |d| d.include?("-process-s-") }).to be true
+      expect(job_defs.any? { |d| d.include?("-process-m-") }).to be true
+      expect(job_defs.any? { |d| d.include?("-process-l-") }).to be true
     end
 
     it "each branch references the correct sized job queue" do
@@ -311,7 +310,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "references unsuffixed job definition when no sizes declared" do
       process_state = asl["States"]["process"]
       job_def = process_state.dig("Parameters", "JobDefinition")
-      expect(job_def).to eq("turbofan-single-size-asl-production-jobdef-process")
+      expect(job_def).to start_with("turbofan-single-size-asl-production-jobdef-process-")
     end
 
     it "references unsuffixed queue when no sizes declared" do
@@ -372,7 +371,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "single-size step uses unsuffixed job definition" do
       discover_state = asl["States"]["discover"]
       job_def = discover_state.dig("Parameters", "JobDefinition")
-      expect(job_def).to eq("turbofan-mixed-asl-production-jobdef-discover")
+      expect(job_def).to start_with("turbofan-mixed-asl-production-jobdef-discover-")
     end
 
     it "multi-size step generates routed Parallel with per-size branches" do
@@ -381,10 +380,9 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       job_defs = routed_state["Branches"].map { |b|
         b["States"].values.first.dig("Parameters", "JobDefinition")
       }
-      expect(job_defs).to contain_exactly(
-        "turbofan-mixed-asl-production-jobdef-process-s",
-        "turbofan-mixed-asl-production-jobdef-process-l"
-      )
+      expect(job_defs.size).to eq(2)
+      expect(job_defs.any? { |d| d.include?("-process-s-") }).to be true
+      expect(job_defs.any? { |d| d.include?("-process-l-") }).to be true
     end
   end
 
