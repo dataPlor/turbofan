@@ -19,6 +19,9 @@ module Turbofan
   class CLI < Thor
     module Cost
       def self.call(pipeline_name:, stage:, days: 60, period: "day")
+        config_file = File.join("turbofans", "config", "turbofan.rb")
+        Kernel.load(File.expand_path(config_file)) if File.exist?(config_file)
+
         cur_uri = Turbofan.config.cur_s3_uri
         unless cur_uri
           print_missing_config
