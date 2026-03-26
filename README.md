@@ -272,19 +272,19 @@ pipeline do
 end
 ```
 
-The trigger input is passed directly to the chunking Lambda. It should be `{"items": [...]}` with small items:
+The trigger input is passed directly to the chunking Lambda. Point it at S3:
 
 ```bash
-# Good: small identifiers as items
-turbofan start my_pipeline staging --input '{"items": [{"prefix": "aa"}, {"prefix": "ab"}]}'
-
-# Good: trigger references S3, first step reads it
 turbofan start my_pipeline staging --input '{"items_s3_uri": "s3://bucket/partitions.json"}'
 ```
 
-The chunking Lambda accepts both formats:
-- `{"items": [...]}` — inline array (must stay under 256KB Lambda payload limit)
-- `{"items_s3_uri": "s3://bucket/file.json"}` — S3 pointer to a JSON file containing an array or `{"items": [...]}`
+The S3 file should contain a JSON array or `{"items": [...]}`:
+
+```json
+[{"prefix": "aa"}, {"prefix": "ab"}, {"prefix": "ac"}, ...]
+```
+
+The chunking Lambda reads from the S3 URI, splits the items into chunks of `batch_size`, and writes each chunk to S3 for the Batch array job.
 
 When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own Batch array job with the appropriate CPU/RAM allocation. See the [Routers](#turbofanrouter) section for details.
 
@@ -449,23 +449,20 @@ turbofan start my_pipeline staging --input_file trigger.json
 
 `turbofan run` is an alias for `turbofan start`.
 
-**Trigger inputs must be small.** The trigger input flows through Step Functions state and AWS Batch container overrides, both of which have size limits (256KB and 8KB respectively). Pass metadata and S3 pointers — not raw data arrays. The first step reads the actual data from S3.
+**Trigger inputs are metadata and S3 pointers — never raw data.** The trigger flows through Step Functions state and Batch container overrides, both of which have size limits. If your pipeline processes a dataset, point at it on S3.
 
 ```bash
-# Good: list of identifiers (small, each item is a key the step looks up)
-turbofan start device_catalog staging --input '{"maid_prefixes": ["aa", "ab", "ac"]}'
-
-# Good: S3 pointer to a large dataset
-turbofan start etl_pipeline staging --input '{"source": "s3://data-lake/2026-03-25/items.parquet"}'
-
-# Good: metadata that the first step uses to query its own data
+# Metadata — the step queries its own data source
 turbofan start geo_pipeline staging --input '{"country": "US", "date": "2026-03-25"}'
 
-# Bad: raw data array (hits 8KB limit at ~100 items)
-turbofan start my_pipeline staging --input '[{"id":1,"name":"..."}, {"id":2,"name":"..."}, ...]'
+# S3 pointer — the step (or chunking lambda) reads items from S3
+turbofan start device_catalog staging --input '{"items_s3_uri": "s3://bucket/partitions.json"}'
+
+# Small identifier list — fine for a handful of items
+turbofan start etl_pipeline staging --input '{"place_ids": [1, 2, 3]}'
 ```
 
-For fan-out pipelines, the trigger input is passed to the chunking Lambda (256KB limit) which splits it into S3 chunks. Each array item should be small (an identifier or key), not a full data record. The step itself reads the actual data using the identifier:
+For fan-out pipelines, use `items_s3_uri` to point at a JSON file containing the items array. The chunking Lambda reads from S3 and distributes items across Batch array jobs. See [Fan-Out](#fan-out) for the input format.
 
 ```ruby
 class ProcessItem
