@@ -416,13 +416,16 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(handler).to include("put_object")
     end
 
-    it "returns chunk_count in response" do
-      expect(handler).to include("chunk_count")
+    it "returns parents in response for non-routed fan-out" do
+      expect(handler).to include("'parents'")
+    end
+
+    it "returns chunk_count in response for routed fan-out" do
+      expect(handler).to include("'count'")
     end
 
     it "does not contain Batch submit_job call" do
       expect(handler).not_to include("submit_job")
-      expect(handler).not_to include("batch")
     end
 
     it "contains a chunk function definition" do
