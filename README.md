@@ -278,11 +278,13 @@ The trigger input is passed directly to the chunking Lambda. Point it at S3:
 turbofan start my_pipeline staging --input '{"items_s3_uri": "s3://bucket/partitions.json"}'
 ```
 
-The S3 file should contain a JSON array or `{"items": [...]}`:
+The S3 file must be `{"items": [...]}`:
 
 ```json
-[{"prefix": "aa"}, {"prefix": "ab"}, {"prefix": "ac"}, ...]
+{"items": [{"prefix": "aa"}, {"prefix": "ab"}, {"prefix": "ac"}]}
 ```
+
+The chunking Lambda validates this shape — if the file doesn't have an `items` array, the Lambda fails with a clear error.
 
 The chunking Lambda reads from the S3 URI, splits the items into chunks of `batch_size`, and writes each chunk to S3 for the Batch array job.
 
@@ -449,20 +451,17 @@ turbofan start my_pipeline staging --input_file trigger.json
 
 `turbofan run` is an alias for `turbofan start`.
 
-**Trigger inputs are metadata and S3 pointers — never raw data.** The trigger flows through Step Functions state and Batch container overrides, both of which have size limits. If your pipeline processes a dataset, point at it on S3.
+**Trigger inputs are metadata and S3 pointers — never raw data.** The trigger flows through Step Functions state and Batch container overrides, both of which have size limits.
 
 ```bash
 # Metadata — the step queries its own data source
 turbofan start geo_pipeline staging --input '{"country": "US", "date": "2026-03-25"}'
 
-# S3 pointer — the step (or chunking lambda) reads items from S3
+# S3 pointer — for fan-out pipelines, point at a JSON file on S3
 turbofan start device_catalog staging --input '{"items_s3_uri": "s3://bucket/partitions.json"}'
-
-# Small identifier list — fine for a handful of items
-turbofan start etl_pipeline staging --input '{"place_ids": [1, 2, 3]}'
 ```
 
-For fan-out pipelines, use `items_s3_uri` to point at a JSON file containing the items array. The chunking Lambda reads from S3 and distributes items across Batch array jobs. See [Fan-Out](#fan-out) for the input format.
+For fan-out pipelines, the S3 file must be in the format `{"items": [...]}`. The chunking Lambda validates this shape, reads the items, and distributes them across Batch array jobs. See [Fan-Out](#fan-out) for details.
 
 ```ruby
 class ProcessItem

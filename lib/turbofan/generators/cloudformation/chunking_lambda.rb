@@ -39,7 +39,11 @@ module Turbofan
                 key = s3_key(execution_id, prev_step, 'output.json')
                 response = S3.get_object(bucket: bucket, key: key)
                 data = JSON.parse(response.body.read)
-                data.is_a?(Hash) && data.key?('items') ? data['items'] : [data]
+                unless data.is_a?(Hash) && data.key?('items') && data['items'].is_a?(Array)
+                  raise "Invalid input from step '#{prev_step}': expected {\"items\": [...]} in output.json. " \
+                        "Got: #{data.is_a?(Hash) ? data.keys.inspect : data.class}"
+                end
+                data['items']
               end
             elsif event.key?('input')
               read_trigger_input(event['input'], bucket)
@@ -49,22 +53,23 @@ module Turbofan
           end
 
           def read_trigger_input(input, bucket)
-            if input.is_a?(Hash) && input.key?('items')
-              # Inline items (small payloads) — backward compat
-              input['items']
-            elsif input.is_a?(Hash) && input.key?('items_s3_uri')
-              # S3 pointer: {"items_s3_uri": "s3://bucket/path/items.json"}
-              uri = input['items_s3_uri']
-              parts = uri.sub('s3://', '').split('/', 2)
-              response = S3.get_object(bucket: parts[0], key: parts[1])
-              data = JSON.parse(response.body.read)
-              data.is_a?(Array) ? data : data.fetch('items', [data])
-            elsif input.is_a?(Array)
-              # Raw array (small payloads) — backward compat
-              input
-            else
-              [input]
+            unless input.is_a?(Hash) && input.key?('items_s3_uri')
+              raise "Invalid trigger input for fan-out: expected {\"items_s3_uri\": \"s3://...\"}. " \
+                    "Fan-out items must be stored on S3 in {\"items\": [...]} format. " \
+                    "Got: #{input.class}"
             end
+
+            uri = input['items_s3_uri']
+            parts = uri.sub('s3://', '').split('/', 2)
+            response = S3.get_object(bucket: parts[0], key: parts[1])
+            data = JSON.parse(response.body.read)
+
+            unless data.is_a?(Hash) && data.key?('items') && data['items'].is_a?(Array)
+              raise "Invalid S3 input format: expected {\"items\": [...]} in #{uri}. " \
+                    "Got: #{data.is_a?(Hash) ? data.keys.inspect : data.class}"
+            end
+
+            data['items']
           end
 
           def handler(event:, context:)
