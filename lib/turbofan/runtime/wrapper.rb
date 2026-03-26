@@ -66,7 +66,8 @@ module Turbofan
       def setup_nvme
         mount = Turbofan::ComputeEnvironment::NVME_MOUNT_PATH
         job_id = ENV["AWS_BATCH_JOB_ID"] || "local-#{Process.pid}"
-        path = "#{mount}/#{job_id}"
+        attempt = ENV.fetch("AWS_BATCH_JOB_ATTEMPT", "1")
+        path = "#{mount}/#{job_id}-attempt#{attempt}"
 
         if File.directory?(mount)
           FileUtils.mkdir_p(path)

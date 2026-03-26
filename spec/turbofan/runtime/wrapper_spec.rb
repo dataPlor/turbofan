@@ -752,19 +752,21 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(wrapper.send(:setup_nvme)).to be_nil
     end
 
-    it "uses AWS_BATCH_JOB_ID for subdirectory name" do
+    it "uses AWS_BATCH_JOB_ID and attempt number for subdirectory name" do
       wrapper = described_class.new(step_class)
-      saved = ENV["AWS_BATCH_JOB_ID"]
+      saved_id = ENV["AWS_BATCH_JOB_ID"]
+      saved_attempt = ENV["AWS_BATCH_JOB_ATTEMPT"]
       ENV["AWS_BATCH_JOB_ID"] = "batch-job-42"
+      ENV["AWS_BATCH_JOB_ATTEMPT"] = "2"
       allow(File).to receive(:directory?).and_call_original
       allow(File).to receive(:directory?).with("/mnt/nvme").and_return(true)
-      allow(File).to receive(:directory?).with("/mnt/nvme/batch-job-42").and_return(true)
       allow(FileUtils).to receive(:mkdir_p)
 
       result = wrapper.send(:setup_nvme)
-      expect(result).to eq("/mnt/nvme/batch-job-42")
+      expect(result).to eq("/mnt/nvme/batch-job-42-attempt2")
     ensure
-      ENV["AWS_BATCH_JOB_ID"] = saved
+      ENV["AWS_BATCH_JOB_ID"] = saved_id
+      ENV["AWS_BATCH_JOB_ATTEMPT"] = saved_attempt
     end
 
     it "falls back to local-{pid} when AWS_BATCH_JOB_ID not set" do
@@ -772,7 +774,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       saved = ENV.delete("AWS_BATCH_JOB_ID")
       allow(File).to receive(:directory?).and_call_original
       allow(File).to receive(:directory?).with("/mnt/nvme").and_return(true)
-      expected_path = "/mnt/nvme/local-#{Process.pid}"
+      expected_path = "/mnt/nvme/local-#{Process.pid}-attempt1"
       allow(File).to receive(:directory?).with(expected_path).and_return(true)
       allow(FileUtils).to receive(:mkdir_p)
 
