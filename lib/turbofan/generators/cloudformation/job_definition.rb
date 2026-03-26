@@ -43,7 +43,9 @@ module Turbofan
             "Type" => "container",
             "PlatformCapabilities" => ["EC2"],
             "PropagateTags" => true,
-            "Tags" => CloudFormation.tags_hash(tags),
+            "Tags" => CloudFormation.tags_hash(tags + [
+              {"Key" => "turbofan:retry-budget", "Value" => INFRASTRUCTURE_RETRIES.to_s}
+            ]),
             "ContainerProperties" => container,
             "RetryStrategy" => retry_strategy(step_class),
             "Timeout" => {"AttemptDurationSeconds" => step_class.turbofan_timeout}
