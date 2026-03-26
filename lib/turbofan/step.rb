@@ -8,7 +8,7 @@ module Turbofan
       base.instance_variable_set(:@turbofan_writes_to, [])
       base.instance_variable_set(:@turbofan_secrets, [])
       base.instance_variable_set(:@turbofan_sizes, {})
-      base.instance_variable_set(:@turbofan_timeout, 3600)
+      base.instance_variable_set(:@turbofan_timeout, nil)
       base.instance_variable_set(:@turbofan_retries, 3)
       base.instance_variable_set(:@turbofan_retry_on, nil)
       base.instance_variable_set(:@turbofan_default_cpu, nil)

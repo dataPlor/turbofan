@@ -174,8 +174,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(memory["Value"]).to eq("4096") # 4 GB = 4096 MB
     end
 
-    it "sets the job timeout" do
-      expect(jd["Properties"]["Timeout"]["AttemptDurationSeconds"]).to eq(3600)
+    it "does not set Timeout when step has no timeout" do
+      expect(jd["Properties"]).not_to have_key("Timeout")
     end
 
     it "includes a retry strategy with infrastructure retry budget" do

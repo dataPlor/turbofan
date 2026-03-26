@@ -8,11 +8,13 @@ module Turbofan
       base.instance_variable_set(:@turbofan_compute_environment, nil)
       base.instance_variable_set(:@turbofan_tags, {})
       base.instance_variable_set(:@turbofan_schedule, nil)
+      base.instance_variable_set(:@turbofan_timeout, nil)
     end
 
     module ClassMethods
       attr_reader :turbofan_name, :turbofan_metrics,
-        :turbofan_compute_environment, :turbofan_tags, :turbofan_schedule
+        :turbofan_compute_environment, :turbofan_tags, :turbofan_schedule,
+        :turbofan_timeout
 
       def pipeline_name(value)
         @turbofan_name = value
@@ -31,6 +33,10 @@ module Turbofan
 
       def schedule(cron_string)
         @turbofan_schedule = cron_string
+      end
+
+      def timeout(value)
+        @turbofan_timeout = value
       end
 
       def compute_environment(sym)

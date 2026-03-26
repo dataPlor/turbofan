@@ -53,9 +53,12 @@ module Turbofan
             "PropagateTags" => true,
             "Tags" => CloudFormation.tags_hash(tags),
             "ContainerProperties" => container,
-            "RetryStrategy" => retry_strategy(step_class),
-            "Timeout" => {"AttemptDurationSeconds" => step_class.turbofan_timeout}
+            "RetryStrategy" => retry_strategy(step_class)
           }
+
+          if step_class.turbofan_timeout
+            properties["Timeout"] = {"AttemptDurationSeconds" => step_class.turbofan_timeout}
+          end
 
           if consumable_resource_refs.any?
             properties["ConsumableResourceProperties"] = {

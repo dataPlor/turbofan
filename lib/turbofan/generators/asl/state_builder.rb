@@ -132,7 +132,9 @@ module Turbofan
           state["Catch"] = [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
 
           step_class = @steps[step_name]
-          state["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
+          if step_class&.turbofan_timeout
+            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          end
 
           if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan_retry_on && !step.fan_out?
             # SFN Retry only for non-fan-out steps. Fan-out steps use Batch-level
@@ -254,6 +256,7 @@ module Turbofan
             "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
           }
 
+          map_state["TimeoutSeconds"] = step.fan_out_timeout if step.fan_out_timeout
           map_state["Next"] = last ? "NotifySuccess" : next_step_name.to_s
           map_state
         end

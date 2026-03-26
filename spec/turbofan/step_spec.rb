@@ -514,8 +514,8 @@ RSpec.describe Turbofan::Step do
       end
     end
 
-    it "defaults timeout to 3600 seconds (1 hour)" do
-      expect(step_class.turbofan_timeout).to eq(3600)
+    it "defaults timeout to nil (no timeout)" do
+      expect(step_class.turbofan_timeout).to be_nil
     end
 
     it "defaults retries to 3" do

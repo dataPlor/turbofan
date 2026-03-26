@@ -449,11 +449,10 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       end
       let(:asl) { generator.generate }
 
-      it "emits TimeoutSeconds with the default value of 3600" do
-        expect(default_timeout_step.turbofan_timeout).to eq(3600)
+      it "does not emit TimeoutSeconds when timeout is nil" do
+        expect(default_timeout_step.turbofan_timeout).to be_nil
         state = asl["States"]["default_step"]
-        expect(state).to have_key("TimeoutSeconds")
-        expect(state["TimeoutSeconds"]).to eq(3600)
+        expect(state).not_to have_key("TimeoutSeconds")
       end
     end
 

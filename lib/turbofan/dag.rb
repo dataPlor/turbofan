@@ -1,7 +1,7 @@
 require "tsort"
 
 module Turbofan
-  DagStep = Struct.new(:name, :fan_out, :batch_size, :tolerated_failure_rate, keyword_init: true) do
+  DagStep = Struct.new(:name, :fan_out, :batch_size, :tolerated_failure_rate, :fan_out_timeout, keyword_init: true) do
     def initialize(name, fan_out: false, batch_size: nil, tolerated_failure_rate: 0, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
@@ -10,7 +10,7 @@ module Turbofan
         raise ArgumentError, "batch_size must be a positive integer" unless batch_size.is_a?(Integer) && batch_size > 0
       end
 
-      super(name: name, fan_out: fan_out, batch_size: batch_size, tolerated_failure_rate: tolerated_failure_rate)
+      super(name: name, fan_out: fan_out, batch_size: batch_size, tolerated_failure_rate: tolerated_failure_rate, fan_out_timeout: nil)
     end
 
     def fan_out?
@@ -157,7 +157,7 @@ module Turbofan
       @trigger_input_override = previous
     end
 
-    def fan_out(proxy, batch_size: nil, tolerated_failure_rate: 0, **rest)
+    def fan_out(proxy, batch_size: nil, tolerated_failure_rate: 0, timeout: nil, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
@@ -172,6 +172,7 @@ module Turbofan
       step.fan_out = true
       step.batch_size = batch_size
       step.tolerated_failure_rate = tolerated_failure_rate
+      step.fan_out_timeout = timeout
       proxy
     end
 

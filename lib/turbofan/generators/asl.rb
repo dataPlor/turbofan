@@ -130,11 +130,13 @@ module Turbofan
         start_step = sorted.first
         start_at = state_name_for(start_step)
 
-        {
+        asl = {
           "Comment" => "Turbofan pipeline: #{@pipeline_name}",
           "StartAt" => start_at,
           "States" => states
         }
+        asl["TimeoutSeconds"] = @pipeline.turbofan_timeout if @pipeline.turbofan_timeout
+        asl
       end
 
       def to_json(*)
