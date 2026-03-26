@@ -122,7 +122,7 @@ module Turbofan
 
               key = s3_key(execution_id, step_name, 'input', "parent#{i}", 'items.json')
               S3.put_object(bucket: bucket, key: key, body: JSON.generate(parent_chunks))
-              parents << { 'index' => i, 'size' => [real_size, MIN_ARRAY_SIZE].max }
+              parents << { 'index' => i, 'size' => [real_size, MIN_ARRAY_SIZE].max, 'real_size' => real_size }
               offset += real_size
             end
 

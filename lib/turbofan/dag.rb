@@ -1,8 +1,8 @@
 require "tsort"
 
 module Turbofan
-  DagStep = Struct.new(:name, :fan_out, :batch_size, keyword_init: true) do
-    def initialize(name, fan_out: false, batch_size: nil, **rest)
+  DagStep = Struct.new(:name, :fan_out, :batch_size, :tolerated_failure_rate, keyword_init: true) do
+    def initialize(name, fan_out: false, batch_size: nil, tolerated_failure_rate: 0, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
@@ -10,7 +10,7 @@ module Turbofan
         raise ArgumentError, "batch_size must be a positive integer" unless batch_size.is_a?(Integer) && batch_size > 0
       end
 
-      super(name: name, fan_out: fan_out, batch_size: batch_size)
+      super(name: name, fan_out: fan_out, batch_size: batch_size, tolerated_failure_rate: tolerated_failure_rate)
     end
 
     def fan_out?
@@ -157,17 +157,21 @@ module Turbofan
       @trigger_input_override = previous
     end
 
-    def fan_out(proxy, batch_size: nil, **rest)
+    def fan_out(proxy, batch_size: nil, tolerated_failure_rate: 0, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
       raise ArgumentError, "fan_out expects a DagProxy, got #{proxy.class}" unless proxy.is_a?(DagProxy)
       raise ArgumentError, "fan_out requires batch_size: parameter" unless batch_size
       raise ArgumentError, "batch_size must be a positive integer" unless batch_size.is_a?(Integer) && batch_size > 0
+      unless tolerated_failure_rate.is_a?(Numeric) && (0...1).cover?(tolerated_failure_rate)
+        raise ArgumentError, "tolerated_failure_rate must be 0.0 to < 1.0, got #{tolerated_failure_rate}"
+      end
       step = @dag.steps.find { |s| s.name == proxy.step_name }
       raise ArgumentError, "step :#{proxy.step_name} not found in DAG" unless step
       step.fan_out = true
       step.batch_size = batch_size
+      step.tolerated_failure_rate = tolerated_failure_rate
       proxy
     end
 
