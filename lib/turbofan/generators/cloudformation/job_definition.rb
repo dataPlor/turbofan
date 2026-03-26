@@ -70,10 +70,10 @@ module Turbofan
           {"JobDef#{Naming.pascal_case(step_name)}#{resource_suffix}" => resource}
         end
 
-        # Batch retry attempts for infrastructure failures (spot termination,
-        # OOM, placement failures). Application failures EXIT immediately via
-        # the catch-all rule, so these attempts are purely for infrastructure.
-        # Set high enough to absorb spot kills without exhausting the budget.
+        # Batch retry attempts. Only exit code 0 (success) exits; everything
+        # else retries up to this limit. Application failures (exit 1) retry
+        # fast and exhaust the budget, but this catches all infrastructure
+        # failures (spot, OOM, CgroupError) without enumeration.
         INFRASTRUCTURE_RETRIES = 10
 
         def self.retry_strategy(step_class)

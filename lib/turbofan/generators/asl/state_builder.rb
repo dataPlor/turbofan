@@ -61,7 +61,6 @@ module Turbofan
           else
             step_name
           end
-          step_class ||= @steps[step_name]
           retry_cfg = Generators::CloudFormation::JobDefinition.send(:retry_strategy, step_class)
           timeout_cfg = step_class&.turbofan_timeout || 3600
           config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_cfg}")[0, 6]

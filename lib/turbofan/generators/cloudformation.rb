@@ -38,7 +38,7 @@ module Turbofan
         all_resource_tags = base_tags + turbofan_base_tags + pipeline_custom_tags
 
         # IAM roles
-        resources.merge!(Iam.generate(prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name, resources: @resources, has_fan_out: any_grouped_fan_out?))
+        resources.merge!(Iam.generate(prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name, resources: @resources, has_fan_out: any_grouped_fan_out?, has_tolerated_fan_out: any_tolerated_fan_out?))
 
         # Per-step resources
         @steps.each do |sname, sclass|

@@ -31,14 +31,20 @@ module Turbofan
               return cause['JobId'] if cause&.key?('JobId')
             end
 
-            # Fallback: find by job name via listJobs
+            # Fallback: find by job name via listJobs (paginated)
             job_name = event['job_name']
             job_queue = event['job_queue']
             return nil unless job_name && job_queue
 
-            response = BATCH.list_jobs(job_queue: job_queue, job_status: 'FAILED')
-            job = response.job_summary_list.find { |j| j.job_name == job_name }
-            job&.job_id
+            next_token = nil
+            loop do
+              response = BATCH.list_jobs(job_queue: job_queue, job_status: 'FAILED', next_token: next_token)
+              job = response.job_summary_list.find { |j| j.job_name == job_name }
+              return job.job_id if job
+              next_token = response.next_token
+              break unless next_token
+            end
+            nil
           end
 
           def handler(event:, context:)

@@ -2,12 +2,12 @@ module Turbofan
   module Generators
     class CloudFormation
       module Iam
-        def self.generate(prefix:, steps:, tags:, pipeline_name:, resources: {}, has_fan_out: false)
+        def self.generate(prefix:, steps:, tags:, pipeline_name:, resources: {}, has_fan_out: false, has_tolerated_fan_out: false)
           secret_arns = collect_secret_arns(steps, resources)
           iam_resources = {}
           iam_resources.merge!(job_role(prefix, steps, tags, pipeline_name, secret_arns))
           iam_resources.merge!(execution_role(prefix, steps, tags, secret_arns))
-          iam_resources.merge!(sfn_role(prefix, tags, has_fan_out: has_fan_out))
+          iam_resources.merge!(sfn_role(prefix, tags, has_fan_out: has_fan_out, has_tolerated_fan_out: has_tolerated_fan_out))
           iam_resources
         end
 
@@ -151,7 +151,7 @@ module Turbofan
         end
         private_class_method :execution_role
 
-        def self.sfn_role(prefix, tags, has_fan_out: false)
+        def self.sfn_role(prefix, tags, has_fan_out: false, has_tolerated_fan_out: false)
           policies = [
             {
               "PolicyName" => "BatchAccess",
@@ -202,7 +202,10 @@ module Turbofan
             }
           ]
 
-          if has_fan_out
+          if has_fan_out || has_tolerated_fan_out
+            lambda_resources = []
+            lambda_resources << {"Fn::GetAtt" => ["ChunkingLambda", "Arn"]} if has_fan_out
+            lambda_resources << {"Fn::GetAtt" => ["ToleranceLambda", "Arn"]} if has_tolerated_fan_out
             policies << {
               "PolicyName" => "LambdaInvoke",
               "PolicyDocument" => {
@@ -211,7 +214,7 @@ module Turbofan
                   {
                     "Effect" => "Allow",
                     "Action" => "lambda:InvokeFunction",
-                    "Resource" => {"Fn::GetAtt" => ["ChunkingLambda", "Arn"]}
+                    "Resource" => lambda_resources.size == 1 ? lambda_resources.first : lambda_resources
                   }
                 ]
               }

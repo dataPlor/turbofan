@@ -304,6 +304,18 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         expect(actions).to include("batch:ListJobs")
       end
 
+      it "SFN role grants lambda:InvokeFunction on ToleranceLambda" do
+        sfn_role = template["Resources"]["SfnRole"]
+        policies = sfn_role.dig("Properties", "Policies")
+        lambda_policy = policies.find { |p| p["PolicyName"] == "LambdaInvoke" }
+        expect(lambda_policy).not_to be_nil
+        resources = lambda_policy.dig("PolicyDocument", "Statement", 0, "Resource")
+        resources = [resources] unless resources.is_a?(Array)
+        tolerance_ref = resources.find { |r| r.is_a?(Hash) && r.dig("Fn::GetAtt", 0) == "ToleranceLambda" }
+        expect(tolerance_ref).not_to be_nil,
+          "SfnRole LambdaInvoke policy must include ToleranceLambda ARN"
+      end
+
       it "includes tolerance Lambda in artifacts" do
         cfn = Turbofan::Generators::CloudFormation.new(
           pipeline: pipeline_class, steps: {process: step_class},
