@@ -409,14 +409,36 @@ turbofan start my_pipeline staging --input_file trigger.json
 
 `turbofan run` is an alias for `turbofan start`.
 
-**Trigger inputs must be small.** The trigger input flows through Step Functions state and AWS Batch container overrides, both of which have size limits (256KB and 8KB respectively). Pass metadata and S3 pointers — not raw data arrays. If your pipeline processes a large dataset, the trigger should reference where the data lives, and the first step reads it:
+**Trigger inputs must be small.** The trigger input flows through Step Functions state and AWS Batch container overrides, both of which have size limits (256KB and 8KB respectively). Pass metadata and S3 pointers — not raw data arrays. The first step reads the actual data from S3.
+
+```bash
+# Good: list of identifiers (small, each item is a key the step looks up)
+turbofan start device_catalog staging --input '{"maid_prefixes": ["aa", "ab", "ac"]}'
+
+# Good: S3 pointer to a large dataset
+turbofan start etl_pipeline staging --input '{"source": "s3://data-lake/2026-03-25/items.parquet"}'
+
+# Good: metadata that the first step uses to query its own data
+turbofan start geo_pipeline staging --input '{"country": "US", "date": "2026-03-25"}'
+
+# Bad: raw data array (hits 8KB limit at ~100 items)
+turbofan start my_pipeline staging --input '[{"id":1,"name":"..."}, {"id":2,"name":"..."}, ...]'
+```
+
+For fan-out pipelines, the trigger input is passed to the chunking Lambda (256KB limit) which splits it into S3 chunks. Each array item should be small (an identifier or key), not a full data record. The step itself reads the actual data using the identifier:
 
 ```ruby
-# Good: small trigger with S3 pointer
-turbofan start my_pipeline staging --input '{"data_uri": "s3://bucket/items.json", "date": "2026-03-25"}'
-
-# Bad: raw data as trigger (will fail at ~100+ items)
-turbofan start my_pipeline staging --input_file giant_array_of_65536_items.json
+class ProcessItem
+  include Turbofan::Step
+  # ...
+  def call(inputs, context)
+    item = inputs.first
+    # item is {"maid_prefix": "aa"} — a small identifier
+    # The step reads actual data from its own sources
+    data = context.duckdb.query("SELECT * FROM ... WHERE prefix = ?", item["maid_prefix"])
+    # ...
+  end
+end
 ```
 
 ### Monitoring
