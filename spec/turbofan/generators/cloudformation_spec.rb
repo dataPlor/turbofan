@@ -184,10 +184,10 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(retry_strategy["Attempts"]).to eq(3)
     end
 
-    it "includes EvaluateOnExit chain for production retries" do
+    it "includes EvaluateOnExit chain within AWS 5-condition limit" do
       evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
       expect(evaluate).to be_an(Array)
-      expect(evaluate.size).to be >= 5
+      expect(evaluate.size).to be <= 5
     end
 
     it "handles Spot reclaim in EvaluateOnExit" do
@@ -216,13 +216,6 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       placement_entry = evaluate.find { |e| e["OnStatusReason"] == "Task failed to start*" }
       expect(placement_entry).not_to be_nil
       expect(placement_entry["Action"]).to eq("RETRY")
-    end
-
-    it "handles success (exit code 0) in EvaluateOnExit" do
-      evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
-      success_entry = evaluate.find { |e| e["OnExitCode"] == "0" }
-      expect(success_entry).not_to be_nil
-      expect(success_entry["Action"]).to eq("EXIT")
     end
 
     it "handles CannotPullContainer via catch-all in EvaluateOnExit" do # rubocop:disable RSpec/RepeatedExample

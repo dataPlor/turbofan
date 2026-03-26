@@ -170,9 +170,7 @@ The framework generates a production-grade `EvaluateOnExit` chain for all job de
 | Exit code `137` (SIGKILL/OOM) | RETRY | No |
 | Exit code `143` (SIGTERM) | RETRY | No |
 | `Task failed to start*` (ECS placement) | RETRY | No |
-| Exit code `0` (success) | EXIT | N/A |
-| `CannotPullContainer*` (config error) | EXIT | N/A |
-| `*` (application failure) | EXIT | Yes |
+| `*` (all other failures) | EXIT | Yes |
 
 Infrastructure failures (Spot reclaim, OOM, SIGTERM, placement) are retried at the **Batch level** per individual job child. The `retries` DSL controls `retryStrategy.attempts` in the Batch job definition (default 3). For fan-out steps, this means each array child retries independently — a single failing child doesn't trigger re-execution of the entire array. Step Functions `Retry` (via `retries N, on: [...]`) is only applied to non-fan-out steps.
 
