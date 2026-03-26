@@ -10,7 +10,7 @@ module Turbofan
 
           resource_reqs = []
           resource_reqs << {"Type" => "VCPU", "Value" => cpu.to_s} if cpu
-          resource_reqs << {"Type" => "MEMORY", "Value" => (ram * 1024).to_s} if ram
+          resource_reqs << {"Type" => "MEMORY", "Value" => (ram * 1024).to_i.to_s} if ram
 
           container = {
             "Image" => image,
