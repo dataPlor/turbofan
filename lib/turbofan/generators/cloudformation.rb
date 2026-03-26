@@ -8,6 +8,7 @@ require_relative "cloudformation/logs"
 require_relative "cloudformation/dashboard"
 require_relative "cloudformation/sns"
 require_relative "cloudformation/chunking_lambda"
+require_relative "cloudformation/tolerance_lambda"
 
 module Turbofan
   module Generators
@@ -111,9 +112,16 @@ module Turbofan
           resources.merge!(eventbridge_rule(prefix, all_resource_tags))
         end
 
+        bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
+
         # Chunking Lambda (only when at least one fan_out uses batch_size:)
         if any_grouped_fan_out?
-          resources.merge!(ChunkingLambda.generate(prefix: prefix, bucket_prefix: Naming.bucket_prefix(pipeline_name, @stage), tags: all_resource_tags))
+          resources.merge!(ChunkingLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
+        end
+
+        # Tolerance Lambda (only when at least one fan_out has tolerated_failure_rate > 0)
+        if any_tolerated_fan_out?
+          resources.merge!(ToleranceLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
         end
 
         {
@@ -131,14 +139,20 @@ module Turbofan
       # Returns S3 artifacts that must be uploaded before deploying the stack.
       # Each entry is {bucket:, key:, body:}.
       def lambda_artifacts
-        return [] unless any_grouped_fan_out?
         pipeline_name = @pipeline.turbofan_name
         bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
-        [{
-          bucket: Turbofan.config.bucket,
-          key: ChunkingLambda.handler_s3_key(bucket_prefix),
-          body: ChunkingLambda.handler_zip
-        }]
+        artifacts = []
+        if any_grouped_fan_out?
+          artifacts << {
+            bucket: Turbofan.config.bucket,
+            key: ChunkingLambda.handler_s3_key(bucket_prefix),
+            body: ChunkingLambda.handler_zip
+          }
+        end
+        if any_tolerated_fan_out?
+          artifacts.concat(ToleranceLambda.lambda_artifacts(bucket_prefix))
+        end
+        artifacts
       end
 
       def self.tags_hash(tags)
@@ -180,6 +194,10 @@ module Turbofan
 
       def any_grouped_fan_out?
         @pipeline.turbofan_dag.steps.any? { |s| s.fan_out? && s.batch_size }
+      end
+
+      def any_tolerated_fan_out?
+        @pipeline.turbofan_dag.steps.any? { |s| s.fan_out? && (s.tolerated_failure_rate || 0) > 0 }
       end
 
       def find_consumable_resource_refs(step_class, prefix)

@@ -170,6 +170,8 @@ module Turbofan
             {"Name" => "TURBOFAN_PARENT_INDEX", "Value.$" => "States.Format('{}', $.index)"}
           ]
 
+          tolerance = step.tolerated_failure_rate || 0
+
           inner_task = {
             "Type" => "Task",
             "Resource" => BATCH_RESOURCE,
@@ -184,12 +186,61 @@ module Turbofan
               "JobId.$" => "$.JobId",
               "JobName.$" => "$.JobName",
               "Status.$" => "$.Status"
-            },
-            "End" => true
+            }
           }
 
           step_class = @steps[step_name]
           inner_task["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
+
+          inner_states = {}
+
+          if tolerance > 0
+            # Catch Batch failures → check tolerance Lambda → succeed or fail
+            inner_task["Catch"] = [{
+              "ErrorEquals" => ["Batch.JobFailed"],
+              "ResultPath" => "$.error",
+              "Next" => "#{step_name}_check_tolerance"
+            }]
+            inner_task["Next"] = "#{step_name}_done"
+
+            inner_states["#{step_name}_batch"] = inner_task
+            inner_states["#{step_name}_check_tolerance"] = {
+              "Type" => "Task",
+              "Resource" => "arn:aws:states:::lambda:invoke",
+              "Parameters" => {
+                "FunctionName" => "#{@prefix}-tolerance-check",
+                "Payload" => {
+                  "error.$" => "$.error",
+                  "step_name" => step_name.to_s,
+                  "parent_index.$" => "$.index",
+                  "parent_size.$" => "$.size",
+                  "parent_real_size.$" => "$.real_size",
+                  "tolerated_failure_rate" => tolerance,
+                  "execution_id.$" => "$$.Execution.Id",
+                  "job_name.$" => "States.Format('#{@prefix}-#{step_name}-parent{}', $.index)",
+                  "job_queue" => "#{@prefix}-queue-#{step_name}"
+                }
+              },
+              "ResultPath" => "$.tolerance_check",
+              "Next" => "#{step_name}_done",
+              "Catch" => [{
+                "ErrorEquals" => ["States.ALL"],
+                "Next" => "#{step_name}_tolerance_exceeded"
+              }]
+            }
+            inner_states["#{step_name}_tolerance_exceeded"] = {
+              "Type" => "Fail",
+              "Error" => "ToleranceExceeded",
+              "Cause" => "Failure rate exceeded tolerated threshold of #{(tolerance * 100).round(1)}%"
+            }
+            inner_states["#{step_name}_done"] = {
+              "Type" => "Pass",
+              "End" => true
+            }
+          else
+            inner_task["End"] = true
+            inner_states["#{step_name}_batch"] = inner_task
+          end
 
           map_state = {
             "Type" => "Map",
@@ -198,7 +249,7 @@ module Turbofan
             "ItemProcessor" => {
               "ProcessorConfig" => {"Mode" => "INLINE"},
               "StartAt" => "#{step_name}_batch",
-              "States" => {"#{step_name}_batch" => inner_task}
+              "States" => inner_states
             },
             "ResultPath" => "$.steps.#{step_name}",
             "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
