@@ -41,8 +41,29 @@ module Turbofan
                 data = JSON.parse(response.body.read)
                 data.is_a?(Hash) && data.key?('items') ? data['items'] : [data]
               end
+            elsif event.key?('input')
+              read_trigger_input(event['input'], bucket)
             else
-              event['items']
+              raise "No input source: expected 'prev_step' or 'input' in event"
+            end
+          end
+
+          def read_trigger_input(input, bucket)
+            if input.is_a?(Hash) && input.key?('items')
+              # Inline items (small payloads) — backward compat
+              input['items']
+            elsif input.is_a?(Hash) && input.key?('items_s3_uri')
+              # S3 pointer: {"items_s3_uri": "s3://bucket/path/items.json"}
+              uri = input['items_s3_uri']
+              parts = uri.sub('s3://', '').split('/', 2)
+              response = S3.get_object(bucket: parts[0], key: parts[1])
+              data = JSON.parse(response.body.read)
+              data.is_a?(Array) ? data : data.fetch('items', [data])
+            elsif input.is_a?(Array)
+              # Raw array (small payloads) — backward compat
+              input
+            else
+              [input]
             end
           end
 

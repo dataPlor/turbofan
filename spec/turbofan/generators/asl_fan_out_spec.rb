@@ -72,10 +72,11 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(payload["group_size"]).to eq(100)
       end
 
-      it "chunk state references prev_step when not first" do
+      it "chunk state references prev_step when not first (reads from S3, not raw data)" do
         payload = asl["States"]["process_chunk"].dig("Parameters", "Payload")
         expect(payload["prev_step"]).to eq("discover")
         expect(payload).not_to have_key("items.$")
+        expect(payload).not_to have_key("items")
       end
 
       it "chunk state has ResultSelector for chunk_count" do
@@ -270,9 +271,9 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(asl["StartAt"]).to eq("process_chunk")
       end
 
-      it "chunk state has items.$ for first step" do
+      it "chunk state passes trigger input for first step" do
         payload = asl["States"]["process_chunk"].dig("Parameters", "Payload")
-        expect(payload["items.$"]).to eq("$.input")
+        expect(payload["input.$"]).to eq("$.input")
         expect(payload).not_to have_key("prev_step")
       end
 
@@ -284,6 +285,14 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
       it "each chunk is capped at 10,000 items" do
         expect(Turbofan::Generators::ASL::MAX_ARRAY_SIZE).to eq(10_000)
+      end
+
+      it "does NOT set TURBOFAN_INPUT on the fan-out batch step" do
+        process_state = asl["States"]["process"]
+        env = process_state.dig("Parameters", "ContainerOverrides", "Environment")
+        input_var = env.find { |e| e["Name"] == "TURBOFAN_INPUT" }
+        expect(input_var).to be_nil,
+          "Fan-out first steps should not set TURBOFAN_INPUT (raw data hits 8KB Batch limit)"
       end
     end
 

@@ -246,6 +246,46 @@ Resources are shared infrastructure that steps depend on — primarily database 
 
 Fan-out distributes an array of items across parallel Batch array job children. You wrap a step call with `fan_out(step(input), batch_size: N)` where `N` is items per child. A Lambda function chunks the input array into S3, and each array job child reads its chunk by index.
 
+The chunking Lambda reads its input from S3 — either the previous step's output (for mid-pipeline fan-outs) or the trigger input (for first-step fan-outs). **All data flows through S3, never through state machine payloads or env vars.**
+
+#### Fan-out input format
+
+The step preceding a fan-out must write its output as `{"items": [...]}` where each item is a small work unit. The chunking Lambda reads `items`, splits them into chunks of `batch_size`, and writes each chunk to S3.
+
+**Fan-out after a step** (most common):
+
+```ruby
+pipeline do
+  # discover writes {"items": [{"prefix": "aa"}, {"prefix": "ab"}, ...]}
+  partitions = discover(trigger_input)
+  fan_out(process(partitions), batch_size: 1)
+end
+```
+
+The `discover` step's output is written to S3 as `{"items": [...]}`. The chunking Lambda reads it via S3 key `{execution_id}/discover/output.json`.
+
+**Fan-out as the first step:**
+
+```ruby
+pipeline do
+  fan_out(process(trigger_input), batch_size: 1)
+end
+```
+
+The trigger input is passed directly to the chunking Lambda. It should be `{"items": [...]}` with small items:
+
+```bash
+# Good: small identifiers as items
+turbofan start my_pipeline staging --input '{"items": [{"prefix": "aa"}, {"prefix": "ab"}]}'
+
+# Good: trigger references S3, first step reads it
+turbofan start my_pipeline staging --input '{"items_s3_uri": "s3://bucket/partitions.json"}'
+```
+
+The chunking Lambda accepts both formats:
+- `{"items": [...]}` — inline array (must stay under 256KB Lambda payload limit)
+- `{"items_s3_uri": "s3://bucket/file.json"}` — S3 pointer to a JSON file containing an array or `{"items": [...]}`
+
 When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own Batch array job with the appropriate CPU/RAM allocation. See the [Routers](#turbofanrouter) section for details.
 
 ### Schemas
