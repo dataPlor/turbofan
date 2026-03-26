@@ -284,13 +284,13 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(asl["States"]).not_to have_key("process_routed")
     end
 
-    it "aggregate step has TURBOFAN_PREV_FAN_OUT_SIZE (singular)" do
+    it "aggregate step has TURBOFAN_PREV_FAN_OUT_PARENTS" do
       aggregate_state = asl["States"]["aggregate"]
       env = aggregate_state.dig("Parameters", "ContainerOverrides", "Environment")
-      singular_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_SIZE" }
-      expect(singular_var).not_to be_nil,
-        "expected aggregate step after non-routed fan-out to have singular TURBOFAN_PREV_FAN_OUT_SIZE"
-      expect(singular_var["Value.$"]).to eq("States.JsonToString($.chunking.process.chunk_count)")
+      parents_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_PARENTS" }
+      expect(parents_var).not_to be_nil,
+        "expected aggregate step after non-routed fan-out to have TURBOFAN_PREV_FAN_OUT_PARENTS"
+      expect(parents_var["Value.$"]).to eq("States.JsonToString($.chunking.process.parents)")
     end
   end
 end

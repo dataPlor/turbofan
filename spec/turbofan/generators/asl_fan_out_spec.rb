@@ -115,12 +115,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         })
       end
 
-      it "aggregate step has TURBOFAN_PREV_FAN_OUT_SIZE env var" do
+      it "aggregate step has TURBOFAN_PREV_FAN_OUT_PARENTS env var" do
         aggregate_state = asl["States"]["aggregate"]
         env = aggregate_state.dig("Parameters", "ContainerOverrides", "Environment")
-        fan_out_size_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_SIZE" }
-        expect(fan_out_size_var).not_to be_nil
-        expect(fan_out_size_var["Value.$"]).to eq("States.JsonToString($.chunking.process.chunk_count)")
+        parents_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_PARENTS" }
+        expect(parents_var).not_to be_nil
+        expect(parents_var["Value.$"]).to eq("States.JsonToString($.chunking.process.parents)")
       end
 
       it "references the correct job definition in Map inner task" do
@@ -486,11 +486,11 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(asl["States"]["aggregate"]["Next"]).to match(/success/i)
       end
 
-      it "aggregate step has TURBOFAN_PREV_FAN_OUT_SIZE env var" do
+      it "aggregate step has TURBOFAN_PREV_FAN_OUT_PARENTS env var" do
         aggregate_state = asl["States"]["aggregate"]
         env = aggregate_state.dig("Parameters", "ContainerOverrides", "Environment")
-        fan_out_size_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_SIZE" }
-        expect(fan_out_size_var).not_to be_nil
+        parents_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_PARENTS" }
+        expect(parents_var).not_to be_nil
       end
     end
 
@@ -593,12 +593,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       let(:generator) { described_class.new(pipeline: pipeline_class, stage: "production") }
       let(:asl) { generator.generate }
 
-      it "passes prev_fan_out_size to the second chunking Lambda" do
+      it "passes prev_fan_out_parents to the second chunking Lambda" do
         chunk_b = asl["States"]["step_b_chunk"]
         payload = chunk_b.dig("Parameters", "Payload")
-        expect(payload).to have_key("prev_fan_out_size.$"),
-          "expected step_b_chunk Lambda payload to include prev_fan_out_size.$ when prev step was fan-out"
-        expect(payload["prev_fan_out_size.$"]).to eq("States.JsonToString($.chunking.step_a.chunk_count)")
+        expect(payload).to have_key("prev_fan_out_parents.$"),
+          "expected step_b_chunk Lambda payload to include prev_fan_out_parents.$ when prev step was fan-out"
+        expect(payload["prev_fan_out_parents.$"]).to eq("States.JsonToString($.chunking.step_a.parents)")
       end
 
       it "does not pass prev_fan_out_size to the first chunking Lambda" do

@@ -25,7 +25,19 @@ module Turbofan
           def read_items(event, bucket, execution_id)
             if event.key?('prev_step')
               prev_step = event['prev_step']
-              if event.key?('prev_fan_out_size')
+              if event.key?('prev_fan_out_parents')
+                parents = event['prev_fan_out_parents']
+                all_items = []
+                parents.each do |parent|
+                  parent['size'].times do |idx|
+                    key = s3_key(execution_id, prev_step, 'output', "parent#{parent['index']}", "#{idx}.json")
+                    response = S3.get_object(bucket: bucket, key: key)
+                    data = JSON.parse(response.body.read)
+                    all_items << data if data
+                  end
+                end
+                all_items
+              elsif event.key?('prev_fan_out_size')
                 count = event['prev_fan_out_size'].to_i
                 threads = (0...count).map do |i|
                   Thread.new(i) do |idx|

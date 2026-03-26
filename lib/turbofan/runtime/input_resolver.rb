@@ -49,6 +49,16 @@ module Turbofan
             step_name: prev_step,
             chunks: chunks
           )
+        elsif ENV.key?("TURBOFAN_PREV_FAN_OUT_PARENTS")
+          parents = JSON.parse(ENV["TURBOFAN_PREV_FAN_OUT_PARENTS"])
+          parent_chunks = parents.each_with_object({}) { |p, h| h["parent#{p["index"]}"] = p["size"] }
+          FanOut.collect_outputs(
+            s3_client: context.s3,
+            bucket: bucket,
+            execution_id: context.execution_id,
+            step_name: prev_step,
+            chunks: parent_chunks
+          )
         elsif ENV.key?("TURBOFAN_PREV_FAN_OUT_SIZE")
           count = ENV["TURBOFAN_PREV_FAN_OUT_SIZE"].to_i
           FanOut.collect_outputs(

@@ -45,8 +45,8 @@ module Turbofan
               end
             else
               env << {
-                "Name" => "TURBOFAN_PREV_FAN_OUT_SIZE",
-                "Value.$" => "States.JsonToString($.chunking.#{prev_step_name}.chunk_count)"
+                "Name" => "TURBOFAN_PREV_FAN_OUT_PARENTS",
+                "Value.$" => "States.JsonToString($.chunking.#{prev_step_name}.parents)"
               }
             end
           end
@@ -277,7 +277,11 @@ module Turbofan
             payload["prev_step"] = prev_step_name.to_s
             prev_step_obj = @pipeline.turbofan_dag.sorted_steps.find { |s| s.name.to_s == prev_step_name.to_s }
             if prev_step_obj&.fan_out?
-              payload["prev_fan_out_size.$"] = "States.JsonToString($.chunking.#{prev_step_name}.chunk_count)"
+              if routed_fan_out?(prev_step_obj)
+                payload["prev_fan_out_size.$"] = "States.JsonToString($.chunking.#{prev_step_name}.chunk_count)"
+              else
+                payload["prev_fan_out_parents.$"] = "States.JsonToString($.chunking.#{prev_step_name}.parents)"
+              end
             end
           end
 
