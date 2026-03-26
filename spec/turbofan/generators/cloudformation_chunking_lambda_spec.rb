@@ -792,6 +792,29 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
     end
   end
 
+  describe "handler input validation" do
+    let(:handler) { Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER }
+
+    it "requires items_s3_uri for trigger input (no inline items)" do
+      expect(handler).to include("items_s3_uri")
+      expect(handler).to include("Invalid trigger input for fan-out")
+    end
+
+    it "validates S3 file contains {items: [...]}" do
+      expect(handler).to include("Invalid S3 input format")
+    end
+
+    it "validates prev_step output contains {items: [...]}" do
+      expect(handler).to include("Invalid input from step")
+    end
+
+    it "does not accept raw arrays as trigger input" do
+      # The handler should NOT have a fallback that accepts event['items'] directly
+      # or treats raw arrays as valid input
+      expect(handler).not_to match(/^\s*event\['items'\]\s*$/)
+    end
+  end
+
   describe "TURBOFAN_BUCKET environment variable" do
     let(:pipeline_class) do
       step_klass = step_class
