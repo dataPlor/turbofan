@@ -40,22 +40,21 @@ module Turbofan
 
     def self.count_jobs(batch_client, job_queue, after: nil)
       counts = {pending: 0, running: 0, succeeded: 0, failed: 0}
-
-      filters = []
-      if after
-        filters << {name: "AFTER_CREATED_AT", values: [(after.to_i * 1000).to_s]}
-      end
+      after_ms = after ? (after.to_i * 1000) : nil
 
       BATCH_STATUSES.each do |batch_status|
         next_token = nil
         loop do
-          params = {job_queue: job_queue, job_status: batch_status, next_token: next_token}
-          params[:filters] = filters if filters.any?
-          response = batch_client.list_jobs(**params)
+          response = batch_client.list_jobs(
+            job_queue: job_queue,
+            job_status: batch_status,
+            next_token: next_token
+          )
           job_count = response.job_summary_list.sum do |job|
+            next 0 if after_ms && job.respond_to?(:created_at) && job.created_at && job.created_at < after_ms
+
             if job.array_properties
               if job.array_properties.index
-                # Child of array job — parent already counted via size
                 0
               elsif job.array_properties.size && job.array_properties.size > 0
                 job.array_properties.size

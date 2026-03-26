@@ -630,18 +630,14 @@ RSpec.describe Turbofan::Status do
         )
 
         expect(batch_client).to have_received(:list_jobs).with(
-          hash_including(
-            job_queue: "turbofan-my_pipeline-production-queue-extract",
-            job_status: "RUNNING",
-            next_token: nil
-          )
+          job_queue: "turbofan-my_pipeline-production-queue-extract",
+          job_status: "RUNNING",
+          next_token: nil
         )
         expect(batch_client).to have_received(:list_jobs).with(
-          hash_including(
-            job_queue: "turbofan-my_pipeline-production-queue-extract",
-            job_status: "RUNNING",
-            next_token: "page2-token"
-          )
+          job_queue: "turbofan-my_pipeline-production-queue-extract",
+          job_status: "RUNNING",
+          next_token: "page2-token"
         )
       end
     end
