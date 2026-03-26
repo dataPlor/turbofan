@@ -197,6 +197,13 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(spot_entry["Action"]).to eq("RETRY")
     end
 
+    it "handles OOM/SIGKILL (exit code 137) in EvaluateOnExit" do
+      evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
+      oom_entry = evaluate.find { |e| e["OnExitCode"] == "137" }
+      expect(oom_entry).not_to be_nil
+      expect(oom_entry["Action"]).to eq("RETRY")
+    end
+
     it "handles SIGTERM (exit code 143) in EvaluateOnExit" do
       evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
       sigterm_entry = evaluate.find { |e| e["OnExitCode"] == "143" }

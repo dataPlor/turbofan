@@ -297,6 +297,65 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       end
     end
 
+    describe "fan-out steps do not get SFN Retry (retries are per-child at Batch level)" do
+      let(:pipeline_class) do
+        stub_const("Process", Class.new {
+          include Turbofan::Step
+
+          compute_environment :test_ce
+          cpu 1
+          retries 3, on: ["States.TaskFailed"]
+
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "fan-out-retry"
+
+          pipeline do
+            fan_out(process(trigger_input), batch_size: 100)
+          end
+        end
+      end
+
+      let(:generator) { described_class.new(pipeline: pipeline_class, stage: "production") }
+      let(:asl) { generator.generate }
+
+      it "does NOT add SFN Retry to the fan-out batch state" do
+        process_state = asl["States"]["process"]
+        expect(process_state).not_to have_key("Retry"),
+          "Fan-out steps must not have SFN Retry — it re-submits the entire array. " \
+          "Retries are handled per-child at the Batch level via retryStrategy.attempts."
+      end
+
+      it "non-fan-out steps with retries on: still get SFN Retry" do
+        extract_class = stub_const("Extract", Class.new {
+          include Turbofan::Step
+
+          compute_environment :test_ce
+          cpu 1
+          retries 2, on: ["States.TaskFailed"]
+
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "non-fan-retry"
+          pipeline do
+            extract(trigger_input)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {extract: extract_class})
+        result = gen.generate
+        extract_state = result["States"]["extract"]
+        expect(extract_state).to have_key("Retry")
+        expect(extract_state["Retry"].first["ErrorEquals"]).to eq(["States.TaskFailed"])
+      end
+    end
+
     describe "fan-out S3 input/output paths" do
       let(:pipeline_class) do
         stub_const("Discover", Class.new {
