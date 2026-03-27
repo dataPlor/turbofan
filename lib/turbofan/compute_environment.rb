@@ -161,6 +161,15 @@ module Turbofan
               Properties:
                 LaunchTemplateName: turbofan-ce-#{slug}-#{stage}-launchtemplate
                 LaunchTemplateData:
+                  TagSpecifications:
+                    - ResourceType: instance
+                      Tags:
+                        - Key: turbofan:managed
+                          Value: 'true'
+                        - Key: turbofan:compute-environment
+                          Value: #{slug}
+                        - Key: turbofan:stage
+                          Value: #{stage}
                   UserData:
                     Fn::Base64: |
           #{userdata_yaml}
