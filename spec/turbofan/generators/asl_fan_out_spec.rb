@@ -347,6 +347,121 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           "Retries are handled per-child at the Batch level via retryStrategy.attempts."
       end
 
+    end
+
+    describe "fan-out timeout behavior" do
+      it "fan-out Map state gets TimeoutSeconds from fan_out_timeout" do
+        step_class = stub_const("Process", Class.new {
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 1
+          timeout 7200
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "fan-timeout"
+          pipeline do
+            fan_out(process(trigger_input), batch_size: 1, timeout: 86400)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
+        asl = gen.generate
+        map_state = asl["States"]["process"]
+        expect(map_state["TimeoutSeconds"]).to eq(86400)
+      end
+
+      it "fan-out Map state has no TimeoutSeconds when fan_out_timeout omitted" do
+        step_class = stub_const("Process", Class.new {
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 1
+          timeout 7200
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "fan-no-timeout"
+          pipeline do
+            fan_out(process(trigger_input), batch_size: 1)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
+        asl = gen.generate
+        map_state = asl["States"]["process"]
+        expect(map_state).not_to have_key("TimeoutSeconds")
+      end
+
+      it "fan-out inner Batch task has NO TimeoutSeconds (step timeout goes to Batch job def only)" do
+        step_class = stub_const("Process", Class.new {
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 1
+          timeout 7200
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "fan-inner-no-timeout"
+          pipeline do
+            fan_out(process(trigger_input), batch_size: 1)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
+        asl = gen.generate
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        expect(inner_task).not_to have_key("TimeoutSeconds"),
+          "Step timeout must not be applied to fan-out inner task — it kills the entire parent array"
+      end
+    end
+
+    describe "pipeline-level timeout" do
+      it "pipeline with timeout gets top-level ASL TimeoutSeconds" do
+        step_class = stub_const("Process", Class.new {
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 1
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "pipeline-timeout"
+          timeout 43200
+          pipeline do
+            process(trigger_input)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
+        asl = gen.generate
+        expect(asl["TimeoutSeconds"]).to eq(43200)
+      end
+
+      it "pipeline without timeout has no top-level TimeoutSeconds" do
+        step_class = stub_const("Process", Class.new {
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 1
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "pipeline-no-timeout"
+          pipeline do
+            process(trigger_input)
+          end
+        end
+        gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
+        asl = gen.generate
+        expect(asl).not_to have_key("TimeoutSeconds")
+      end
+    end
+
+    describe "fan-out steps do not get SFN Retry (retries are per-child at Batch level)" do
       it "non-fan-out steps with retries on: still get SFN Retry" do
         extract_class = stub_const("Extract", Class.new {
           include Turbofan::Step
