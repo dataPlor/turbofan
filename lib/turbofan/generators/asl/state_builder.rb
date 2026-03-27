@@ -194,7 +194,9 @@ module Turbofan
           }
 
           step_class = @steps[step_name]
-          inner_task["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
+          # Don't apply step timeout to fan-out inner task — Batch
+          # AttemptDurationSeconds already handles per-job timeout.
+          # SFN TimeoutSeconds here would kill the entire parent array job.
 
           inner_states = {}
 
