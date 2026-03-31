@@ -2,6 +2,14 @@ module Turbofan
   module Generators
     class ASL
       module StateBuilder
+        CATCH_ALL_FAILURE = [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}].freeze
+        LAMBDA_RETRY = [{
+          "ErrorEquals" => ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "States.TaskFailed"],
+          "IntervalSeconds" => 2,
+          "MaxAttempts" => 3,
+          "BackoffRate" => 2.0
+        }].freeze
+
         private
 
         def state_name_for(step)
@@ -159,7 +167,7 @@ module Turbofan
             "Parameters" => params
           }
 
-          state["Catch"] = [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+          state["Catch"] = CATCH_ALL_FAILURE
 
           if step_class&.turbofan_timeout
             state["TimeoutSeconds"] = step_class.turbofan_timeout
@@ -214,7 +222,7 @@ module Turbofan
               "FunctionName" => "#{@prefix}-lambda-#{step_name}",
               "Payload" => payload
             },
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Catch" => CATCH_ALL_FAILURE
           }
 
           step_class = resolve_step_class(step_name)
@@ -271,7 +279,7 @@ module Turbofan
                 ]
               }
             },
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Catch" => CATCH_ALL_FAILURE
           }
 
           if step_class.turbofan_timeout
@@ -380,7 +388,7 @@ module Turbofan
               "States" => inner_states
             },
             "ResultPath" => "$.steps.#{step_name}",
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Catch" => CATCH_ALL_FAILURE
           }
 
           map_state["TimeoutSeconds"] = step.fan_out_timeout if step.fan_out_timeout
@@ -473,13 +481,8 @@ module Turbofan
             },
             "ResultPath" => "$.routing.#{step.name}",
             "Next" => "#{step.name}_chunk",
-            "Retry" => [{
-              "ErrorEquals" => ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "States.TaskFailed"],
-              "IntervalSeconds" => 2,
-              "MaxAttempts" => 3,
-              "BackoffRate" => 2.0
-            }],
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Retry" => LAMBDA_RETRY,
+            "Catch" => CATCH_ALL_FAILURE
           }
         end
 
@@ -537,13 +540,8 @@ module Turbofan
             "ResultSelector" => result_selector,
             "ResultPath" => "$.chunking.#{step.name}",
             "Next" => next_state,
-            "Retry" => [{
-              "ErrorEquals" => ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "States.TaskFailed"],
-              "IntervalSeconds" => 2,
-              "MaxAttempts" => 3,
-              "BackoffRate" => 2.0
-            }],
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Retry" => LAMBDA_RETRY,
+            "Catch" => CATCH_ALL_FAILURE
           }
         end
 
@@ -609,7 +607,7 @@ module Turbofan
             "Branches" => branches,
             "Next" => parallel_next,
             "ResultPath" => "$.steps.#{step_name}_routed",
-            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+            "Catch" => CATCH_ALL_FAILURE
           }
         end
       end
