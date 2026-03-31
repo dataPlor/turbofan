@@ -392,7 +392,7 @@ end
             "Type" => "AWS::IAM::Role",
             "Properties" => {
               "RoleName" => "#{prefix}-lambda-#{step_name}-role",
-              "Tags" => CloudFormation.tags_hash(tags),
+              "Tags" => tags.is_a?(Array) ? tags : tags.map { |k, v| {"Key" => k, "Value" => v} },
               "AssumeRolePolicyDocument" => {
                 "Version" => "2012-10-17",
                 "Statement" => [
