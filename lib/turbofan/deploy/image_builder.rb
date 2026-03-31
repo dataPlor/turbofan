@@ -149,7 +149,7 @@ module Turbofan
         sha.empty? ? nil : "git-#{sha}"
       end
 
-      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd, lambda: false)
+      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd, lambda_wrap: false)
         tag ||= content_tag(step_dir, schemas_dir, external_deps: external_deps, project_root: project_root)
 
         if image_exists?(ecr_client, repository_name, tag)
@@ -158,7 +158,7 @@ module Turbofan
         end
 
         build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri, external_deps: external_deps, project_root: project_root)
-        wrap_for_lambda(repository_uri: repository_uri, tag: tag) if binding.local_variable_get(:lambda)
+        wrap_for_lambda(repository_uri: repository_uri, tag: tag) if lambda_wrap
         push(tag: tag, repository_uri: repository_uri)
 
         git_tag = git_sha
