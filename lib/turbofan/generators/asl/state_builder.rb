@@ -133,6 +133,11 @@ module Turbofan
               prev_step_name: prev_step_name, prev_step: prev_step, prev_step_names: prev_step_names)
           end
 
+          if step_class&.turbofan_fargate?
+            return build_fargate_state(step, next_step_name, first: first, last: last,
+              prev_step_name: prev_step_name, prev_step: prev_step, prev_step_names: prev_step_names)
+          end
+
           env = step_env(step,
             first: first, prev_step_name: prev_step_name,
             prev_step: prev_step, prev_step_names: prev_step_names)
@@ -223,6 +228,59 @@ module Turbofan
             state["ResultSelector"] = {
               "Payload.$" => "$.Payload"
             }
+            state["ResultPath"] = "$.steps.#{step_name}"
+            state["Next"] = next_step_name.to_s
+          end
+
+          state
+        end
+
+        def build_fargate_state(step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
+          step_name = step.name
+          step_class = resolve_step_class(step_name)
+
+          env = step_env(step,
+            first: first, prev_step_name: prev_step_name,
+            prev_step: prev_step, prev_step_names: prev_step_names)
+
+          # Resolve CE for networking
+          ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
+          subnets = ce_class.resolved_subnets
+          security_groups = ce_class.resolved_security_groups
+
+          state = {
+            "Type" => "Task",
+            "Resource" => "arn:aws:states:::ecs:runTask.sync",
+            "Parameters" => {
+              "LaunchType" => "FARGATE",
+              "Cluster" => "#{@prefix}-fargate-cluster",
+              "TaskDefinition" => "#{@prefix}-taskdef-#{step_name}",
+              "NetworkConfiguration" => {
+                "AwsvpcConfiguration" => {
+                  "Subnets" => subnets,
+                  "SecurityGroups" => security_groups
+                }
+              },
+              "Overrides" => {
+                "ContainerOverrides" => [
+                  {
+                    "Name" => "worker",
+                    "Environment" => env
+                  }
+                ]
+              }
+            },
+            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+          }
+
+          if step_class.turbofan_timeout
+            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          end
+
+          if last
+            state["Next"] = "NotifySuccess"
+          else
             state["ResultPath"] = "$.steps.#{step_name}"
             state["Next"] = next_step_name.to_s
           end

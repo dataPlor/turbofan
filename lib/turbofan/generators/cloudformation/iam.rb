@@ -2,12 +2,12 @@ module Turbofan
   module Generators
     class CloudFormation
       module Iam
-        def self.generate(prefix:, steps:, tags:, pipeline_name:, resources: {}, has_fan_out: false, has_tolerated_fan_out: false, routed_step_names: [], lambda_step_names: [])
+        def self.generate(prefix:, steps:, tags:, pipeline_name:, resources: {}, has_fan_out: false, has_tolerated_fan_out: false, routed_step_names: [], lambda_step_names: [], fargate_step_names: [])
           secret_arns = collect_secret_arns(steps, resources)
           iam_resources = {}
           iam_resources.merge!(job_role(prefix, steps, tags, pipeline_name, secret_arns))
           iam_resources.merge!(execution_role(prefix, steps, tags, secret_arns))
-          iam_resources.merge!(sfn_role(prefix, tags, has_fan_out: has_fan_out, has_tolerated_fan_out: has_tolerated_fan_out, routed_step_names: routed_step_names, lambda_step_names: lambda_step_names))
+          iam_resources.merge!(sfn_role(prefix, tags, has_fan_out: has_fan_out, has_tolerated_fan_out: has_tolerated_fan_out, routed_step_names: routed_step_names, lambda_step_names: lambda_step_names, fargate_step_names: fargate_step_names))
           iam_resources
         end
 
@@ -151,7 +151,7 @@ module Turbofan
         end
         private_class_method :execution_role
 
-        def self.sfn_role(prefix, tags, has_fan_out: false, has_tolerated_fan_out: false, routed_step_names: [], lambda_step_names: [])
+        def self.sfn_role(prefix, tags, has_fan_out: false, has_tolerated_fan_out: false, routed_step_names: [], lambda_step_names: [], fargate_step_names: [])
           policies = [
             {
               "PolicyName" => "BatchAccess",
@@ -222,6 +222,34 @@ module Turbofan
                     "Effect" => "Allow",
                     "Action" => "lambda:InvokeFunction",
                     "Resource" => lambda_resources.size == 1 ? lambda_resources.first : lambda_resources
+                  }
+                ]
+              }
+            }
+          end
+
+          if fargate_step_names.any?
+            # ECS RunTask + PassRole for Fargate steps
+            pass_role_resources = fargate_step_names.flat_map do |sname|
+              [
+                {"Fn::GetAtt" => ["FargateExecRole#{Naming.pascal_case(sname)}", "Arn"]},
+                {"Fn::GetAtt" => ["FargateTaskRole#{Naming.pascal_case(sname)}", "Arn"]}
+              ]
+            end
+            policies << {
+              "PolicyName" => "ECSAccess",
+              "PolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => [
+                  {
+                    "Effect" => "Allow",
+                    "Action" => ["ecs:RunTask", "ecs:StopTask", "ecs:DescribeTasks"],
+                    "Resource" => "*"
+                  },
+                  {
+                    "Effect" => "Allow",
+                    "Action" => "iam:PassRole",
+                    "Resource" => pass_role_resources
                   }
                 ]
               }

@@ -44,7 +44,8 @@ module Turbofan
           resources: @resources, has_fan_out: any_grouped_fan_out?,
           has_tolerated_fan_out: any_tolerated_fan_out?,
           routed_step_names: routed_fan_out_steps.map { |ds, _| ds.name },
-          lambda_step_names: lambda_step_names
+          lambda_step_names: lambda_step_names,
+          fargate_step_names: fargate_step_names
         ))
 
         # Per-step resources
@@ -73,7 +74,17 @@ module Turbofan
           # Check if this step uses consumable resources
           consumable_resource_refs = find_consumable_resource_refs(sclass, prefix)
 
-          if sclass.turbofan_lambda?
+          if sclass.turbofan_fargate?
+            # Fargate task definition with container image from ECR
+            image_uri = sclass.turbofan_external? ? sclass.turbofan_docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
+            cpu_units = (sclass.turbofan_default_cpu * 1024).to_i.to_s
+            memory_mb = (sclass.turbofan_default_ram * 1024).to_i.to_s
+            resources.merge!(fargate_step_resources(
+              prefix: prefix, step_name: sname, image_uri: image_uri,
+              cpu_units: cpu_units, memory_mb: memory_mb,
+              tags: step_tags, log_group_ref: {"Ref" => log_group_key}
+            ))
+          elsif sclass.turbofan_lambda?
             # Lambda function with container image from ECR
             image_uri = sclass.turbofan_external? ? sclass.turbofan_docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
             memory_mb = ((sclass.turbofan_default_ram || 1) * 1024).to_i
@@ -253,6 +264,115 @@ end
         router_path = File.join(step_dir, "router", "router.rb")
         return nil unless File.exist?(router_path)
         File.read(router_path)
+      end
+
+      def fargate_step_names
+        @steps.filter_map { |sname, sclass| sname if sclass.turbofan_fargate? }
+      end
+
+      def fargate_step_resources(prefix:, step_name:, image_uri:, cpu_units:, memory_mb:, tags:, log_group_ref:)
+        task_def_name = "FargateTaskDef#{Naming.pascal_case(step_name)}"
+        exec_role_name = "FargateExecRole#{Naming.pascal_case(step_name)}"
+        task_role_name = "FargateTaskRole#{Naming.pascal_case(step_name)}"
+
+        resources = {}
+
+        # Shared Fargate cluster (only created once)
+        resources["FargateCluster"] ||= {
+          "Type" => "AWS::ECS::Cluster",
+          "Properties" => {
+            "ClusterName" => "#{prefix}-fargate-cluster",
+            "CapacityProviders" => ["FARGATE", "FARGATE_SPOT"],
+            "Tags" => CloudFormation.tags_hash(tags).map { |k, v| {"Key" => k, "Value" => v} }
+          }
+        }
+
+        # Execution role (pull images, send logs)
+        resources[exec_role_name] = {
+          "Type" => "AWS::IAM::Role",
+          "Properties" => {
+            "RoleName" => "#{prefix}-fargate-exec-#{step_name}",
+            "Tags" => CloudFormation.tags_hash(tags),
+            "AssumeRolePolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => [
+                {
+                  "Effect" => "Allow",
+                  "Principal" => {"Service" => "ecs-tasks.amazonaws.com"},
+                  "Action" => "sts:AssumeRole"
+                }
+              ]
+            },
+            "ManagedPolicyArns" => [
+              "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+            ]
+          }
+        }
+
+        # Task role (app permissions — S3 access)
+        resources[task_role_name] = {
+          "Type" => "AWS::IAM::Role",
+          "Properties" => {
+            "RoleName" => "#{prefix}-fargate-task-#{step_name}",
+            "Tags" => CloudFormation.tags_hash(tags),
+            "AssumeRolePolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => [
+                {
+                  "Effect" => "Allow",
+                  "Principal" => {"Service" => "ecs-tasks.amazonaws.com"},
+                  "Action" => "sts:AssumeRole"
+                }
+              ]
+            },
+            "Policies" => [
+              {
+                "PolicyName" => "S3Access",
+                "PolicyDocument" => {
+                  "Version" => "2012-10-17",
+                  "Statement" => [
+                    {
+                      "Effect" => "Allow",
+                      "Action" => ["s3:GetObject", "s3:PutObject"],
+                      "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+
+        # Task definition
+        resources[task_def_name] = {
+          "Type" => "AWS::ECS::TaskDefinition",
+          "Properties" => {
+            "Family" => "#{prefix}-taskdef-#{step_name}",
+            "NetworkMode" => "awsvpc",
+            "RequiresCompatibilities" => ["FARGATE"],
+            "Cpu" => cpu_units,
+            "Memory" => memory_mb,
+            "ExecutionRoleArn" => {"Fn::GetAtt" => [exec_role_name, "Arn"]},
+            "TaskRoleArn" => {"Fn::GetAtt" => [task_role_name, "Arn"]},
+            "ContainerDefinitions" => [
+              {
+                "Name" => "worker",
+                "Image" => image_uri,
+                "Essential" => true,
+                "LogConfiguration" => {
+                  "LogDriver" => "awslogs",
+                  "Options" => {
+                    "awslogs-group" => log_group_ref,
+                    "awslogs-region" => "${AWS::Region}",
+                    "awslogs-stream-prefix" => "fargate"
+                  }
+                }
+              }
+            ]
+          }
+        }
+
+        resources
       end
 
       def lambda_step_names
