@@ -1184,6 +1184,33 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         end
       end
 
+      context "when :lambda step has ram but no cpu" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :lambda
+            compute_environment :check_ce
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "lambda-no-cpu-ok"
+          end
+        end
+
+        it "passes without cpu (Lambda does not require cpu)" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          cpu_errors = result.errors.select { |e| e.include?(":process") && e.include?("missing cpu") }
+          expect(cpu_errors).to be_empty
+        end
+      end
+
       context "when :lambda step exceeds ram limit" do
         let(:step_class) do
           ce = ce_class

@@ -161,8 +161,10 @@ module Turbofan
           has_sizes = step_class.turbofan_sizes.any?
           has_cpu = step_class.turbofan_default_cpu
           has_ram = step_class.turbofan_default_ram
+          is_lambda = step_class.turbofan_execution == :lambda
 
-          if !has_sizes && !(has_cpu && has_ram)
+          # Lambda only needs ram (cpu scales with ram). Batch and Fargate need both.
+          if !has_sizes && !is_lambda && !(has_cpu && has_ram)
             if has_cpu && !has_ram
               errors << "Step :#{step_name} is missing ram (cpu is set but ram is also required)"
             elsif has_ram && !has_cpu
