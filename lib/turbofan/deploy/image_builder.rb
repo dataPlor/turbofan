@@ -34,6 +34,10 @@ module Turbofan
         true
       rescue Aws::ECR::Errors::ImageNotFoundException
         false
+      rescue Aws::ECR::Errors::RepositoryNotFoundException
+        ecr_client.create_repository(repository_name: repository_name)
+        puts "Created ECR repository: #{repository_name}"
+        false
       end
 
       def self.build(step_dir, schemas_dir, tag:, repository_uri:, external_deps: [], project_root: Dir.pwd)
