@@ -444,7 +444,7 @@ end
                   "GEM_PATH" => "/usr/local/bundle"
                 }
               },
-              "Tags" => CloudFormation.tags_hash(tags)
+              "Tags" => tags.is_a?(Array) ? tags : tags.map { |k, v| {"Key" => k, "Value" => v} }
             }
           }
         }
