@@ -5,7 +5,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags stack: "geo", "stack-component": "validation"
@@ -25,7 +25,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end
@@ -73,7 +73,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags "already-string" => "value", :other => "sym"
@@ -108,7 +108,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags stack: "geo"
@@ -125,7 +125,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags({})
@@ -163,7 +163,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags version: 2, enabled: true
@@ -185,7 +185,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           tags "turbofan:foo" => "bar"
@@ -208,7 +208,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           tags "turbofan:managed": "true"
@@ -221,7 +221,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_a) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         tags stack: "geo"
@@ -231,7 +231,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_b) do
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end

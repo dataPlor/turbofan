@@ -13,6 +13,7 @@ end
 class FetchBrand
   include Turbofan::Step
 
+  execution :batch
   uses :places_read
   input_schema "passthrough.json"
   output_schema "passthrough.json"

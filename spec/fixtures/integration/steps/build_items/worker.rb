@@ -1,6 +1,7 @@
 class BuildItems
   include Turbofan::Step
 
+  execution :batch
   input_schema "passthrough.json"
   output_schema "passthrough.json"
 

@@ -16,6 +16,7 @@ module Turbofan
       base.instance_variable_set(:@turbofan_default_ram, nil)
       base.instance_variable_set(:@turbofan_compute_environment, nil)
       base.instance_variable_set(:@turbofan_tags, {})
+      base.instance_variable_set(:@turbofan_execution, nil)
       base.instance_variable_set(:@turbofan_docker_image, nil)
       base.instance_variable_set(:@turbofan_duckdb_extensions, [])
     end
@@ -23,7 +24,7 @@ module Turbofan
     module ClassMethods
       attr_reader :turbofan_uses, :turbofan_writes_to,
         :turbofan_secrets, :turbofan_sizes, :turbofan_batch_size,
-        :turbofan_timeout,
+        :turbofan_execution, :turbofan_timeout,
         :turbofan_retries, :turbofan_retry_on, :turbofan_default_cpu,
         :turbofan_default_ram,
         :turbofan_compute_environment,
@@ -62,6 +63,23 @@ module Turbofan
 
       def turbofan_external?
         !@turbofan_docker_image.nil? && !@turbofan_docker_image.empty?
+      end
+
+      VALID_EXECUTION_MODELS = %i[batch lambda fargate].freeze
+
+      def execution(model)
+        unless VALID_EXECUTION_MODELS.include?(model)
+          raise ArgumentError, "execution must be one of #{VALID_EXECUTION_MODELS.inspect}, got #{model.inspect}"
+        end
+        @turbofan_execution = model
+      end
+
+      def turbofan_lambda?
+        @turbofan_execution == :lambda
+      end
+
+      def turbofan_fargate?
+        @turbofan_execution == :fargate
       end
 
       def cpu(value)

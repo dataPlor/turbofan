@@ -12,7 +12,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb
@@ -45,7 +45,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         ram 4096
       end
@@ -65,7 +65,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 4
         ram 8192
@@ -86,7 +86,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb
@@ -107,7 +107,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb
@@ -132,7 +132,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses "s3://data-bucket/input/*"
@@ -157,7 +157,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         writes_to :places_write
@@ -187,7 +187,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         reads_from :places_read
@@ -209,7 +209,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb
@@ -221,7 +221,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :places_read
@@ -233,7 +233,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         writes_to :places_write
@@ -245,7 +245,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses "s3://bucket/path"
@@ -257,7 +257,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end
@@ -268,7 +268,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb, extensions: [:spatial]
@@ -282,7 +282,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb
@@ -295,7 +295,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         writes_to :places
@@ -311,7 +311,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           uses :"Invalid-Key"
@@ -324,7 +324,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           uses "http://example.com"
@@ -337,7 +337,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           uses 42
@@ -351,7 +351,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :places_read
@@ -370,7 +370,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :shared_db
@@ -385,7 +385,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         timeout 7200
@@ -402,7 +402,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         retries 5
@@ -419,7 +419,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         secret :db_url, from: "turbofan/my-pipeline/db-url"
@@ -444,7 +444,7 @@ RSpec.describe Turbofan::Step do
         ce = ce_class
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 3
@@ -465,7 +465,7 @@ RSpec.describe Turbofan::Step do
         ce = ce_class
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 3, on: ["States.TaskFailed"]
@@ -486,7 +486,7 @@ RSpec.describe Turbofan::Step do
         ce = ce_class
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 2, on: ["States.Timeout", "Batch.ServerException"]
@@ -508,7 +508,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end
@@ -544,7 +544,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb
@@ -556,7 +556,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         ram 16
       end
@@ -583,7 +583,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           family :c
         end
       }.to raise_error(NoMethodError)
@@ -598,7 +598,7 @@ RSpec.describe Turbofan::Step do
       stub_const("ComputeEnvironments::FamTest", ce)
       step_class = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :fam_test
         cpu 1
       end
@@ -611,7 +611,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           cpu 2
         end
       }.not_to raise_error
@@ -623,7 +623,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           ram 4096
         end
       }.not_to raise_error
@@ -637,7 +637,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           cpu 2
           compute_environment :test_ce
         end
@@ -652,7 +652,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           ram 4096
           compute_environment :test_ce
         end
@@ -667,7 +667,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           size :s, cpu: 1, ram: 2048
           compute_environment :test_ce
         end
@@ -682,7 +682,7 @@ RSpec.describe Turbofan::Step do
         stub_const("ComputeEnvironments::CpuZero", ce)
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :cpu_zero
           cpu 0
         end
@@ -695,7 +695,7 @@ RSpec.describe Turbofan::Step do
         stub_const("ComputeEnvironments::CpuNeg", ce)
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :cpu_neg
           cpu(-1)
         end
@@ -710,7 +710,7 @@ RSpec.describe Turbofan::Step do
         stub_const("ComputeEnvironments::RamZero", ce)
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :ram_zero
           ram 0
         end
@@ -723,7 +723,7 @@ RSpec.describe Turbofan::Step do
         stub_const("ComputeEnvironments::RamNeg", ce)
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :ram_neg
           ram(-1)
         end
@@ -736,7 +736,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -757,6 +757,7 @@ RSpec.describe Turbofan::Step do
     it "accepts a Symbol and stores it" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
       end
       step_class.compute_environment(:test_ce)
       expect(step_class.turbofan_compute_environment).to eq(:test_ce)
@@ -767,7 +768,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment bad_class
         end
       }.to raise_error(ArgumentError, /must be a Symbol/)
@@ -776,6 +777,7 @@ RSpec.describe Turbofan::Step do
     it "defaults to nil" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
       end
       expect(step_class.turbofan_compute_environment).to be_nil
     end
@@ -787,7 +789,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         inject_secret :db_url, from: "arn:aws:secretsmanager:us-east-1:123456789:secret:db-url"
@@ -807,7 +809,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         secret :api_key, from: "arn:aws:secretsmanager:us-east-1:123456789:secret:api-key"
@@ -826,7 +828,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb, extensions: [:spatial, :h3]
@@ -841,7 +843,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb, extensions: [:spatial, :spatial, :h3]
@@ -853,7 +855,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb, extensions: ["spatial"]
@@ -866,7 +868,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           uses :gpu, extensions: [:spatial]
@@ -879,7 +881,7 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-
+          execution :batch
           compute_environment :test_ce
           cpu 1
           uses :duckdb, extensions: [:"Invalid-Ext"]
@@ -891,7 +893,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end
@@ -902,7 +904,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         uses :duckdb, extensions: [:spatial]
@@ -917,7 +919,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step_class = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/my-step:latest"
@@ -929,7 +931,7 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step_class = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
         docker_image ""
@@ -941,11 +943,78 @@ RSpec.describe Turbofan::Step do
       ce = ce_class
       step_class = Class.new do
         include Turbofan::Step
-
+        execution :batch
         compute_environment :test_ce
         cpu 1
       end
       expect(step_class.turbofan_external?).to be false
+    end
+  end
+
+  describe "execution model DSL" do
+    it "sets execution to :batch" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :batch
+      end
+      expect(klass.turbofan_execution).to eq(:batch)
+    end
+
+    it "sets execution to :lambda" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :lambda
+      end
+      expect(klass.turbofan_execution).to eq(:lambda)
+    end
+
+    it "sets execution to :fargate" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+      end
+      expect(klass.turbofan_execution).to eq(:fargate)
+    end
+
+    it "defaults to nil" do
+      klass = Class.new { include Turbofan::Step }
+      expect(klass.turbofan_execution).to be_nil
+    end
+
+    it "raises ArgumentError for invalid execution model" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :kubernetes
+        end
+      }.to raise_error(ArgumentError, /execution must be one of/)
+    end
+
+    it "turbofan_lambda? returns true for :lambda" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :lambda
+      end
+      expect(klass.turbofan_lambda?).to be true
+      expect(klass.turbofan_fargate?).to be false
+    end
+
+    it "turbofan_fargate? returns true for :fargate" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+      end
+      expect(klass.turbofan_fargate?).to be true
+      expect(klass.turbofan_lambda?).to be false
+    end
+
+    it "turbofan_lambda? and turbofan_fargate? both false for :batch" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :batch
+      end
+      expect(klass.turbofan_lambda?).to be false
+      expect(klass.turbofan_fargate?).to be false
     end
   end
 end

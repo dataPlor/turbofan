@@ -58,6 +58,7 @@ module Turbofan
           class #{class_name}
             include Turbofan::Step
 
+            execution :batch
             compute_environment :#{compute_environment}
             cpu #{cpu}
             ram 2048

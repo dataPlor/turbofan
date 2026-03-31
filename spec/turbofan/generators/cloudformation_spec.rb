@@ -16,6 +16,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :test_ce
       cpu 2
       ram 4
@@ -232,6 +233,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -493,6 +495,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -505,6 +508,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -547,6 +551,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -592,6 +597,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       step_with_own_ce = Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -751,6 +757,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         ram 4
         input_schema "passthrough.json"
@@ -798,6 +805,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end

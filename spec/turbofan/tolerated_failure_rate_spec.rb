@@ -6,6 +6,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     it "accepts tolerated_failure_rate on fan_out" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 10
@@ -30,6 +31,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     it "defaults tolerated_failure_rate to 0" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 10
@@ -54,6 +56,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     it "rejects tolerated_failure_rate >= 1.0" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 10
@@ -76,6 +79,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     it "rejects negative tolerated_failure_rate" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 10
@@ -98,6 +102,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     it "accepts tolerated_failure_rate of 0 explicitly" do
       step_class = Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 10
@@ -124,6 +129,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     let(:step_class) do
       Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 1
@@ -262,6 +268,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
     let(:step_class) do
       Class.new do
         include Turbofan::Step
+        execution :batch
         compute_environment :test_ce
         cpu 1
         batch_size 1

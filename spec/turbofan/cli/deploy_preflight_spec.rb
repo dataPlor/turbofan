@@ -121,6 +121,7 @@ RSpec.describe "Deploy pre-flight integration", type: :integration do # rubocop:
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"

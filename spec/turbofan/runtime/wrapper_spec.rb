@@ -14,6 +14,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 2
       ram 4
       input_schema "passthrough.json"
@@ -423,6 +424,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
           include Turbofan::Step
 
           compute_environment :test_ce
+          execution :batch
           cpu 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -613,6 +615,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "passthrough.json"
         def self.name = "NoSchemaStep"
@@ -629,6 +632,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         output_schema "passthrough.json"
         def self.name = "NoInputStep"
@@ -669,6 +673,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "query_input.json"
         output_schema "passthrough.json"
@@ -686,6 +691,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "passthrough.json"
         output_schema "latlng_output.json"
@@ -703,6 +709,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "query_input.json"
         output_schema "latlng_output.json"
@@ -813,6 +820,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       strict_step = Class.new do
         include Turbofan::Step
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "strict_input.json"
         output_schema "passthrough.json"
@@ -947,6 +955,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         size :m, cpu: 2, ram: 8
         input_schema "passthrough.json"
         output_schema "passthrough.json"

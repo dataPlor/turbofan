@@ -12,6 +12,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Fetch", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -58,6 +59,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Fetch", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -102,6 +104,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Analyze", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -151,6 +154,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Transform", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -199,6 +203,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -208,6 +213,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
           batch_size 100
@@ -219,6 +225,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Aggregate", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -281,6 +288,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Discover", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -290,6 +298,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
           batch_size 50
@@ -338,6 +347,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("Simple", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -386,6 +396,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("GoodStep", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 
@@ -396,6 +407,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
         stub_const("BadStep", Class.new {
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
 

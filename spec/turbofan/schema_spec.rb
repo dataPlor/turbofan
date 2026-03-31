@@ -4,7 +4,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
   it "stores input_schema filename" do
     klass = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
@@ -14,7 +14,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
   it "stores output_schema filename" do
     klass = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
@@ -24,7 +24,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
   it "loads and caches parsed input schema" do
     klass = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
@@ -36,7 +36,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
   it "raises if schema file does not exist" do
     klass = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "nonexistent.json"
       output_schema "geocode_output.json"
     end

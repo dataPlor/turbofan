@@ -4,7 +4,7 @@ RSpec.describe "Turbofan.discover_components" do # rubocop:disable RSpec/Describ
   it "discovers loaded Step classes by snake_case name" do
     step_class = Class.new do
       include Turbofan::Step
-
+      execution :batch
       compute_environment :test_ce
       cpu 1
     end
@@ -27,7 +27,10 @@ RSpec.describe "Turbofan.discover_components" do # rubocop:disable RSpec/Describ
   end
 
   it "skips anonymous classes (no name)" do
-    Class.new { include Turbofan::Step }
+    Class.new do
+      include Turbofan::Step
+      execution :batch
+    end
     components = Turbofan.discover_components
     expect(components[:steps].values).not_to include(nil)
   end
@@ -35,7 +38,7 @@ RSpec.describe "Turbofan.discover_components" do # rubocop:disable RSpec/Describ
   it "only returns the live constant, not stale ObjectSpace references (H-1)" do
     old_class = Class.new {
       include Turbofan::Step
-
+      execution :batch
       compute_environment :test_ce
       cpu 1
     }

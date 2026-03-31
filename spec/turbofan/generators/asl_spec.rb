@@ -10,6 +10,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -82,6 +83,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -91,6 +93,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -138,6 +141,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -147,6 +151,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Transform", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -156,6 +161,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -197,6 +203,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2
@@ -290,6 +297,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -328,6 +336,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -339,6 +348,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         size :s, cpu: 1
         size :l, cpu: 4
@@ -397,6 +407,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 1
 
@@ -436,6 +447,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         Class.new do
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 3, on: ["States.TaskFailed"]
@@ -496,6 +508,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         Class.new do
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 2, on: ["States.Timeout", "Batch.ServerException"]
@@ -543,6 +556,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         Class.new do
           include Turbofan::Step
 
+          execution :batch
           compute_environment :test_ce
           cpu 1
           retries 3

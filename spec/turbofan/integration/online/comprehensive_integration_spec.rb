@@ -43,6 +43,7 @@ RSpec.describe "Comprehensive integration (online)", :deploy do # rubocop:disabl
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       input_schema "passthrough.json"

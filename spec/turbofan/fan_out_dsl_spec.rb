@@ -12,6 +12,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     step_class = Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :fan_out_ce
       cpu 1
       batch_size 50
@@ -40,6 +41,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     step_class = Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :fan_out_ce
       cpu 1
       batch_size 50
@@ -52,6 +54,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     export_class = Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :fan_out_ce
       cpu 1
 
@@ -79,6 +82,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     step_class = Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :fan_out_ce
       cpu 1
       batch_size 50

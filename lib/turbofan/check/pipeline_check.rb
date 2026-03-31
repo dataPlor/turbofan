@@ -11,6 +11,7 @@ module Turbofan
         validate_schema_files(steps, errors)
         validate_dag_consistency(pipeline, steps, errors)
         validate_batch_size(pipeline, steps, errors, warnings)
+        validate_execution(pipeline, steps, errors, warnings)
         validate_routers(pipeline, steps, step_dirs, errors, warnings)
 
         Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
@@ -41,6 +42,59 @@ module Turbofan
         end
       end
       private_class_method :validate_batch_size
+
+      def self.validate_execution(pipeline, steps, errors, warnings)
+        # Per-step checks (no DAG needed)
+        steps.each do |step_name, step_class|
+          unless step_class.turbofan_execution
+            errors << "Step :#{step_name} has no execution model declared " \
+                      "(add `execution :batch`, `execution :lambda`, or `execution :fargate`)"
+            next
+          end
+
+          case step_class.turbofan_execution
+          when :lambda
+            unless step_class.turbofan_default_ram
+              errors << "Step :#{step_name} (execution :lambda) requires `ram` declaration"
+            end
+            if step_class.turbofan_default_ram && step_class.turbofan_default_ram > 10
+              errors << "Step :#{step_name} (execution :lambda) ram exceeds Lambda maximum of 10 GB"
+            end
+            if step_class.turbofan_default_cpu
+              warnings << "Step :#{step_name} (execution :lambda) declares cpu but Lambda ignores it (cpu scales with ram)"
+            end
+            if step_class.turbofan_sizes.any?
+              warnings << "Step :#{step_name} (execution :lambda) declares sizes but sizes are only used with execution :batch fan-out"
+            end
+          when :fargate
+            unless step_class.turbofan_default_cpu
+              errors << "Step :#{step_name} (execution :fargate) requires `cpu` declaration"
+            end
+            unless step_class.turbofan_default_ram
+              errors << "Step :#{step_name} (execution :fargate) requires `ram` declaration"
+            end
+          end
+        end
+
+        # Fan-out check (needs DAG)
+        begin
+          dag = pipeline.turbofan_dag
+        rescue ArgumentError, Turbofan::SchemaIncompatibleError
+          return
+        end
+
+        dag.steps.each do |dag_step|
+          next unless dag_step.fan_out?
+          step_class = steps[dag_step.name]
+          next unless step_class&.turbofan_execution
+
+          unless step_class.turbofan_execution == :batch
+            errors << "Step :#{dag_step.name} is a fan-out step but uses execution :#{step_class.turbofan_execution} " \
+                      "(fan-out requires execution :batch)"
+          end
+        end
+      end
+      private_class_method :validate_execution
 
       def self.validate_routers(pipeline, steps, step_dirs, _errors, warnings)
         begin

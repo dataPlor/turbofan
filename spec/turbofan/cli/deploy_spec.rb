@@ -22,6 +22,7 @@ RSpec.describe Turbofan::CLI::Deploy do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
@@ -260,6 +261,7 @@ RSpec.describe Turbofan::CLI::Deploy do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 2
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -298,6 +300,7 @@ RSpec.describe Turbofan::CLI::Deploy do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 2
         uses :duckdb
         input_schema "passthrough.json"

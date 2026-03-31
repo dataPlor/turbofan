@@ -5,6 +5,7 @@ INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config
 class ReadVisits
   include Turbofan::Step
 
+  execution :batch
   input_schema "passthrough.json"
   output_schema "passthrough.json"
 

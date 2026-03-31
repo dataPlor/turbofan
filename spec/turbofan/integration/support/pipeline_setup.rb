@@ -41,6 +41,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       retries 2
@@ -83,6 +84,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       timeout 60
@@ -146,6 +148,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :nvme_ce
+      execution :batch
       cpu 1
       ram 2
       uses :places_read
@@ -173,6 +176,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       uses "s3://#{INTEGRATION_EXT_BUCKET}/analytics_data/test/"
@@ -204,6 +208,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/classify:latest"
@@ -229,6 +234,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       input_schema "passthrough.json"
@@ -257,6 +263,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       size :s, cpu: 1, ram: 2
       size :m, cpu: 2, ram: 4
       size :l, cpu: 4, ram: 8
@@ -283,6 +290,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       ram 2
       writes_to "s3://#{INTEGRATION_EXT_BUCKET}/turbofan-test/"

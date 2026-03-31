@@ -23,6 +23,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "consumable resources", :sc
     Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :test_ce
       cpu 2
       uses :duckdb
@@ -36,6 +37,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "consumable resources", :sc
     Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
@@ -235,6 +237,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "consumable resources", :sc
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb

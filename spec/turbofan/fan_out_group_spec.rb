@@ -11,13 +11,14 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "sets turbofan_batch_size" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         batch_size 100
       end
       expect(klass.turbofan_batch_size).to eq(100)
     end
 
     it "defaults to 1" do
-      klass = Class.new { include Turbofan::Step }
+      klass = Class.new { include Turbofan::Step; execution :batch }
       expect(klass.turbofan_batch_size).to eq(1)
     end
 
@@ -25,6 +26,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           batch_size 0
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -34,6 +36,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           batch_size(-5)
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -43,6 +46,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           batch_size 10.5
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -53,6 +57,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "stores per-size batch_size" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         size :s, cpu: 1, ram: 2, batch_size: 100
       end
       expect(klass.turbofan_sizes[:s][:batch_size]).to eq(100)
@@ -61,6 +66,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "defaults per-size batch_size to nil" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         size :s, cpu: 1, ram: 2
       end
       expect(klass.turbofan_sizes[:s][:batch_size]).to be_nil
@@ -70,6 +76,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           size :s, cpu: 1, ram: 2, batch_size: 0
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -79,6 +86,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           size :s, cpu: 1, ram: 2, batch_size: -1
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -88,6 +96,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       expect {
         Class.new do
           include Turbofan::Step
+          execution :batch
           size :s, cpu: 1, ram: 2, batch_size: 10.5
         end
       }.to raise_error(ArgumentError, /batch_size must be a positive integer/)
@@ -98,6 +107,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "returns per-size batch_size when set" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         batch_size 10
         size :s, cpu: 1, ram: 2, batch_size: 100
       end
@@ -107,6 +117,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "falls back to step default when per-size not set" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         batch_size 10
         size :s, cpu: 1, ram: 2
       end
@@ -116,6 +127,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     it "falls back to default of 1 when neither per-size nor explicit default set" do
       klass = Class.new do
         include Turbofan::Step
+        execution :batch
         size :s, cpu: 1, ram: 2
       end
       expect(klass.turbofan_batch_size_for(:s)).to eq(1)
@@ -128,6 +140,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :group_ce
         cpu 1
         batch_size 100
@@ -141,6 +154,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       Class.new do
         include Turbofan::Step
 
+        execution :batch
         compute_environment :group_ce
         cpu 1
         input_schema "geocode_output.json"
@@ -157,6 +171,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         ce = ce_class
         no_bs_step = Class.new do
           include Turbofan::Step
+          execution :batch
           compute_environment :group_ce
           cpu 1
           input_schema "geocode_input.json"

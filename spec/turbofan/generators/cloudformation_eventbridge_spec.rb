@@ -14,6 +14,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
     Class.new do
       include Turbofan::Step
 
+      execution :batch
       compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"

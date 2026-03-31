@@ -26,6 +26,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 2
         uses :duckdb
         input_schema "passthrough.json"
@@ -42,6 +43,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
         include Turbofan::Step
 
         compute_environment :test_ce
+        execution :batch
         cpu 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -142,6 +144,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
           include Turbofan::Step
 
           compute_environment :test_ce
+          execution :batch
           cpu 2
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -161,6 +164,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
           include Turbofan::Step
 
           compute_environment :test_ce
+          execution :batch
           cpu 1
           docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/external-repo:latest"
           input_schema "passthrough.json"

@@ -29,6 +29,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       include Turbofan::Step
 
       compute_environment :test_ce
+      execution :batch
       cpu 1
       batch_size 1
       input_schema "passthrough.json"

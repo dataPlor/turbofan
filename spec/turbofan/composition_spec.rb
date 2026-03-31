@@ -4,7 +4,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
   it "inlines a sub-pipeline's steps into the parent DAG" do
     geocode = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -14,7 +14,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
     validate = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_output.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -34,7 +34,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
     export = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_output.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -59,7 +59,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
   it "supports 3-level nested composition" do
     step_a = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "passthrough.json"
       output_schema "passthrough.json"
       compute_environment :test_ce
@@ -69,7 +69,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
     step_b = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "passthrough.json"
       output_schema "passthrough.json"
       compute_environment :test_ce
@@ -79,7 +79,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
 
     step_c = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "passthrough.json"
       output_schema "passthrough.json"
       compute_environment :test_ce
@@ -122,7 +122,7 @@ RSpec.describe "Pipeline composition", :schemas do # rubocop:disable RSpec/Descr
   it "raises on step name collision" do
     geocode = Class.new do
       include Turbofan::Step
-
+      execution :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce

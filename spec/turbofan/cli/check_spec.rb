@@ -129,6 +129,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
             include Turbofan::Step
 
             compute_environment :test_ce
+            execution :batch
             input_schema "check_nocpu_pipeline_step1_input.json"
             output_schema "check_nocpu_pipeline_step1_output.json"
 
@@ -168,6 +169,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
             include Turbofan::Step
 
             compute_environment :test_ce
+            execution :batch
             input_schema "check_nocpu_pipeline_step1_input.json"
             output_schema "check_nocpu_pipeline_step1_output.json"
 
@@ -229,6 +231,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
             include Turbofan::Step
 
             compute_environment NotAComputeEnvironment
+            execution :batch
             cpu 1
             input_schema "check_badce_pipeline_step1_input.json"
             output_schema "check_badce_pipeline_step1_output.json"
