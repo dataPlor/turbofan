@@ -810,8 +810,10 @@ end
 - `:lambda` requires `ram`, ignores `cpu` (Lambda scales CPU with memory)
 - `:lambda` max `ram` is 10 GB
 - `:fargate` requires both `cpu` and `ram`
-- `:lambda` steps require `aws_lambda_ric` gem in the step's Gemfile
+- `:lambda` steps are automatically wrapped with `aws_lambda_ric` at build time — no Dockerfile changes needed
 - `:fargate` creates a shared ECS cluster per pipeline with FARGATE + FARGATE_SPOT capacity providers
+
+**Lambda image wrapping:** When you declare `execution :lambda`, `turbofan deploy` builds your Docker image normally from your Dockerfile, then automatically applies a second build stage that installs `aws_lambda_ric` and sets the Lambda entrypoint. Your Dockerfile stays execution-model-agnostic — the same Dockerfile works for `:batch`, `:lambda`, and `:fargate`. No manual RIC installation needed.
 
 #### The `call` Method
 
