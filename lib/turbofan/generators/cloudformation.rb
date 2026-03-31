@@ -442,7 +442,7 @@ end
                 "Variables" => {
                   "TURBOFAN_BUCKET" => Turbofan.config.bucket,
                   "TURBOFAN_BUCKET_PREFIX" => Naming.bucket_prefix(@pipeline.turbofan_name, @stage),
-                  "GEM_PATH" => "/usr/local/bundle"
+                  "GEM_PATH" => "/usr/local/bundle/ruby/3.2.0:/usr/share/ruby3.2-gems:/usr/share/gems"
                 }
               },
               "Tags" => tags.is_a?(Array) ? tags : tags.map { |k, v| {"Key" => k, "Value" => v} }
