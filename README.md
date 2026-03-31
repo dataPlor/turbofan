@@ -784,7 +784,7 @@ class ProcessPartitions
   # ...
 end
 
-# Lambda: fast preprocessing (coming soon)
+# Lambda: fast preprocessing
 class FilterGkeys
   include Turbofan::Step
   execution :lambda
@@ -794,7 +794,7 @@ class FilterGkeys
   # ...
 end
 
-# Fargate: predictable execution (coming soon)
+# Fargate: predictable execution
 class ExportResults
   include Turbofan::Step
   execution :fargate
@@ -810,7 +810,8 @@ end
 - `:lambda` requires `ram`, ignores `cpu` (Lambda scales CPU with memory)
 - `:lambda` max `ram` is 10 GB
 - `:fargate` requires both `cpu` and `ram`
-- `:lambda` and `:fargate` ASL generation is not yet implemented — `execution :batch` is the only fully functional model today
+- `:lambda` steps require `aws_lambda_ric` gem in the step's Gemfile
+- `:fargate` creates a shared ECS cluster per pipeline with FARGATE + FARGATE_SPOT capacity providers
 
 #### The `call` Method
 
