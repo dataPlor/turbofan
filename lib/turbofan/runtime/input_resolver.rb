@@ -28,7 +28,15 @@ module Turbofan
         else
           raw = ENV.fetch("TURBOFAN_INPUT", "{}")
           parsed = JSON.parse(raw)
-          Payload.deserialize(parsed, s3_client: context.s3)
+          parsed = Payload.deserialize(parsed, s3_client: context.s3)
+          # Resolve items_s3_uri for first-step triggers (e.g., Lambda steps
+          # that are the first step in a pipeline receive the trigger input
+          # directly, without a chunking Lambda to resolve S3 items first).
+          if parsed.is_a?(Hash) && parsed.key?("items_s3_uri")
+            resolve_items_s3_uri(parsed["items_s3_uri"], context)
+          else
+            parsed
+          end
         end
       end
       private_class_method :deserialize
@@ -90,6 +98,14 @@ module Turbofan
         end
       end
       private_class_method :fetch_parallel_outputs
+
+      def self.resolve_items_s3_uri(uri, context)
+        bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
+        key = uri.sub("s3://#{bucket}/", "")
+        response = context.s3.get_object(bucket: bucket, key: key)
+        JSON.parse(response.body.read)
+      end
+      private_class_method :resolve_items_s3_uri
 
       def self.normalize_envelope(raw)
         if raw.is_a?(Array)
