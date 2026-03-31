@@ -89,6 +89,13 @@ module Turbofan
               routed = step_class&.turbofan_sizes&.any?
               chunk_prev = is_join ? nil : find_prev(sorted, index, visited)
 
+              if routed
+                # Insert routing Lambda before chunking
+                states["#{step.name}_route"] = build_routing_state(
+                  step, chunk_prev&.name, first: first
+                )
+              end
+
               states["#{step.name}_chunk"] = build_chunk_state(
                 step, chunk_prev&.name, first: first, routed: routed
               )

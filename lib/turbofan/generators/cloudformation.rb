@@ -8,6 +8,7 @@ require_relative "cloudformation/dashboard"
 require_relative "cloudformation/sns"
 require_relative "cloudformation/chunking_lambda"
 require_relative "cloudformation/tolerance_lambda"
+require_relative "cloudformation/routing_lambda"
 
 module Turbofan
   module Generators
@@ -37,7 +38,12 @@ module Turbofan
         all_resource_tags = base_tags + turbofan_base_tags + pipeline_custom_tags
 
         # IAM roles
-        resources.merge!(Iam.generate(prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name, resources: @resources, has_fan_out: any_grouped_fan_out?, has_tolerated_fan_out: any_tolerated_fan_out?))
+        resources.merge!(Iam.generate(
+          prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name,
+          resources: @resources, has_fan_out: any_grouped_fan_out?,
+          has_tolerated_fan_out: any_tolerated_fan_out?,
+          routed_step_names: routed_fan_out_steps.map { |ds, _| ds.name }
+        ))
 
         # Per-step resources
         @steps.each do |sname, sclass|
@@ -117,6 +123,19 @@ module Turbofan
           resources.merge!(ToleranceLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
         end
 
+        # Routing Lambdas (one per routed fan-out step)
+        routed_fan_out_steps.each do |dag_step, step_class|
+          router_source = load_router_source(dag_step.name)
+          next unless router_source
+
+          code_hash = Digest::SHA256.hexdigest(RoutingLambda::HANDLER + router_source)[0, 12]
+          resources.merge!(RoutingLambda.generate(
+            prefix: prefix, step_name: dag_step.name,
+            bucket_prefix: bucket_prefix, tags: all_resource_tags,
+            code_hash: code_hash
+          ))
+        end
+
         {
           "AWSTemplateFormatVersion" => "2010-09-09",
           "Description" => "Turbofan pipeline: #{pipeline_name} (#{@stage})",
@@ -144,6 +163,16 @@ module Turbofan
         end
         if any_tolerated_fan_out?
           artifacts.concat(ToleranceLambda.lambda_artifacts(bucket_prefix))
+        end
+        routed_fan_out_steps.each do |dag_step, _step_class|
+          router_source = load_router_source(dag_step.name)
+          next unless router_source
+
+          artifacts.concat(RoutingLambda.lambda_artifacts(
+            bucket_prefix: bucket_prefix,
+            step_name: dag_step.name,
+            router_source: router_source
+          ))
         end
         artifacts
       end
@@ -193,6 +222,21 @@ module Turbofan
           end
         end
 end
+
+      def routed_fan_out_steps
+        @pipeline.turbofan_dag.steps.filter_map do |dag_step|
+          next unless dag_step.fan_out?
+          step_class = @steps[dag_step.name]
+          next unless step_class&.turbofan_sizes&.any?
+          [dag_step, step_class]
+        end
+      end
+
+      def load_router_source(step_name)
+        router_path = File.join("steps", step_name.to_s, "router", "router.rb")
+        return nil unless File.exist?(router_path)
+        File.read(router_path)
+      end
 
       def any_tolerated_fan_out?
         @pipeline.turbofan_dag.steps.any? { |s| s.fan_out? && (s.tolerated_failure_rate || 0) > 0 }

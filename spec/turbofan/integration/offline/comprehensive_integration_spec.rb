@@ -124,7 +124,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(sizes).to contain_exactly("s", "m", "l")
     end
 
-    it "has correct state chain: retry_demo -> controlled_step -> fetch_brand -> Parallel -> build_items -> score_items_chunk -> score_items_routed -> aggregate -> NotifySuccess" do
+    it "has correct state chain: ... -> build_items -> score_items_route -> score_items_chunk -> score_items_routed -> aggregate -> NotifySuccess" do
       states = asl["States"]
 
       # retry_demo points to controlled_step
@@ -140,8 +140,9 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       # parallel state points to build_items
       expect(states[parallel_key]["Next"]).to eq("build_items")
 
-      # linear chain after parallel
-      expect(states["build_items"]["Next"]).to eq("score_items_chunk")
+      # linear chain after parallel: routing -> chunking -> routed parallel -> aggregate
+      expect(states["build_items"]["Next"]).to eq("score_items_route")
+      expect(states["score_items_route"]["Next"]).to eq("score_items_chunk")
       expect(states["score_items_chunk"]["Next"]).to eq("score_items_routed")
       expect(states["score_items_routed"]["Next"]).to eq("aggregate")
       expect(states["aggregate"]["Next"]).to eq("NotifySuccess")
