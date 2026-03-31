@@ -380,7 +380,7 @@ end
         account_id = Turbofan.config.aws_account_id
         region = Turbofan.config.default_region || "us-east-1"
         tag = image_tag || "latest"
-        "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-#{step_name}:#{tag}"
+        "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-ecr-#{step_name}:#{tag}"
       end
 
       def lambda_step_function(prefix:, step_name:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
