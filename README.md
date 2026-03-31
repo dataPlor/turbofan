@@ -343,12 +343,36 @@ Steps declare JSON Schema files for input and output validation. At DAG build ti
 
 ### Routers
 
-Steps with multiple size profiles (`:s`, `:m`, `:l`, etc.) use a router to classify items by size. Each size generates a separate Batch job definition and queue with different CPU/RAM allocations. During routed fan-out, the chunking Lambda groups items by their `__turbofan_size` field and creates per-size Batch array jobs.
+Steps with multiple size profiles (`:s`, `:m`, `:l`, etc.) use a **router** to classify items by size. The router is a Ruby class that lives alongside the step at `steps/{step}/router/router.rb`:
+
+```ruby
+class ComputeTradeAreaRouter
+  include Turbofan::Router
+
+  sizes :s, :m, :l
+
+  def route(input)
+    case input["gkey"].length
+    when 1..3 then :l
+    when 4    then :m
+    when 5..6 then :s
+    end
+  end
+end
+```
+
+Generate a scaffold with `turbofan add router {step_name}`.
+
+At runtime, a **routing Lambda** runs before the chunking Lambda. It loads the router, calls `route(item)` per item, and tags each item with `__turbofan_size`. The chunking Lambda then groups tagged items by size and creates per-size Batch array jobs. Each size gets its own job definition with the appropriate CPU/RAM allocation.
+
+```
+{step}_route → {step}_chunk → {step}_routed (Parallel → Map per size → Batch)
+```
 
 ## Features
 
 - **Fan-out at scale** — Batch array jobs with up to 10,000 children, automatic chunking Lambda for larger datasets
-- **Routed fan-out** — Steps with multiple `size` profiles route items to per-size Batch array jobs with different CPU/RAM allocations. Items are grouped by `__turbofan_size` and each size gets its own job definition and queue.
+- **Routed fan-out** — Steps with multiple `size` profiles use a Router class to classify items. A routing Lambda tags items with `__turbofan_size`, then the chunking Lambda groups and creates per-size Batch array jobs with different CPU/RAM allocations.
 - **Concurrency control** — Consumable resources enforce database connection limits at the Batch scheduler level
 - **Content-addressed deploys** — Docker images tagged by SHA256 of source files; unchanged steps aren't rebuilt
 - **Schema validation** — Build-time edge compatibility checks and runtime input/output validation

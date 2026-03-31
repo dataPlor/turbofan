@@ -5,7 +5,7 @@ module Turbofan
     module AddRouter
       def self.call(step_name)
         Dir.chdir(Turbofan::CLI.project_root) do
-          class_name = step_name.split("_").map(&:capitalize).join
+          class_name = Turbofan::Naming.pascal_case(step_name)
           step_dir = File.join("turbofans", "steps", step_name)
           router_dir = File.join(step_dir, "router")
 
@@ -20,10 +20,12 @@ module Turbofan
           class #{class_name}Router
             include Turbofan::Router
 
+            # Declare sizes matching the step's size definitions
             sizes :s, :m, :l
 
+            # Classify each item into a size. Return a size symbol.
+            # This runs on Lambda — keep it fast and dependency-light.
             def route(input)
-              # TODO: implement routing logic
               :m
             end
           end
