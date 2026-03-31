@@ -9,12 +9,13 @@ module Turbofan
 
         pipeline = load_result.pipeline
         steps = load_result.steps
+        step_dirs = load_result.step_dirs
 
         all_errors = []
         all_warnings = []
 
         # Run PipelineCheck
-        pipeline_result = Turbofan::Check::PipelineCheck.run(pipeline: pipeline, steps: steps)
+        pipeline_result = Turbofan::Check::PipelineCheck.run(pipeline: pipeline, steps: steps, step_dirs: step_dirs)
         all_errors.concat(pipeline_result.errors)
         all_warnings.concat(pipeline_result.warnings)
 

@@ -13,7 +13,7 @@ require_relative "cloudformation/routing_lambda"
 module Turbofan
   module Generators
     class CloudFormation
-      def initialize(pipeline:, steps:, stage:, config:, image_tags: {}, resources: {}, dashboard: true)
+      def initialize(pipeline:, steps:, stage:, config:, image_tags: {}, resources: {}, dashboard: true, step_dirs: {})
         @pipeline = pipeline
         @steps = steps
         @stage = stage
@@ -21,6 +21,7 @@ module Turbofan
         @image_tags = image_tags
         @resources = resources
         @dashboard = dashboard
+        @step_dirs = step_dirs
       end
 
       def generate
@@ -233,7 +234,10 @@ end
       end
 
       def load_router_source(step_name)
-        router_path = File.join("steps", step_name.to_s, "router", "router.rb")
+        step_dir = @step_dirs[step_name]
+        return nil unless step_dir
+
+        router_path = File.join(step_dir, "router", "router.rb")
         return nil unless File.exist?(router_path)
         File.read(router_path)
       end

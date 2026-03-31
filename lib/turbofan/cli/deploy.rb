@@ -86,7 +86,7 @@ module Turbofan
         end
 
         cfn_generator = Turbofan::Generators::CloudFormation.new(
-          pipeline: pipeline_class, steps: steps, stage: stage, config: config, image_tags: image_tags, resources: used_resources
+          pipeline: pipeline_class, steps: steps, stage: stage, config: config, image_tags: image_tags, resources: used_resources, step_dirs: step_dirs
         )
         template_body = JSON.generate(cfn_generator.generate)
         artifacts = cfn_generator.lambda_artifacts
