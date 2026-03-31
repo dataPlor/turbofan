@@ -430,6 +430,7 @@ end
               "PackageType" => "Image",
               "Code" => {"ImageUri" => image_uri},
               "Role" => {"Fn::GetAtt" => [role_name, "Arn"]},
+              "Architectures" => ["arm64"],
               "Timeout" => [timeout, 900].min,
               "MemorySize" => [memory_mb, 10240].min,
               "ImageConfig" => {
