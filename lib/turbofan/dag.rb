@@ -194,7 +194,14 @@ module Turbofan
       target_schema = target_class.turbofan_input_schema
       source_schema = source_proxy.schema
       required_props = target_schema["required"] || []
-      source_props = source_schema["properties"] || {}
+      # If the source output is an {items: [...]} envelope, validate against
+      # the per-item schema inside the array (the runtime unwraps items before
+      # passing to the next step).
+      source_props = if source_schema.dig("properties", "items", "items", "properties")
+        source_schema["properties"]["items"]["items"]["properties"]
+      else
+        source_schema["properties"] || {}
+      end
       missing = required_props - source_props.keys
       return if missing.empty?
       raise SchemaIncompatibleError,
