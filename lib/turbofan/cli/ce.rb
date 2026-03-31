@@ -96,7 +96,8 @@ module Turbofan
         lt_name = "turbofan-ce-#{ce_class.slug}-#{stage}-launchtemplate"
         ec2.delete_launch_template(launch_template_name: lt_name)
         $stdout.puts "  Cleaned up orphaned launch template: #{lt_name}"
-      rescue Aws::EC2::Errors::InvalidLaunchTemplateNameNotFound
+      rescue Aws::EC2::Errors::InvalidLaunchTemplateNameNotFound,
+             Aws::EC2::Errors::InvalidLaunchTemplateNameNotFoundException
         nil # no orphan — CloudFormation manages it
       rescue Aws::Errors::MissingRegionError, Aws::Errors::MissingCredentialsError
         nil # skip cleanup when AWS is not configured (e.g., tests)
