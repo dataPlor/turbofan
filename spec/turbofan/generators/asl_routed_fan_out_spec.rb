@@ -156,6 +156,18 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       end
     end
 
+    it "each branch Map ItemsPath references per-size parents (supports empty arrays for sizes with no items)" do
+      routed = asl["States"]["process_routed"]
+      routed["Branches"].each do |branch|
+        map_state = branch["States"].values.first
+        expect(map_state["Type"]).to eq("Map")
+        items_path = map_state["ItemsPath"]
+        expect(items_path).to match(/\$\.chunking\.process\.sizes\.(s|m|l)\.parents/)
+        # Empty parents ([]) would result in 0 Map iterations = instant success
+        expect(map_state["MaxConcurrency"]).to eq(0)
+      end
+    end
+
     it "aggregate step does NOT have TURBOFAN_PREV_FAN_OUT_SIZE (singular)" do
       aggregate_state = asl["States"]["aggregate"]
       env = aggregate_state.dig("Parameters", "ContainerOverrides", "Environment")

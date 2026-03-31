@@ -427,6 +427,10 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(handler).to include("'parents'")
     end
 
+    it "backfills empty parents for declared sizes with no items" do
+      expect(handler).to include("sizes[size_name] ||= { 'parents' => [] }")
+    end
+
     it "does not contain Batch submit_job call" do
       expect(handler).not_to include("submit_job")
     end

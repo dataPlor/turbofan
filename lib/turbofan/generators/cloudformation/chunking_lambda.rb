@@ -163,6 +163,11 @@ module Turbofan
                 sizes[size_name] = { 'parents' => parents }
               end
 
+              # Ensure all declared sizes are present (empty parents for sizes with no items)
+              batch_sizes.each_key do |size_name|
+                sizes[size_name] ||= { 'parents' => [] }
+              end
+
               { 'sizes' => sizes }
             else
               chunks = chunk(items, group_size)
