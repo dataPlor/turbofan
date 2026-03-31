@@ -10,9 +10,36 @@ module Turbofan
         validate_steps(steps, errors)
         validate_schema_files(steps, errors)
         validate_dag_consistency(pipeline, steps, errors)
+        validate_batch_size(pipeline, steps, errors, warnings)
 
         Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
       end
+
+      def self.validate_batch_size(pipeline, steps, errors, _warnings)
+        begin
+          dag = pipeline.turbofan_dag
+        rescue ArgumentError, Turbofan::SchemaIncompatibleError
+          return
+        end
+
+        dag.steps.each do |dag_step|
+          next unless dag_step.fan_out?
+          step_class = steps[dag_step.name]
+          next unless step_class
+          next unless step_class.turbofan_sizes.any?
+
+          # Routed fan-out: each size must resolve to a batch_size.
+          # The step default is 1, so this only errors if someone
+          # explicitly set the default to nil (shouldn't happen).
+          step_class.turbofan_sizes.each do |size_name, _config|
+            unless step_class.turbofan_batch_size_for(size_name)
+              errors << "Step :#{dag_step.name} size :#{size_name} has no batch_size " \
+                        "(set batch_size on the size or a default on the step)"
+            end
+          end
+        end
+      end
+      private_class_method :validate_batch_size
 
       def self.validate_dag_consistency(pipeline, steps, errors)
         begin

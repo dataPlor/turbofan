@@ -8,7 +8,9 @@ module Turbofan
         if context.array_index
           step_name = ENV.fetch("TURBOFAN_STEP_NAME")
           parent_index = ENV["TURBOFAN_PARENT_INDEX"]
-          segment = if context.size
+          segment = if context.size && parent_index
+            "#{context.size}/parent#{parent_index}/"
+          elsif context.size
             "#{context.size}/"
           elsif parent_index
             "parent#{parent_index}/"

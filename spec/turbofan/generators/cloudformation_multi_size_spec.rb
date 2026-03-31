@@ -21,6 +21,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         size :m, cpu: 2, ram: 4
         size :l, cpu: 4, ram: 8
         uses :duckdb
+        batch_size 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -34,7 +35,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         pipeline_name "multi-size"
 
         pipeline do
-          fan_out(process(trigger_input), batch_size: 1)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -253,6 +254,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           compute_environment :test_ce
           size :s, cpu: 1, ram: 8
           size :l, cpu: 4, ram: 32
+          batch_size 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         end
@@ -266,7 +268,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           pipeline_name "r-multi"
 
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
       end
@@ -345,6 +347,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
           compute_environment :test_ce
           size :s, cpu: 1, ram: 2
           size :l, cpu: 4, ram: 8
+          batch_size 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         end
@@ -360,7 +363,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            fan_out(process(files), batch_size: 1)
+            fan_out(process(files))
           end
         end
       end

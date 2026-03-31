@@ -22,6 +22,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         size :s, cpu: 1
         size :m, cpu: 2
         size :l, cpu: 4
+        batch_size 3
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -49,7 +50,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
         pipeline do
           files = discover(trigger_input)
-          results = fan_out(process(files), batch_size: 3)
+          results = fan_out(process(files))
           aggregate(results)
         end
       end
@@ -95,7 +96,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "each branch references the correct sized job definition" do
       routed_state = asl["States"]["process_routed"]
       job_defs = routed_state["Branches"].map { |b|
-        b["States"].values.first.dig("Parameters", "JobDefinition")
+        b["States"].values.first.dig("ItemProcessor", "States").values.first.dig("Parameters", "JobDefinition")
       }
       expect(job_defs.size).to eq(3)
       expect(job_defs.any? { |d| d.include?("-process-s-") }).to be true
@@ -106,7 +107,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "each branch references the correct sized job queue" do
       routed_state = asl["States"]["process_routed"]
       queues = routed_state["Branches"].map { |b|
-        b["States"].values.first.dig("Parameters", "JobQueue")
+        b["States"].values.first.dig("ItemProcessor", "States").values.first.dig("Parameters", "JobQueue")
       }
       expect(queues).to contain_exactly(
         "#{prefix}-queue-process-s",
@@ -118,22 +119,21 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "each branch sets TURBOFAN_SIZE env var" do
       routed_state = asl["States"]["process_routed"]
       sizes = routed_state["Branches"].map { |b|
-        env = b["States"].values.first.dig("Parameters", "ContainerOverrides", "Environment")
+        env = b["States"].values.first.dig("ItemProcessor", "States").values.first.dig("Parameters", "ContainerOverrides", "Environment")
         env.find { |e| e["Name"] == "TURBOFAN_SIZE" }&.dig("Value")
       }
       expect(sizes).to contain_exactly("s", "m", "l")
     end
 
-    it "each branch has dynamic ArrayProperties from per-size count" do
+    it "each branch has dynamic ArrayProperties from parent size" do
       routed_state = asl["States"]["process_routed"]
       array_props = routed_state["Branches"].map { |b|
-        state = b["States"].values.first
-        state.dig("Parameters", "ArrayProperties", "Size.$")
+        b["States"].values.first.dig("ItemProcessor", "States").values.first.dig("Parameters", "ArrayProperties", "Size.$")
       }
       expect(array_props).to contain_exactly(
-        "$.chunking.process.sizes.s.count",
-        "$.chunking.process.sizes.m.count",
-        "$.chunking.process.sizes.l.count"
+        "$.size",
+        "$.size",
+        "$.size"
       )
     end
 
@@ -155,7 +155,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         expect(size_var).not_to be_nil,
           "expected aggregate step to have TURBOFAN_PREV_FAN_OUT_SIZE_#{size_upper} env var"
         expect(size_var["Value.$"]).to eq(
-          "States.JsonToString($.chunking.process.sizes.#{size_lower}.count)"
+          "States.JsonToString($.chunking.process.sizes.#{size_lower}.parents)"
         )
       end
     end
@@ -188,6 +188,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2
+        batch_size 3
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -203,7 +204,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
         pipeline do
           files = discover(trigger_input)
-          fan_out(process(files), batch_size: 3)
+          fan_out(process(files))
         end
       end
     end
@@ -239,6 +240,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
         compute_environment :test_ce
         cpu 1
+        batch_size 3
 
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -259,7 +261,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
         pipeline do
           files = discover(trigger_input)
-          results = fan_out(process(files), batch_size: 3)
+          results = fan_out(process(files))
           aggregate(results)
         end
       end

@@ -241,6 +241,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           include Turbofan::Step
           compute_environment :test_ce
           cpu 1
+          batch_size 100
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         })
@@ -256,7 +257,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "validate-fanout"
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 100)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end

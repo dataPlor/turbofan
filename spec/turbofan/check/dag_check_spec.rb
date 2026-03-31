@@ -94,6 +94,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 100
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -114,7 +115,7 @@ RSpec.describe Turbofan::Check::DagCheck, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 100)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end

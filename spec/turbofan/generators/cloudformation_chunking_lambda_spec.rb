@@ -18,6 +18,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
       compute_environment :test_ce
       cpu 2
+      batch_size 100
       input_schema "passthrough.json"
       output_schema "passthrough.json"
     end
@@ -40,7 +41,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "chunked-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -120,7 +121,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "chunked-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -216,7 +217,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "env-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 50)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -320,6 +321,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         compute_environment :test_ce
         cpu 4
+        batch_size 50
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -335,8 +337,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "multi-group-pipeline"
         pipeline do
-          extracted = fan_out(extract(trigger_input), batch_size: 100)
-          fan_out(transform(extracted), batch_size: 50)
+          extracted = fan_out(extract(trigger_input))
+          fan_out(transform(extracted))
         end
       end
     end
@@ -369,6 +371,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         compute_environment :test_ce
         cpu 4
+        batch_size 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -384,8 +387,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "mixed-pipeline"
         pipeline do
-          extracted = fan_out(extract(trigger_input), batch_size: 100)
-          fan_out(transform(extracted), batch_size: 1)
+          extracted = fan_out(extract(trigger_input))
+          fan_out(transform(extracted))
         end
       end
     end
@@ -420,8 +423,8 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(handler).to include("'parents'")
     end
 
-    it "returns chunk_count in response for routed fan-out" do
-      expect(handler).to include("'count'")
+    it "returns parents in response for routed fan-out" do
+      expect(handler).to include("'parents'")
     end
 
     it "does not contain Batch submit_job call" do
@@ -495,7 +498,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "naming-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -536,7 +539,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "least-priv-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -585,7 +588,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "tagged-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -635,6 +638,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         compute_environment :test_ce
         cpu 2
+        batch_size 100
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -647,6 +651,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         compute_environment :test_ce
         cpu 2
+        batch_size 50
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -660,7 +665,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "pipeline-alpha"
         pipeline do
-          fan_out(alpha_step(trigger_input), batch_size: 100)
+          fan_out(alpha_step(trigger_input))
         end
       end
     end
@@ -673,7 +678,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "pipeline-beta"
         pipeline do
-          fan_out(beta_step(trigger_input), batch_size: 50)
+          fan_out(beta_step(trigger_input))
         end
       end
     end
@@ -740,7 +745,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "my-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -776,7 +781,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "handler-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end
@@ -835,7 +840,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
 
         pipeline_name "bucket-env-pipeline"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
     end

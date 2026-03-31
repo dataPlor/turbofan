@@ -35,12 +35,12 @@ module Turbofan
 
           if prev_step&.fan_out?
             if routed_fan_out?(prev_step)
-              sizes = @steps[prev_step.name].turbofan_sizes
+              sizes = resolve_step_class(prev_step.name).turbofan_sizes
               env << {"Name" => "TURBOFAN_PREV_FAN_OUT_SIZES", "Value" => sizes.keys.map(&:to_s).join(",")}
               sizes.each_key do |size_name|
                 env << {
                   "Name" => "TURBOFAN_PREV_FAN_OUT_SIZE_#{size_name.to_s.upcase}",
-                  "Value.$" => "States.JsonToString($.chunking.#{prev_step_name}.sizes.#{size_name}.count)"
+                  "Value.$" => "States.JsonToString($.chunking.#{prev_step_name}.sizes.#{size_name}.parents)"
                 }
               end
             else
@@ -55,7 +55,7 @@ module Turbofan
         end
 
         def resolve_job_refs(step_name)
-          step_class = @steps[step_name]
+          step_class = resolve_step_class(step_name)
           suffix = if step_class&.turbofan_sizes&.any?
             "#{step_name}-#{step_class.turbofan_sizes.keys.first}"
           else
@@ -76,7 +76,7 @@ module Turbofan
 
         def routed_fan_out?(step)
           return false unless step&.fan_out?
-          step_class = @steps[step.name]
+          step_class = resolve_step_class(step.name)
           step_class&.turbofan_sizes&.any?
         end
 
@@ -134,7 +134,7 @@ module Turbofan
 
           state["Catch"] = [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
 
-          step_class = @steps[step_name]
+          step_class = resolve_step_class(step_name)
           if step_class&.turbofan_timeout
             state["TimeoutSeconds"] = step_class.turbofan_timeout
           end
@@ -193,7 +193,7 @@ module Turbofan
             }
           }
 
-          step_class = @steps[step_name]
+          step_class = resolve_step_class(step_name)
           # Don't apply step timeout to fan-out inner task — Batch
           # AttemptDurationSeconds already handles per-job timeout.
           # SFN TimeoutSeconds here would kill the entire parent array job.
@@ -292,7 +292,7 @@ module Turbofan
             "End" => true
           }
 
-          step_class = @steps[step_name]
+          step_class = resolve_step_class(step_name)
           state["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
 
           state
@@ -325,11 +325,21 @@ module Turbofan
         end
 
         def build_chunk_state(step, prev_step_name, first:, routed: false)
+          step_class = resolve_step_class(step.name)
           payload = {
             "step_name" => step.name.to_s,
-            "group_size" => step.batch_size,
+            "group_size" => step_class.turbofan_batch_size,
             "execution_id.$" => "$$.Execution.Id"
           }
+
+          if routed && step_class.turbofan_sizes.any?
+            batch_sizes = {}
+            step_class.turbofan_sizes.each do |size_name, size_config|
+              bs = step_class.turbofan_batch_size_for(size_name)
+              batch_sizes[size_name.to_s] = bs if bs
+            end
+            payload["batch_sizes"] = batch_sizes
+          end
           if first
             payload["trigger.$"] = "$"
           else
@@ -337,7 +347,7 @@ module Turbofan
             prev_step_obj = @pipeline.turbofan_dag.sorted_steps.find { |s| s.name.to_s == prev_step_name.to_s }
             if prev_step_obj&.fan_out?
               if routed_fan_out?(prev_step_obj)
-                sizes = @steps[prev_step_obj.name].turbofan_sizes
+                sizes = resolve_step_class(prev_step_obj.name).turbofan_sizes
                 payload["prev_fan_out_sizes.$"] = "States.JsonToString($.chunking.#{prev_step_name}.sizes)"
               else
                 payload["prev_fan_out_parents.$"] = "States.JsonToString($.chunking.#{prev_step_name}.parents)"
@@ -377,30 +387,49 @@ module Turbofan
 
         def build_routed_parallel_state(step, next_step_name)
           step_name = step.name
-          step_class = @steps[step_name]
+          step_class = resolve_step_class(step_name)
           sizes = step_class.turbofan_sizes
           config_hash = config_hash_for(step_class)
 
           branches = sizes.map do |size_name, _size_config|
-            branch_state_name = "#{step_name}_#{size_name}"
+            map_state_name = "#{step_name}_#{size_name}"
+            batch_state_name = "#{step_name}_#{size_name}_batch"
             env = base_env + [
               {"Name" => "TURBOFAN_STEP_NAME", "Value" => step_name.to_s},
-              {"Name" => "TURBOFAN_SIZE", "Value" => size_name.to_s}
+              {"Name" => "TURBOFAN_SIZE", "Value" => size_name.to_s},
+              {"Name" => "TURBOFAN_PARENT_INDEX", "Value.$" => "States.Format('{}', $.index)"}
             ]
 
+            inner_task = {
+              "Type" => "Task",
+              "Resource" => BATCH_RESOURCE,
+              "Parameters" => {
+                "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}-#{config_hash}",
+                "JobName.$" => "States.Format('#{@prefix}-#{step_name}-#{size_name}-parent{}', $.index)",
+                "JobQueue" => "#{@prefix}-queue-#{step_name}-#{size_name}",
+                "ContainerOverrides" => {"Environment" => env},
+                "ArrayProperties" => {"Size.$" => "$.size"}
+              },
+              "ResultSelector" => {
+                "JobId.$" => "$.JobId",
+                "JobName.$" => "$.JobName",
+                "Status.$" => "$.Status"
+              },
+              "End" => true
+            }
+
             {
-              "StartAt" => branch_state_name,
+              "StartAt" => map_state_name,
               "States" => {
-                branch_state_name => {
-                  "Type" => "Task",
-                  "Resource" => BATCH_RESOURCE,
-                  "Parameters" => {
-                    "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}-#{config_hash}",
-                    "JobName" => "#{@prefix}-#{step_name}-#{size_name}",
-                    "JobQueue" => "#{@prefix}-queue-#{step_name}-#{size_name}",
-                    "ContainerOverrides" => {"Environment" => env},
-                    "ArrayProperties" => {
-                      "Size.$" => "$.chunking.#{step_name}.sizes.#{size_name}.count"
+                map_state_name => {
+                  "Type" => "Map",
+                  "ItemsPath" => "$.chunking.#{step_name}.sizes.#{size_name}.parents",
+                  "MaxConcurrency" => 0,
+                  "ItemProcessor" => {
+                    "ProcessorConfig" => {"Mode" => "INLINE"},
+                    "StartAt" => batch_state_name,
+                    "States" => {
+                      batch_state_name => inner_task
                     }
                   },
                   "End" => true

@@ -44,13 +44,16 @@ module Turbofan
                 sizes = event['prev_fan_out_sizes']
                 all_items = []
                 sizes.each do |size_name, size_info|
-                  size_info['count'].times do |idx|
-                    begin
-                      key = s3_key(execution_id, prev_step, 'output', size_name, "#{idx}.json")
-                      response = S3.get_object(bucket: bucket, key: key)
-                      all_items << JSON.parse(response.body.read)
-                    rescue Aws::S3::Errors::NoSuchKey
-                      nil # sentinel — skip
+                  parents = size_info['parents'] || []
+                  parents.each do |parent|
+                    parent['size'].times do |idx|
+                      begin
+                        key = s3_key(execution_id, prev_step, 'output', size_name, "parent#{parent['index']}", "#{idx}.json")
+                        response = S3.get_object(bucket: bucket, key: key)
+                        all_items << JSON.parse(response.body.read)
+                      rescue Aws::S3::Errors::NoSuchKey
+                        nil # sentinel — skip
+                      end
                     end
                   end
                 end
@@ -104,7 +107,7 @@ module Turbofan
           MAX_ARRAY_SIZE = 10_000
           MIN_ARRAY_SIZE = 2
 
-          def split_into_parents(chunks, execution_id, step_name, bucket)
+          def split_into_parents(chunks, execution_id, step_name, bucket, size_name: nil)
             parent_count = [(chunks.size.to_f / MAX_ARRAY_SIZE).ceil, 1].max
             base = chunks.size / parent_count
             remainder = chunks.size % parent_count
@@ -120,7 +123,11 @@ module Turbofan
                 parent_chunks += [nil] * (MIN_ARRAY_SIZE - parent_chunks.size)
               end
 
-              key = s3_key(execution_id, step_name, 'input', "parent#{i}", 'items.json')
+              key = if size_name
+                s3_key(execution_id, step_name, 'input', size_name, "parent#{i}", 'items.json')
+              else
+                s3_key(execution_id, step_name, 'input', "parent#{i}", 'items.json')
+              end
               S3.put_object(bucket: bucket, key: key, body: JSON.generate(parent_chunks))
               parents << { 'index' => i, 'size' => [real_size, MIN_ARRAY_SIZE].max, 'real_size' => real_size }
               offset += real_size
@@ -139,6 +146,7 @@ module Turbofan
             items = read_items(event, bucket, execution_id)
 
             if routed
+              batch_sizes = event.fetch('batch_sizes', {})
               groups = {}
               items.each do |item|
                 size = item.fetch('_turbofan_size', 'default')
@@ -147,14 +155,12 @@ module Turbofan
 
               sizes = {}
               groups.each do |size_name, size_items|
-                chunks = chunk(size_items, group_size)
-                if chunks.size > MAX_ARRAY_SIZE
-                  raise "Routed fan-out size '#{size_name}' has #{chunks.size} chunks " \
-                        "(max #{MAX_ARRAY_SIZE}). Reduce batch_size or split the size."
-                end
-                key = s3_key(execution_id, step_name, 'input', size_name, 'items.json')
-                S3.put_object(bucket: bucket, key: key, body: JSON.generate(chunks))
-                sizes[size_name] = { 'count' => chunks.size }
+                size_batch_size = batch_sizes.fetch(size_name, group_size)
+                chunks = chunk(size_items, size_batch_size)
+                parents = split_into_parents(
+                  chunks, execution_id, step_name, bucket, size_name: size_name
+                )
+                sizes[size_name] = { 'parents' => parents }
               end
 
               { 'sizes' => sizes }

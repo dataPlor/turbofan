@@ -11,9 +11,9 @@ class HelloPolyglot
   compute_environment ComputeEnvironments::TurbofanTempTest
 
   pipeline do
-    r = fan_out(hello_ruby(trigger_input), batch_size: 1)
-    p = fan_out(hello_python(r), batch_size: 1)
-    n = fan_out(hello_node(p), batch_size: 1)
-    fan_out(hello_rust(n), batch_size: 1)
+    r = fan_out(hello_ruby(trigger_input))
+    p = fan_out(hello_python(r))
+    n = fan_out(hello_node(p))
+    fan_out(hello_rust(n))
   end
 end

@@ -16,10 +16,9 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
     end
 
     it "accepts fan_out flag" do
-      dag.add_step(:process, fan_out: true, batch_size: 50)
+      dag.add_step(:process, fan_out: true)
       step = dag.steps.first
       expect(step.fan_out?).to be true
-      expect(step.batch_size).to eq(50)
     end
 
     it "returns the created DagStep" do
@@ -86,13 +85,12 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
     end
 
     it "preserves DagStep attributes in sorted output" do
-      dag.add_step(:process, fan_out: true, batch_size: 100)
+      dag.add_step(:process, fan_out: true)
       dag.add_edge(from: :trigger, to: :process)
 
       sorted = dag.sorted_steps
       step = sorted.first
       expect(step.fan_out?).to be true
-      expect(step.batch_size).to eq(100)
     end
   end
 
@@ -209,12 +207,13 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
 
   # A4: Rename group -> batch_size in DagBuilder#fan_out
   describe "fan_out with batch_size", :schemas do
-    it "accepts batch_size: keyword" do
+    it "reads batch_size from the Step class" do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
         compute_environment :test_ce
         cpu 1
+        batch_size 100
 
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -225,13 +224,13 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
         pipeline_name "batch-size-test"
 
         pipeline do
-          fan_out(process(trigger_input), batch_size: 100)
+          fan_out(process(trigger_input))
         end
       end
 
       dag = pipeline_class.turbofan_dag
       process_step = dag.steps.find { |s| s.name == :process }
-      expect(process_step.batch_size).to eq(100)
+      expect(process_step.fan_out?).to be true
     end
 
     it "raises when using the old group: keyword in fan_out" do
@@ -240,6 +239,7 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
 
         compute_environment :test_ce
         cpu 1
+        batch_size 100
 
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -290,38 +290,10 @@ RSpec.describe Turbofan::DagStep do
     end
   end
 
-  describe "#batch_size (old #group)" do
-    it "is nil by default" do
-      step = described_class.new(:process)
-      expect(step.batch_size).to be_nil
-    end
-
-    it "stores the batch_size value" do
-      step = described_class.new(:process, fan_out: true, batch_size: 100)
-      expect(step.batch_size).to eq(100)
-    end
-
-    it "rejects zero" do
-      expect { described_class.new(:process, batch_size: 0) }
-        .to raise_error(ArgumentError, /batch_size must be a positive integer/)
-    end
-
-    it "rejects negative values" do
-      expect { described_class.new(:process, batch_size: -1) }
-        .to raise_error(ArgumentError, /batch_size must be a positive integer/)
-    end
-
-    it "rejects non-integer values" do
-      expect { described_class.new(:process, batch_size: "10") }
-        .to raise_error(ArgumentError, /batch_size must be a positive integer/)
-    end
-  end
-
-  # A4: Rename group -> batch_size
-  describe "#batch_size" do
-    it "stores the batch_size value" do
-      step = described_class.new(:foo, batch_size: 5)
-      expect(step.batch_size).to eq(5)
+  describe "#batch_size (moved to Step class)" do
+    it "raises when passing batch_size: to DagStep" do
+      expect { described_class.new(:process, batch_size: 100) }
+        .to raise_error(ArgumentError, /batch_size has moved to the Step class/)
     end
 
     it "raises when using the old group: keyword" do

@@ -4,6 +4,7 @@ class HelloPython
   compute_environment ComputeEnvironments::TurbofanTempTest
   cpu 1
   ram 2
+  batch_size 1
 
   input_schema "hello_polyglot.json"
   output_schema "hello_polyglot.json"

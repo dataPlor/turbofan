@@ -8,6 +8,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 10
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -17,7 +18,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Pipeline
         pipeline_name "tolerance-test"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 10, tolerated_failure_rate: 0.01)
+          fan_out(process(trigger_input), tolerated_failure_rate: 0.01)
         end
       end
 
@@ -31,6 +32,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 10
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -40,7 +42,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Pipeline
         pipeline_name "tolerance-default"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 10)
+          fan_out(process(trigger_input))
         end
       end
 
@@ -54,6 +56,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 10
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -64,7 +67,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "tolerance-invalid"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 10, tolerated_failure_rate: 1.0)
+            fan_out(process(trigger_input), tolerated_failure_rate: 1.0)
           end
         end.turbofan_dag
       }.to raise_error(ArgumentError, /tolerated_failure_rate/)
@@ -75,6 +78,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 10
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -85,7 +89,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "tolerance-negative"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 10, tolerated_failure_rate: -0.1)
+            fan_out(process(trigger_input), tolerated_failure_rate: -0.1)
           end
         end.turbofan_dag
       }.to raise_error(ArgumentError, /tolerated_failure_rate/)
@@ -96,6 +100,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 10
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -105,7 +110,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Pipeline
         pipeline_name "tolerance-zero"
         pipeline do
-          fan_out(process(trigger_input), batch_size: 10, tolerated_failure_rate: 0)
+          fan_out(process(trigger_input), tolerated_failure_rate: 0)
         end
       end
 
@@ -121,6 +126,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -134,7 +140,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "tolerance-asl"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1, tolerated_failure_rate: 0.01)
+            fan_out(process(trigger_input), tolerated_failure_rate: 0.01)
           end
         end
       end
@@ -228,7 +234,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "no-tolerance-asl"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
       end
@@ -258,6 +264,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         include Turbofan::Step
         compute_environment :test_ce
         cpu 1
+        batch_size 1
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -273,7 +280,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "tolerance-cfn"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1, tolerated_failure_rate: 0.05)
+            fan_out(process(trigger_input), tolerated_failure_rate: 0.05)
           end
         end
       end
@@ -335,7 +342,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
           include Turbofan::Pipeline
           pipeline_name "no-tolerance-cfn"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
       end

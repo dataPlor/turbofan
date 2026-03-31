@@ -18,6 +18,7 @@ module Turbofan
         @steps = steps
         @pipeline_name = pipeline.turbofan_name
         @prefix = "turbofan-#{@pipeline_name}-#{stage}"
+        @discovered_steps = nil
       end
 
       def generate
@@ -84,7 +85,7 @@ module Turbofan
             actual_next = last ? nil : state_name_for(next_step)
 
             if step.fan_out?
-              step_class = @steps[step.name]
+              step_class = resolve_step_class(step.name)
               routed = step_class&.turbofan_sizes&.any?
               chunk_prev = is_join ? nil : find_prev(sorted, index, visited)
 
@@ -144,6 +145,16 @@ module Turbofan
       end
 
       private
+
+      def resolve_step_class(step_name)
+        # First try the provided steps hash (keyed by symbol or string)
+        result = @steps[step_name] || @steps[step_name.to_sym] || @steps[step_name.to_s]
+        return result if result
+
+        # Fall back to discovering components (used in tests)
+        @discovered_steps ||= Turbofan.discover_components[:steps]
+        @discovered_steps[step_name.to_sym] || @discovered_steps[step_name.to_s]
+      end
 
       def detect_forks(dag, sorted)
         forks = {}     # fork_name => [branch_child_names]

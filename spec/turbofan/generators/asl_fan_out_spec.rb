@@ -19,6 +19,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 100
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -39,7 +40,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 100)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end
@@ -152,6 +153,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 100
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -163,7 +165,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            fan_out(process(files), batch_size: 100)
+            fan_out(process(files))
           end
         end
       end
@@ -226,6 +228,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 50
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -237,7 +240,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            fan_out(process(files), batch_size: 50)
+            fan_out(process(files))
           end
         end
       end
@@ -265,6 +268,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 500
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -275,7 +279,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "big-fan"
 
           pipeline do
-            fan_out(process(trigger_input), batch_size: 500)
+            fan_out(process(trigger_input))
           end
         end
       end
@@ -322,6 +326,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           compute_environment :test_ce
           cpu 1
           retries 3, on: ["States.TaskFailed"]
+          batch_size 100
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -332,7 +337,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "fan-out-retry"
 
           pipeline do
-            fan_out(process(trigger_input), batch_size: 100)
+            fan_out(process(trigger_input))
           end
         end
       end
@@ -356,6 +361,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           compute_environment :test_ce
           cpu 1
           timeout 7200
+          batch_size 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         })
@@ -363,7 +369,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           include Turbofan::Pipeline
           pipeline_name "fan-timeout"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1, timeout: 86400)
+            fan_out(process(trigger_input), timeout: 86400)
           end
         end
         gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
@@ -378,6 +384,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           compute_environment :test_ce
           cpu 1
           timeout 7200
+          batch_size 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         })
@@ -385,7 +392,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           include Turbofan::Pipeline
           pipeline_name "fan-no-timeout"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
         gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
@@ -400,6 +407,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           compute_environment :test_ce
           cpu 1
           timeout 7200
+          batch_size 1
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         })
@@ -407,7 +415,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           include Turbofan::Pipeline
           pipeline_name "fan-inner-no-timeout"
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
         gen = described_class.new(pipeline: pipeline, stage: "production", steps: {process: step_class})
@@ -504,6 +512,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -524,7 +533,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 1)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end
@@ -563,6 +572,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -582,7 +592,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "fan-then-step"
 
           pipeline do
-            results = fan_out(process(trigger_input), batch_size: 1)
+            results = fan_out(process(trigger_input))
             aggregate(results)
           end
         end
@@ -625,6 +635,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -645,7 +656,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 1)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end
@@ -680,6 +691,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -689,6 +701,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -699,8 +712,8 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "chained-fan-outs"
 
           pipeline do
-            a = fan_out(step_a(trigger_input), batch_size: 1)
-            fan_out(step_b(a), batch_size: 1)
+            a = fan_out(step_a(trigger_input))
+            fan_out(step_b(a))
           end
         end
       end
@@ -730,6 +743,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 1
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -740,7 +754,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
           pipeline_name "fan-only"
 
           pipeline do
-            fan_out(process(trigger_input), batch_size: 1)
+            fan_out(process(trigger_input))
           end
         end
       end

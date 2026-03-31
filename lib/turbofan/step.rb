@@ -8,6 +8,7 @@ module Turbofan
       base.instance_variable_set(:@turbofan_writes_to, [])
       base.instance_variable_set(:@turbofan_secrets, [])
       base.instance_variable_set(:@turbofan_sizes, {})
+      base.instance_variable_set(:@turbofan_batch_size, 1)
       base.instance_variable_set(:@turbofan_timeout, nil)
       base.instance_variable_set(:@turbofan_retries, 3)
       base.instance_variable_set(:@turbofan_retry_on, nil)
@@ -21,7 +22,8 @@ module Turbofan
 
     module ClassMethods
       attr_reader :turbofan_uses, :turbofan_writes_to,
-        :turbofan_secrets, :turbofan_sizes, :turbofan_timeout,
+        :turbofan_secrets, :turbofan_sizes, :turbofan_batch_size,
+        :turbofan_timeout,
         :turbofan_retries, :turbofan_retry_on, :turbofan_default_cpu,
         :turbofan_default_ram,
         :turbofan_compute_environment,
@@ -72,10 +74,27 @@ module Turbofan
         @turbofan_default_ram = value
       end
 
-      def size(name, cpu: nil, ram: nil)
+      def batch_size(value)
+        unless value.is_a?(Integer) && value > 0
+          raise ArgumentError, "batch_size must be a positive integer, got #{value.inspect}"
+        end
+        @turbofan_batch_size = value
+      end
+
+      def turbofan_batch_size_for(size_name)
+        per_size = @turbofan_sizes.dig(size_name, :batch_size)
+        per_size || @turbofan_batch_size
+      end
+
+      def size(name, cpu: nil, ram: nil, batch_size: nil)
         validate_positive!(:cpu, cpu) if cpu
         validate_positive!(:ram, ram) if ram
-        @turbofan_sizes[name] = {cpu: cpu, ram: ram}
+        if batch_size
+          unless batch_size.is_a?(Integer) && batch_size > 0
+            raise ArgumentError, "batch_size must be a positive integer, got #{batch_size.inspect}"
+          end
+        end
+        @turbofan_sizes[name] = {cpu: cpu, ram: ram, batch_size: batch_size}
       end
 
       def uses(target, extensions: nil)

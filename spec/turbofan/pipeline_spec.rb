@@ -178,6 +178,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
 
         compute_environment :test_ce
         cpu 1
+        batch_size 100
 
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -198,7 +199,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
 
         pipeline do
           files = discover(trigger_input)
-          results = fan_out(process(files), batch_size: 100)
+          results = fan_out(process(files))
           aggregate(results)
         end
       end
@@ -215,10 +216,9 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       expect(process_step.fan_out?).to be true
     end
 
-    it "stores group on the fan_out step" do
-      dag = pipeline_class.turbofan_dag
-      process_step = dag.steps.find { |s| s.name == :process }
-      expect(process_step.batch_size).to eq(100)
+    it "stores batch_size on the Step class" do
+      pipeline_class # trigger stub_const
+      expect(Process.turbofan_batch_size).to eq(100)
     end
 
     it "marks non-fan-out steps as regular steps" do
@@ -237,13 +237,14 @@ RSpec.describe Turbofan::Pipeline, :schemas do
     end
   end
 
-  describe "fan_out without explicit group" do
+  describe "fan_out rejects batch_size: keyword (moved to Step class)" do
     let(:pipeline_class) do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
         compute_environment :test_ce
         cpu 1
+        batch_size 100
 
         input_schema "passthrough.json"
         output_schema "passthrough.json"
@@ -254,13 +255,13 @@ RSpec.describe Turbofan::Pipeline, :schemas do
         pipeline_name "no-group"
 
         pipeline do
-          fan_out(process(trigger_input))
+          fan_out(process(trigger_input), batch_size: 100)
         end
       end
     end
 
-    it "raises ArgumentError when batch_size is not provided" do
-      expect { pipeline_class.turbofan_dag }.to raise_error(ArgumentError, /fan_out requires batch_size: parameter/)
+    it "raises ArgumentError when batch_size: is passed to fan_out" do
+      expect { pipeline_class.turbofan_dag }.to raise_error(ArgumentError, /batch_size has moved to the Step class/)
     end
   end
 

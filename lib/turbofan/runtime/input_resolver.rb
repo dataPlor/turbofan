@@ -39,8 +39,12 @@ module Turbofan
 
         if ENV.key?("TURBOFAN_PREV_FAN_OUT_SIZES")
           size_names = ENV["TURBOFAN_PREV_FAN_OUT_SIZES"].split(",")
-          chunks = size_names.each_with_object({}) do |size, h|
-            h[size] = ENV["TURBOFAN_PREV_FAN_OUT_SIZE_#{size.upcase}"].to_i
+          chunks = {}
+          size_names.each do |size|
+            parents = JSON.parse(ENV["TURBOFAN_PREV_FAN_OUT_SIZE_#{size.upcase}"])
+            parents.each do |parent|
+              chunks["#{size}/parent#{parent["index"]}"] = parent["size"]
+            end
           end
           FanOut.collect_outputs(
             s3_client: context.s3,

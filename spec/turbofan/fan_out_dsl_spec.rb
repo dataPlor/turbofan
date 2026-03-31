@@ -12,10 +12,12 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     step_class = Class.new do
       include Turbofan::Step
 
-      input_schema "geocode_input.json"
-      output_schema "geocode_output.json"
       compute_environment :fan_out_ce
       cpu 1
+      batch_size 50
+
+      input_schema "geocode_input.json"
+      output_schema "geocode_output.json"
     end
     stub_const("BrandProcess", step_class)
 
@@ -24,14 +26,13 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       pipeline_name "test"
       pipeline do
-        fan_out(brand_process(trigger_input), batch_size: 50)
+        fan_out(brand_process(trigger_input))
       end
     end
 
     dag = pipeline_class.turbofan_dag
     step = dag.steps.find { |s| s.name == :brand_process }
     expect(step.fan_out?).to be true
-    expect(step.batch_size).to eq(50)
   end
 
   it "returns the original proxy for chaining" do
@@ -39,20 +40,23 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     step_class = Class.new do
       include Turbofan::Step
 
-      input_schema "geocode_input.json"
-      output_schema "geocode_output.json"
       compute_environment :fan_out_ce
       cpu 1
+      batch_size 50
+
+      input_schema "geocode_input.json"
+      output_schema "geocode_output.json"
     end
     stub_const("BrandProcess", step_class)
 
     export_class = Class.new do
       include Turbofan::Step
 
-      input_schema "geocode_output.json"
-      output_schema "geocode_output.json"
       compute_environment :fan_out_ce
       cpu 1
+
+      input_schema "geocode_output.json"
+      output_schema "geocode_output.json"
     end
     stub_const("S3Export", export_class)
 
@@ -61,7 +65,7 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       pipeline_name "test"
       pipeline do
-        result = fan_out(brand_process(trigger_input), batch_size: 50)
+        result = fan_out(brand_process(trigger_input))
         s3_export(result)
       end
     end
@@ -70,15 +74,17 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     expect(dag.steps.map(&:name)).to eq([:brand_process, :s3_export])
   end
 
-  it "raises ArgumentError when fan_out is called without batch_size:" do
+  it "raises ArgumentError when batch_size: is passed to fan_out (moved to Step class)" do
     ce = ce_class
     step_class = Class.new do
       include Turbofan::Step
 
-      input_schema "geocode_input.json"
-      output_schema "geocode_output.json"
       compute_environment :fan_out_ce
       cpu 1
+      batch_size 50
+
+      input_schema "geocode_input.json"
+      output_schema "geocode_output.json"
     end
     stub_const("BrandProcess", step_class)
 
@@ -87,10 +93,10 @@ RSpec.describe "fan_out DSL", :schemas do # rubocop:disable RSpec/DescribeClass
 
       pipeline_name "test-no-group"
       pipeline do
-        fan_out(brand_process(trigger_input))
+        fan_out(brand_process(trigger_input), batch_size: 50)
       end
     end
 
-    expect { pipeline_class.turbofan_dag }.to raise_error(ArgumentError, /fan_out requires batch_size: parameter/)
+    expect { pipeline_class.turbofan_dag }.to raise_error(ArgumentError, /batch_size has moved to the Step class/)
   end
 end

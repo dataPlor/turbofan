@@ -30,6 +30,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
       compute_environment :test_ce
       cpu 1
+      batch_size 1
       input_schema "passthrough.json"
       output_schema "passthrough.json"
     end
@@ -59,7 +60,8 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     it "marks score_items as fan_out with group 2" do
       score = dag.steps.find { |s| s.name == :score_items }
       expect(score.fan_out?).to be true
-      expect(score.batch_size).to eq(2)
+      score_class = steps_hash[:score_items]
+      expect(score_class.turbofan_batch_size).to eq(2)
     end
 
     it "has correct serial chain after parallel join" do
@@ -114,7 +116,9 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     it "each routed branch sets TURBOFAN_SIZE" do
       routed = asl["States"]["score_items_routed"]
       sizes = routed["Branches"].map { |b|
-        env = b["States"].values.first.dig("Parameters", "ContainerOverrides", "Environment")
+        map_state = b["States"].values.first
+        inner_task = map_state.dig("ItemProcessor", "States").values.first
+        env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
         env.find { |e| e["Name"] == "TURBOFAN_SIZE" }&.dig("Value")
       }
       expect(sizes).to contain_exactly("s", "m", "l")
@@ -173,7 +177,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       %w[S M L].each do |size|
         var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_SIZE_#{size}" }
         expect(var).not_to be_nil, "Expected TURBOFAN_PREV_FAN_OUT_SIZE_#{size} env var"
-        expect(var["Value.$"]).to include("chunking.score_items.sizes.#{size.downcase}.count")
+        expect(var["Value.$"]).to include("chunking.score_items.sizes.#{size.downcase}.parents")
       end
     end
   end
@@ -189,9 +193,11 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "TURBOFAN_BUCKET env var uses the shared bucket name" do
-      # Check in a routed branch
+      # Check in a routed branch (each branch now contains a Map state with Batch Task inside)
       routed = asl["States"]["score_items_routed"]
-      branch_env = routed["Branches"].first["States"].values.first.dig("Parameters", "ContainerOverrides", "Environment")
+      map_state = routed["Branches"].first["States"].values.first
+      inner_task = map_state.dig("ItemProcessor", "States").values.first
+      branch_env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
       bucket_var = branch_env.find { |e| e["Name"] == "TURBOFAN_BUCKET" }
 
       expect(bucket_var["Value"]).to eq(Turbofan.config.bucket)
@@ -199,7 +205,9 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
     it "TURBOFAN_BUCKET_PREFIX env var is set to pipeline-stage" do
       routed = asl["States"]["score_items_routed"]
-      branch_env = routed["Branches"].first["States"].values.first.dig("Parameters", "ContainerOverrides", "Environment")
+      map_state = routed["Branches"].first["States"].values.first
+      inner_task = map_state.dig("ItemProcessor", "States").values.first
+      branch_env = inner_task.dig("Parameters", "ContainerOverrides", "Environment")
       prefix_var = branch_env.find { |e| e["Name"] == "TURBOFAN_BUCKET_PREFIX" }
 
       expect(prefix_var).not_to be_nil
@@ -415,8 +423,8 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
         pipeline_name "chained-fan-outs"
         pipeline do
-          a = fan_out(step_a(trigger_input), batch_size: 1)
-          b = fan_out(step_b(a), batch_size: 1)
+          a = fan_out(step_a(trigger_input))
+          b = fan_out(step_b(a))
           step_c(b)
         end
       end

@@ -809,5 +809,163 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         expect(result.warnings.none? { |w| w.include?("EventBridge") }).to be true
       end
     end
+
+    context "batch_size validation" do
+      context "when fan-out step uses default batch_size" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "default-batch-size"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "passes with default batch_size of 1" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.passed?).to be true
+        end
+      end
+
+      context "when fan-out step has explicit batch_size" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            batch_size 100
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "has-batch-size"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            batch_size 100
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "passes when fan-out step has explicit batch_size" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.passed?).to be true
+        end
+      end
+
+      context "when routed fan-out sizes use default batch_size" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            size :s, cpu: 1, ram: 2, batch_size: 100
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "routed-default-batch-size"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            size :s, cpu: 1, ram: 2, batch_size: 100
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "passes when size :l falls back to default batch_size of 1" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.passed?).to be true
+        end
+      end
+
+      context "when routed fan-out size falls back to explicit step default" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            batch_size 10
+            size :s, cpu: 1, ram: 2, batch_size: 100
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "routed-with-default"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            batch_size 10
+            size :s, cpu: 1, ram: 2, batch_size: 100
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "passes when size falls back to explicit step default batch_size" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.passed?).to be true
+        end
+      end
+    end
   end
 end

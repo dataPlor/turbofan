@@ -382,9 +382,9 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       run_wrapper(spy, env: {
         "TURBOFAN_PREV_STEP" => "process",
         "TURBOFAN_PREV_FAN_OUT_SIZES" => "s,m,l",
-        "TURBOFAN_PREV_FAN_OUT_SIZE_S" => "2",
-        "TURBOFAN_PREV_FAN_OUT_SIZE_M" => "1",
-        "TURBOFAN_PREV_FAN_OUT_SIZE_L" => "1",
+        "TURBOFAN_PREV_FAN_OUT_SIZE_S" => JSON.generate([{"index" => 0, "size" => 2, "real_size" => 2}]),
+        "TURBOFAN_PREV_FAN_OUT_SIZE_M" => JSON.generate([{"index" => 0, "size" => 2, "real_size" => 1}]),
+        "TURBOFAN_PREV_FAN_OUT_SIZE_L" => JSON.generate([{"index" => 0, "size" => 2, "real_size" => 1}]),
         "TURBOFAN_EXECUTION_ID" => "exec-routed",
         "TURBOFAN_BUCKET" => "my-bucket"
       })
@@ -392,19 +392,19 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(received_input).to eq(outputs)
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-routed/process/output/s/0.json"
+        key: "exec-routed/process/output/s/parent0/0.json"
       )
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-routed/process/output/s/1.json"
+        key: "exec-routed/process/output/s/parent0/1.json"
       )
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-routed/process/output/m/0.json"
+        key: "exec-routed/process/output/m/parent0/0.json"
       )
       expect(s3_client).to have_received(:get_object).with(
         bucket: "my-bucket",
-        key: "exec-routed/process/output/l/0.json"
+        key: "exec-routed/process/output/l/parent0/0.json"
       )
     end
   end

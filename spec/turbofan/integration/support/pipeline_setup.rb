@@ -261,6 +261,7 @@ RSpec.shared_context "when using integration pipeline setup" do
       size :m, cpu: 2, ram: 4
       size :l, cpu: 4, ram: 8
       timeout 300
+      batch_size 2
       input_schema "passthrough.json"
       output_schema "passthrough.json"
 
@@ -323,7 +324,7 @@ RSpec.shared_context "when using integration pipeline setup" do
         read_visits(brand)                       # ─┐ parallel: same parent
         classified = classify(brand)             # ─┘
         items = build_items(classified)          # after parallel join
-        scored = fan_out(score_items(items), batch_size: 2)
+        scored = fan_out(score_items(items))
         aggregate(scored)
       end
     end

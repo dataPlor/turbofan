@@ -114,7 +114,7 @@ module Turbofan
 
         bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
 
-        # Chunking Lambda (only when at least one fan_out uses batch_size:)
+        # Chunking Lambda (only when pipeline has fan-out steps)
         if any_grouped_fan_out?
           resources.merge!(ChunkingLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
         end
@@ -193,8 +193,13 @@ module Turbofan
       end
 
       def any_grouped_fan_out?
-        @pipeline.turbofan_dag.steps.any? { |s| s.fan_out? && s.batch_size }
-      end
+        @pipeline.turbofan_dag.steps.any? do |dag_step|
+          if dag_step.fan_out?
+            step_class = @steps[dag_step.name]
+            step_class&.turbofan_batch_size
+          end
+        end
+end
 
       def any_tolerated_fan_out?
         @pipeline.turbofan_dag.steps.any? { |s| s.fan_out? && (s.tolerated_failure_rate || 0) > 0 }

@@ -106,9 +106,9 @@ Every step must declare `input_schema` and `output_schema`. Validated at DAG-bui
 
 AWS Batch array jobs exclusively (see `generators/asl.rb`). No Step Functions Map/DistributedMap. Spot pricing (60-90% savings) and scales to 10,000 children per parent.
 
-#### 5. `batch_size:` replaces `concurrency:`
+#### 5. `batch_size` is a Step concern
 
-A chunking Lambda packs N items per array child (see `dag.rb`, `cloudformation/chunking_lambda.rb`). Concurrency is controlled by consumable resources and compute environment `maxvCpus`, not Step Functions limits. This separates the question "how many items per container?" from "how many containers run concurrently?"
+By default, each fan-out array child processes 1 item (`batch_size` defaults to 1). Steps can override this to pack multiple items per child: `batch_size 100`. Routed steps can override per-size: `size :s, cpu: 2, ram: 3.5, batch_size: 100`. Concurrency is controlled by consumable resources and compute environment `maxvCpus`, not Step Functions limits. This separates the question "how many items per container?" from "how many containers run concurrently?"
 
 #### 6. Content-addressed builds
 
@@ -243,13 +243,13 @@ Resources are shared infrastructure that steps depend on — primarily database 
 
 ### Fan-Out
 
-Fan-out distributes an array of items across parallel Batch array job children. You wrap a step call with `fan_out(step(input), batch_size: N)` where `N` is items per child. A Lambda function chunks the input array into S3, and each array job child reads its chunk by index.
+Fan-out distributes an array of items across parallel Batch array job children. Wrap a step call with `fan_out(step(input))` and each array child processes 1 item by default. To pack multiple items per child, declare `batch_size N` on the Step class. A Lambda function chunks the input array into S3, and each array job child reads its chunk by index.
 
 The chunking Lambda reads its input from S3 — either the previous step's output (for mid-pipeline fan-outs) or the trigger input (for first-step fan-outs). **All data flows through S3, never through state machine payloads or env vars.**
 
 #### Fan-out input format
 
-The step preceding a fan-out must write its output as `{"items": [...]}` where each item is a small work unit. The chunking Lambda reads `items`, splits them into chunks of `batch_size`, and writes each chunk to S3.
+The step preceding a fan-out must write its output as `{"items": [...]}` where each item is a small work unit. The chunking Lambda reads `items`, splits them into chunks based on the step's `batch_size`, and writes each chunk to S3.
 
 **Fan-out after a step** (most common):
 
@@ -257,7 +257,7 @@ The step preceding a fan-out must write its output as `{"items": [...]}` where e
 pipeline do
   # discover writes {"items": [{"prefix": "aa"}, {"prefix": "ab"}, ...]}
   partitions = discover(trigger_input)
-  fan_out(process(partitions), batch_size: 1)
+  fan_out(process(partitions))
 end
 ```
 
@@ -267,7 +267,17 @@ The `discover` step's output is written to S3 as `{"items": [...]}`. The chunkin
 
 ```ruby
 pipeline do
-  fan_out(process(trigger_input), batch_size: 1)
+  fan_out(process(trigger_input))
+end
+```
+
+The step must declare `batch_size`:
+
+```ruby
+class Process
+  include Turbofan::Step
+  batch_size 1
+  # ...
 end
 ```
 
@@ -297,11 +307,25 @@ AWS Batch array jobs are capped at 10,000 children. When a fan-out produces more
 The chunking Lambda handles the splitting. A Step Functions **Map state** submits each parent as a separate Batch array job in parallel. This is transparent to step authors — your `call(inputs, context)` method sees the same single-item input regardless of how many parents were used.
 
 **Limits:**
-- Inline Map supports up to 40 iterations (400,000 items with `batch_size=1`, or 40M items with `batch_size=100`)
+- Inline Map supports up to 40 iterations (400,000 items with `batch_size 1`, or 40M items with `batch_size 100`)
 - When one parent's Batch job fails, all other parents are cancelled (fail-fast behavior)
-- Routed fan-outs with >10,000 items in a single size are not supported (the Lambda raises a validation error)
 
-When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own Batch array job with the appropriate CPU/RAM allocation. See the [Routers](#turbofanrouter) section for details.
+When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own set of parent array jobs with the appropriate CPU/RAM allocation. Each size can declare its own `batch_size` to optimize packing:
+
+```ruby
+class ProcessPartition
+  include Turbofan::Step
+  compute_environment :compute_bound
+  batch_size 10                              # default for all sizes
+  size :s, cpu: 2, ram: 3.5, batch_size: 100 # pack 100 tiny items per child
+  size :m, cpu: 2, ram: 3.5, batch_size: 10  # medium items
+  size :l, cpu: 4, ram: 8,   batch_size: 1   # one dense item per child
+  input_schema "partition_input.json"
+  output_schema "partition_output.json"
+end
+```
+
+Per-size `batch_size` overrides the step default. Each size is independently split into parents if it exceeds 10,000 chunks. See the [Routers](#turbofanrouter) section for details.
 
 ### Schemas
 
@@ -361,7 +385,7 @@ These tests run as part of the default `bundle exec rspec` suite.
 A single comprehensive end-to-end test that deploys a real 7-step pipeline to AWS, executes it, and verifies S3 outputs. The fixture workers live in `spec/fixtures/integration/steps/`. The pipeline topology is:
 
 ```
-retry_demo → fetch_brand → [read_visits | classify] → build_items → fan_out(score_items, batch_size: 2) → aggregate
+retry_demo → fetch_brand → [read_visits | classify] → build_items → fan_out(score_items) → aggregate
 ```
 
 The test exercises:
@@ -376,7 +400,7 @@ The test exercises:
    - `classify`: `classification == "food_and_beverage"`, `language == "python"` — proves external Python container S3 protocol and parallel branch execution work
    - `build_items`: `item_count == 9` — proves parallel join collects outputs from both branches
    - `score_items`: per-size chunk outputs for sizes `s`, `m`, `l` — proves routed fan-out routes items by `_turbofan_size`, creates per-size Batch array jobs, and each job receives `TURBOFAN_SIZE` env var
-   - `aggregate`: `total_scored == 9`, `chunks_received == 6` — proves routed fan-out produces 6 chunks (3 sizes × 2 chunks each with `batch_size: 2`) and fan-in collection reassembles correctly
+   - `aggregate`: `total_scored == 9`, `chunks_received == 6` — proves routed fan-out produces 6 chunks (3 sizes × 2 chunks each with `batch_size 2`) and fan-in collection reassembles correctly
 5. **External S3 write verification** — verifies `writes_to` IAM policy allows writing to an external S3 bucket
 6. **CloudWatch Logs verification** — verifies structured JSON log entry from `context.logger` appears in CloudWatch
 7. **Stack teardown** — empties ECR repos and S3 bucket prefix (via AWS CLI), cleans up external S3 writes, then deletes the CloudFormation stack with retry on DELETE_FAILED
@@ -589,7 +613,7 @@ class DailyGeoChores
 
   pipeline do |input|
     places = extract_places(input)
-    validated = fan_out(validate_places(places), batch_size: 100)
+    validated = fan_out(validate_places(places))
     place_batch_update(validated)
   end
 end
@@ -613,7 +637,7 @@ Inside the `pipeline` block, the following methods are available:
 
 - **`trigger_input`** — Returns a `DagProxy` representing the execution's trigger input. This is the implicit input to the first step.
 - **Step methods** — Automatically generated from discovered step classes. `ValidatePlaces` becomes `validate_places(input_proxy)`. Each returns a `DagProxy` for chaining.
-- **`fan_out(proxy, batch_size: N)`** — Marks a step for fan-out execution. `batch_size` is **required** and controls items per array job child (must be a positive integer). Returns the same `DagProxy` for chaining. If the step has `size` definitions, this creates a routed fan-out.
+- **`fan_out(proxy)`** — Marks a step for fan-out execution. The step class must declare `batch_size N` (items per array job child). Returns the same `DagProxy` for chaining. If the step has `size` definitions, this creates a routed fan-out. Optional kwargs: `tolerated_failure_rate:` (0.0 to <1.0), `timeout:` (seconds for the entire fan-out Map state).
 
 Steps are wired by passing return values:
 
@@ -629,7 +653,7 @@ end
 ```ruby
 pipeline do |input|
   # Fan-out
-  results = fan_out(process_items(input), batch_size: 100)
+  results = fan_out(process_items(input))
   aggregate(results)
 end
 ```
@@ -948,11 +972,14 @@ Struct with fields:
 |-------|------|-------------|
 | `name` | Symbol | Step name |
 | `fan_out` | Boolean | Whether this step uses fan-out |
-| `batch_size` | Integer/nil | Items per array job child. Must be a positive integer when set. |
+| `tolerated_failure_rate` | Numeric | Acceptable failure rate (0.0 to <1.0) |
+| `fan_out_timeout` | Integer/nil | Timeout in seconds for the fan-out Map state |
 
 `fan_out?` convenience method returns the `fan_out` boolean.
 
-**Validation:** Rejects the old `group` and `concurrency` keywords with helpful error messages (`use batch_size: instead`). Validates `batch_size` is a positive integer if provided.
+**Note:** `batch_size` is declared on the Step class, not on DagStep. The DagStep only tracks fan-out orchestration concerns.
+
+**Validation:** Rejects the old `group`, `concurrency`, and `batch_size` keywords with helpful error messages directing users to the Step class.
 
 #### `Turbofan::DagProxy`
 
@@ -1349,9 +1376,9 @@ asl.to_json   # => JSON string
 ```
 
 Generated states:
-- **`{step_name}_chunk`** — Lambda task that chunks fan-out input into S3 (only for fan-out steps with `batch_size:`). For routed fan-out, passes `routed: true` to the Lambda, which groups items by `_turbofan_size` and returns `{"sizes": {"s": {"count": N}, ...}}`.
-- **`{step_name}`** — Batch `submitJob.sync` task
-- **`{step_name}_routed`** — Parallel state with one branch per size (only for routed fan-out steps). Each branch targets the correctly-sized job definition and queue, and sets `TURBOFAN_SIZE` env var. Array size for each branch is derived from the chunking Lambda result (e.g., `$.chunking.{step}.sizes.s.count`).
+- **`{step_name}_chunk`** — Lambda task that chunks fan-out input into S3 (only for fan-out steps). For routed fan-out, passes `routed: true` and `batch_sizes` hash to the Lambda, which groups items by `_turbofan_size`, chunks each group with its per-size batch_size, and splits into parents. Returns `{"sizes": {"s": {"parents": [...]}, ...}}`.
+- **`{step_name}`** — Batch `submitJob.sync` task (or Map state iterating parents for non-routed fan-out)
+- **`{step_name}_routed`** — Parallel state with one branch per size (only for routed fan-out steps). Each branch contains a **Map state** that iterates that size's parents. Each Map iteration submits a Batch array job with the correctly-sized job definition and queue, and sets `TURBOFAN_SIZE` and `TURBOFAN_PARENT_INDEX` env vars.
 - **`Parallel`** — Parallel state for DAG forks (steps with the same parent that can execute concurrently)
 - **`NotifySuccess`** — SNS publish task (ends execution as SUCCEEDED)
 - **`NotifyFailure`** — SNS publish task, then transitions to `FailExecution`
@@ -1392,7 +1419,7 @@ Generated resources:
 - Step Functions state machine
 - CloudWatch dashboard (optional — skipped when `dashboard: false`)
 - SNS notification topic
-- Chunking Lambda with routing support, deployed via S3 zip (if any step uses fan-out with `batch_size:`)
+- Chunking Lambda with routing support, deployed via S3 zip (if any step uses fan-out)
 - EventBridge rule + guard Lambda (if `schedule` is set)
 
 ---

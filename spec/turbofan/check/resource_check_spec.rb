@@ -210,6 +210,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 100
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -230,7 +231,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
           pipeline_name "fan-out-pg"
           pipeline do
             files = discover(trigger_input)
-            results = fan_out(process(files), batch_size: 100)
+            results = fan_out(process(files))
             aggregate(results)
           end
         end
@@ -291,6 +292,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
 
           compute_environment :test_ce
           cpu 1
+          batch_size 50
 
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -302,7 +304,7 @@ RSpec.describe Turbofan::Check::ResourceCheck, :schemas do
           pipeline_name "fan-out-s3"
           pipeline do
             files = discover(trigger_input)
-            fan_out(process(files), batch_size: 50)
+            fan_out(process(files))
           end
         end
       end
