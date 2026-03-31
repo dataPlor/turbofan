@@ -43,7 +43,8 @@ module Turbofan
           prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name,
           resources: @resources, has_fan_out: any_grouped_fan_out?,
           has_tolerated_fan_out: any_tolerated_fan_out?,
-          routed_step_names: routed_fan_out_steps.map { |ds, _| ds.name }
+          routed_step_names: routed_fan_out_steps.map { |ds, _| ds.name },
+          lambda_step_names: lambda_step_names
         ))
 
         # Per-step resources
@@ -72,24 +73,36 @@ module Turbofan
           # Check if this step uses consumable resources
           consumable_resource_refs = find_consumable_resource_refs(sclass, prefix)
 
-          # One job definition per size (or one if unsized)
-          sizes = sclass.turbofan_sizes.any? ? sclass.turbofan_sizes : {nil => nil}
-          sizes.each do |size_name, size_config|
-            resources.merge!(JobDefinition.generate(
-              prefix: prefix,
-              step_name: sname,
-              step_class: sclass,
-              job_role_ref: {"Fn::GetAtt" => ["JobRole", "Arn"]},
-              execution_role_ref: {"Fn::GetAtt" => ["ExecutionRole", "Arn"]},
-              log_group_ref: {"Ref" => log_group_key},
-              duckdb: step_duckdb,
-              tags: step_tags,
-              size_name: size_name,
-              size_config: size_config,
-              image_tag: @image_tags[sname],
-              external_image: sclass.turbofan_external? ? sclass.turbofan_docker_image : nil,
-              consumable_resource_refs: consumable_resource_refs
+          if sclass.turbofan_lambda?
+            # Lambda function with container image from ECR
+            image_uri = sclass.turbofan_external? ? sclass.turbofan_docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
+            memory_mb = ((sclass.turbofan_default_ram || 1) * 1024).to_i
+            timeout_val = sclass.turbofan_timeout || 900
+            resources.merge!(lambda_step_function(
+              prefix: prefix, step_name: sname, image_uri: image_uri,
+              memory_mb: memory_mb, timeout: timeout_val,
+              tags: step_tags, log_group_ref: {"Ref" => log_group_key}
             ))
+          else
+            # Batch job definitions (one per size, or one if unsized)
+            sizes = sclass.turbofan_sizes.any? ? sclass.turbofan_sizes : {nil => nil}
+            sizes.each do |size_name, size_config|
+              resources.merge!(JobDefinition.generate(
+                prefix: prefix,
+                step_name: sname,
+                step_class: sclass,
+                job_role_ref: {"Fn::GetAtt" => ["JobRole", "Arn"]},
+                execution_role_ref: {"Fn::GetAtt" => ["ExecutionRole", "Arn"]},
+                log_group_ref: {"Ref" => log_group_key},
+                duckdb: step_duckdb,
+                tags: step_tags,
+                size_name: size_name,
+                size_config: size_config,
+                image_tag: @image_tags[sname],
+                external_image: sclass.turbofan_external? ? sclass.turbofan_docker_image : nil,
+                consumable_resource_refs: consumable_resource_refs
+              ))
+            end
           end
         end
 
@@ -240,6 +253,84 @@ end
         router_path = File.join(step_dir, "router", "router.rb")
         return nil unless File.exist?(router_path)
         File.read(router_path)
+      end
+
+      def lambda_step_names
+        @steps.filter_map { |sname, sclass| sname if sclass.turbofan_lambda? }
+      end
+
+      def ecr_image_uri(prefix, step_name, image_tag)
+        account_id = Turbofan.config.aws_account_id
+        region = Turbofan.config.region || "us-east-1"
+        tag = image_tag || "latest"
+        "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-#{step_name}:#{tag}"
+      end
+
+      def lambda_step_function(prefix:, step_name:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
+        resource_name = "LambdaStep#{Naming.pascal_case(step_name)}"
+        role_name = "LambdaStepRole#{Naming.pascal_case(step_name)}"
+
+        {
+          role_name => {
+            "Type" => "AWS::IAM::Role",
+            "Properties" => {
+              "RoleName" => "#{prefix}-lambda-#{step_name}-role",
+              "Tags" => CloudFormation.tags_hash(tags),
+              "AssumeRolePolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => [
+                  {
+                    "Effect" => "Allow",
+                    "Principal" => {"Service" => "lambda.amazonaws.com"},
+                    "Action" => "sts:AssumeRole"
+                  }
+                ]
+              },
+              "ManagedPolicyArns" => [
+                "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ],
+              "Policies" => [
+                {
+                  "PolicyName" => "S3Access",
+                  "PolicyDocument" => {
+                    "Version" => "2012-10-17",
+                    "Statement" => [
+                      {
+                        "Effect" => "Allow",
+                        "Action" => ["s3:GetObject", "s3:PutObject"],
+                        "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          resource_name => {
+            "Type" => "AWS::Lambda::Function",
+            "Properties" => {
+              "FunctionName" => "#{prefix}-lambda-#{step_name}",
+              "PackageType" => "Image",
+              "Code" => {"ImageUri" => image_uri},
+              "Role" => {"Fn::GetAtt" => [role_name, "Arn"]},
+              "Timeout" => [timeout, 900].min,
+              "MemorySize" => [memory_mb, 10240].min,
+              "ImageConfig" => {
+                "EntryPoint" => ["/usr/local/bin/aws_lambda_ric"],
+                "Command" => ["turbofan/runtime/lambda_handler.Turbofan::Runtime::LambdaHandler.process"],
+                "WorkingDirectory" => "/app"
+              },
+              "Environment" => {
+                "Variables" => {
+                  "TURBOFAN_BUCKET" => Turbofan.config.bucket,
+                  "TURBOFAN_BUCKET_PREFIX" => Naming.bucket_prefix(@pipeline.turbofan_name, @stage),
+                  "GEM_PATH" => "/usr/local/bundle"
+                }
+              },
+              "Tags" => CloudFormation.tags_hash(tags)
+            }
+          }
+        }
       end
 
       def any_tolerated_fan_out?

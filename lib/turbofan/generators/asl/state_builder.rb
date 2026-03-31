@@ -126,6 +126,12 @@ module Turbofan
 
         def build_state(step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
           step_name = step.name
+          step_class = resolve_step_class(step_name)
+
+          if step_class&.turbofan_lambda?
+            return build_lambda_state(step, next_step_name, first: first, last: last,
+              prev_step_name: prev_step_name, prev_step: prev_step, prev_step_names: prev_step_names)
+          end
 
           env = step_env(step,
             first: first, prev_step_name: prev_step_name,
@@ -150,15 +156,11 @@ module Turbofan
 
           state["Catch"] = [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
 
-          step_class = resolve_step_class(step_name)
           if step_class&.turbofan_timeout
             state["TimeoutSeconds"] = step_class.turbofan_timeout
           end
 
           if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan_retry_on && !step.fan_out?
-            # SFN Retry only for non-fan-out steps. Fan-out steps use Batch-level
-            # retries per child (retryStrategy.attempts in the job definition).
-            # SFN Retry on a fan-out step would re-submit the entire array job.
             state["Retry"] = [{
               "ErrorEquals" => step_class.turbofan_retry_on,
               "MaxAttempts" => step_class.turbofan_retries,
@@ -174,6 +176,52 @@ module Turbofan
               "JobId.$" => "$.JobId",
               "JobName.$" => "$.JobName",
               "Status.$" => "$.Status"
+            }
+            state["ResultPath"] = "$.steps.#{step_name}"
+            state["Next"] = next_step_name.to_s
+          end
+
+          state
+        end
+
+        def build_lambda_state(step, next_step_name, first:, last:, prev_step_name:, prev_step: nil, prev_step_names: nil)
+          step_name = step.name
+
+          # Build the same env vars as Batch, but as a flat hash payload
+          env = step_env(step,
+            first: first, prev_step_name: prev_step_name,
+            prev_step: prev_step, prev_step_names: prev_step_names)
+
+          # Convert env array [{Name, Value}] to flat hash for Lambda payload
+          payload = {}
+          env.each do |e|
+            if e.key?("Value.$")
+              payload["#{e["Name"]}.$"] = e["Value.$"]
+            else
+              payload[e["Name"]] = e["Value"]
+            end
+          end
+
+          state = {
+            "Type" => "Task",
+            "Resource" => "arn:aws:states:::lambda:invoke",
+            "Parameters" => {
+              "FunctionName" => "#{@prefix}-lambda-#{step_name}",
+              "Payload" => payload
+            },
+            "Catch" => [{"ErrorEquals" => ["States.ALL"], "Next" => "NotifyFailure"}]
+          }
+
+          step_class = resolve_step_class(step_name)
+          if step_class&.turbofan_timeout
+            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          end
+
+          if last
+            state["Next"] = "NotifySuccess"
+          else
+            state["ResultSelector"] = {
+              "Payload.$" => "$.Payload"
             }
             state["ResultPath"] = "$.steps.#{step_name}"
             state["Next"] = next_step_name.to_s
