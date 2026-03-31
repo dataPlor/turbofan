@@ -46,12 +46,15 @@ module Turbofan
           # interruption" update which Batch silently ignores (immutable revisions).
           config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_val}")[0, 6]
 
+          job_tags = tags.dup
+          job_tags << {"Key" => "turbofan:size", "Value" => size_name.to_s} if size_name
+
           properties = {
             "JobDefinitionName" => "#{prefix}-jobdef-#{step_name}#{suffix}-#{config_hash}",
             "Type" => "container",
             "PlatformCapabilities" => ["EC2"],
             "PropagateTags" => true,
-            "Tags" => CloudFormation.tags_hash(tags),
+            "Tags" => CloudFormation.tags_hash(job_tags),
             "ContainerProperties" => container,
             "RetryStrategy" => retry_strategy(step_class)
           }

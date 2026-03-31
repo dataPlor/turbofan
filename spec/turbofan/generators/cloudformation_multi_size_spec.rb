@@ -149,6 +149,49 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       end
     end
 
+    describe "per-size job definition tagging" do
+      it "includes turbofan:size tag on each sized job definition" do
+        jd_keys = template["Resources"].keys.select { |k| k.start_with?("JobDef") }
+
+        jd_keys.each do |key|
+          tags = template["Resources"][key]["Properties"]["Tags"]
+          expect(tags).to have_key("turbofan:size"), "expected #{key} to have turbofan:size tag"
+          expect(tags["turbofan:size"]).to match(/\A(s|m|l)\z/)
+        end
+      end
+
+      it "does not include turbofan:size tag on unsized job definitions" do
+        single_size_step = Class.new do
+          include Turbofan::Step
+          compute_environment :test_ce
+          cpu 2
+          batch_size 1
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        end
+        stub_const("Single", single_size_step)
+
+        single_pipeline = Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "single-tag-test"
+          pipeline do
+            fan_out(single(trigger_input))
+          end
+        end
+
+        single_template = described_class.new(
+          pipeline: single_pipeline, steps: {single: single_size_step},
+          stage: "production", config: {}
+        ).generate
+
+        jd_keys = single_template["Resources"].keys.select { |k| k.start_with?("JobDef") }
+        jd_keys.each do |key|
+          tags = single_template["Resources"][key]["Properties"]["Tags"]
+          expect(tags).not_to have_key("turbofan:size"), "expected unsized job definition to NOT have turbofan:size tag"
+        end
+      end
+    end
+
     describe "resource naming convention" do
       it "follows turbofan-{pipeline}-{stage}-jobdef-{step}-{size}-{hash} for job definitions" do
         jd_keys = template["Resources"].keys.select { |k| k.start_with?("JobDef") }
