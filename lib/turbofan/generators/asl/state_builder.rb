@@ -56,15 +56,15 @@ module Turbofan
 
         def resolve_job_refs(step_name)
           step_class = resolve_step_class(step_name)
-          suffix = if step_class&.turbofan_sizes&.any?
+          jobdef_suffix = if step_class&.turbofan_sizes&.any?
             "#{step_name}-#{step_class.turbofan_sizes.keys.first}"
           else
             step_name
           end
 
           {
-            job_definition: "#{@prefix}-jobdef-#{suffix}-#{config_hash_for(step_class)}",
-            job_queue: "#{@prefix}-queue-#{suffix}"
+            job_definition: "#{@prefix}-jobdef-#{jobdef_suffix}-#{config_hash_for(step_class)}",
+            job_queue: "#{@prefix}-queue-#{step_name}"
           }
         end
 
@@ -406,7 +406,7 @@ module Turbofan
               "Parameters" => {
                 "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}-#{config_hash}",
                 "JobName.$" => "States.Format('#{@prefix}-#{step_name}-#{size_name}-parent{}', $.index)",
-                "JobQueue" => "#{@prefix}-queue-#{step_name}-#{size_name}",
+                "JobQueue" => "#{@prefix}-queue-#{step_name}",
                 "ContainerOverrides" => {"Environment" => env},
                 "ArrayProperties" => {"Size.$" => "$.size"}
               },

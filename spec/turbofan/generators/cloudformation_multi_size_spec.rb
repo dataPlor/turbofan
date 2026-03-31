@@ -135,19 +135,17 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       end
     end
 
-    describe "job queues per size" do
-      it "generates one queue per declared size" do
+    describe "job queues per step" do
+      it "generates one queue per step" do
         queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys.size).to eq(3)
+        expect(queue_keys.size).to eq(1)
       end
 
-      it "names queues with size suffix: queue-{step}-{size}" do
+      it "names queues without size suffix: queue-{step}" do
         queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
         queue_names = queue_keys.map { |k| template["Resources"][k]["Properties"]["JobQueueName"] }
 
-        expect(queue_names).to include("turbofan-multi-size-production-queue-process-s")
-        expect(queue_names).to include("turbofan-multi-size-production-queue-process-m")
-        expect(queue_names).to include("turbofan-multi-size-production-queue-process-l")
+        expect(queue_names).to include("turbofan-multi-size-production-queue-process")
       end
     end
 
@@ -182,7 +180,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
 
         queue_keys.each do |key|
           name = template["Resources"][key]["Properties"]["JobQueueName"]
-          expect(name).to match(/\Aturbofan-multi-size-production-queue-process-(s|m|l)\z/)
+          expect(name).to match(/\Aturbofan-multi-size-production-queue-process\z/)
         end
       end
     end
@@ -382,9 +380,9 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         expect(jd_keys.size).to eq(3)
       end
 
-      it "generates 1 queue for single-size + 2 for multi-size = 3 total" do
+      it "generates 1 queue for single-size + 1 for multi-size = 2 total" do
         queue_keys = mixed_template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys.size).to eq(3)
+        expect(queue_keys.size).to eq(2)
       end
 
       it "single-size step job def has no size suffix" do

@@ -255,11 +255,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         inner_task = map_state.dig("ItemProcessor", "States").values.first
         inner_task.dig("Parameters", "JobQueue")
       }
-      expect(queues).to contain_exactly(
-        "turbofan-multi-size-asl-production-queue-process-s",
-        "turbofan-multi-size-asl-production-queue-process-m",
-        "turbofan-multi-size-asl-production-queue-process-l"
-      )
+      expect(queues).to all(eq("turbofan-multi-size-asl-production-queue-process"))
     end
 
     it "each branch sets TURBOFAN_SIZE env var" do
