@@ -298,7 +298,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     it "chunking lambda handler includes routing support" do
       handler = Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER
       expect(handler).to include("routed")
-      expect(handler).to include("_turbofan_size")
+      expect(handler).to include("__turbofan_size")
     end
 
     it "chunking lambda references S3 for code deployment" do
@@ -528,13 +528,13 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     include_context "with mock S3"
     let(:exec_id) { "exec-routed-123" }
 
-    it "routes items by _turbofan_size, chunks per size, and collects all outputs" do
-      # 1. Simulate build_items output (annotated with _turbofan_size)
+    it "routes items by __turbofan_size, chunks per size, and collects all outputs" do
+      # 1. Simulate build_items output (annotated with __turbofan_size)
       sizes = %w[s m l]
-      items = (0..8).map { |i| {"id" => i, "_turbofan_size" => sizes[i % 3]} }
+      items = (0..8).map { |i| {"id" => i, "__turbofan_size" => sizes[i % 3]} }
 
-      # 2. Simulate routing Lambda: group by _turbofan_size, write single items.json per size
-      groups = items.group_by { |item| item["_turbofan_size"] }
+      # 2. Simulate routing Lambda: group by __turbofan_size, write single items.json per size
+      groups = items.group_by { |item| item["__turbofan_size"] }
       size_counts = {}
       groups.each do |size_name, size_items|
         chunks = size_items.each_slice(3).to_a
@@ -552,7 +552,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
         step_name: "score_items",
         chunk: "s"
       )
-      expect(chunk_s_0.map { |i| i["_turbofan_size"] }).to all(eq("s"))
+      expect(chunk_s_0.map { |i| i["__turbofan_size"] }).to all(eq("s"))
 
       # 4. Simulate wrapper output per size
       groups.each do |size_name, size_items|

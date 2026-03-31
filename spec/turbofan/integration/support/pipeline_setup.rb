@@ -223,7 +223,7 @@ RSpec.shared_context "when using integration pipeline setup" do
 
   # Step 3: Serial after parallel join — build work items for fan-out
   #         Uses context.logger and context.metrics for observability testing.
-  #         Annotates items with _turbofan_size for routed fan-out.
+  #         Annotates items with __turbofan_size for routed fan-out.
   let(:build_items_class) do
     Class.new do
       include Turbofan::Step
@@ -243,7 +243,7 @@ RSpec.shared_context "when using integration pipeline setup" do
         sizes = %w[s m l]
         {
           "items" => (0..8).map { |i|
-            {"id" => i, "brand_name" => brand, "_turbofan_size" => sizes[i % 3]}
+            {"id" => i, "brand_name" => brand, "__turbofan_size" => sizes[i % 3]}
           },
           "item_count" => 9
         }

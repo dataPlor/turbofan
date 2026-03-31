@@ -16,9 +16,9 @@ module Turbofan
 
       def self.deserialize(input, s3_client:)
         return input unless input.is_a?(Hash)
-        return input unless input.key?("_turbofan_s3_ref")
+        return input unless input.key?("__turbofan_s3_ref")
 
-        ref = input["_turbofan_s3_ref"]
+        ref = input["__turbofan_s3_ref"]
         parsed = URI.parse(ref)
         bucket = parsed.host
         key = parsed.path.delete_prefix("/")

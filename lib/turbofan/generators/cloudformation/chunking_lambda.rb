@@ -149,7 +149,7 @@ module Turbofan
               batch_sizes = event.fetch('batch_sizes', {})
               groups = {}
               items.each do |item|
-                size = item.fetch('_turbofan_size', 'default')
+                size = item.fetch('__turbofan_size', 'default')
                 (groups[size] ||= []) << item
               end
 

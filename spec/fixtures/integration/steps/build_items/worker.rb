@@ -13,7 +13,7 @@ class BuildItems
     sizes = %w[s m l]
     {
       "items" => (0..8).map { |i|
-        {"id" => i, "brand_name" => brand, "_turbofan_size" => sizes[i % 3]}
+        {"id" => i, "brand_name" => brand, "__turbofan_size" => sizes[i % 3]}
       },
       "item_count" => 9
     }

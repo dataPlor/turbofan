@@ -80,7 +80,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       allow(s3_client).to receive(:get_object).and_return(s3_response)
 
       run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"_turbofan_s3_ref":"s3://my-bucket/exec-1/StepA/output.json"}'
+        "TURBOFAN_INPUT" => '{"__turbofan_s3_ref":"s3://my-bucket/exec-1/StepA/output.json"}'
       })
 
       expect(received_input).to eq([{"hydrated" => true}])
@@ -782,6 +782,36 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(result).to eq(expected_path)
     ensure
       ENV["AWS_BATCH_JOB_ID"] = saved if saved
+    end
+  end
+
+  describe "framework field stripping" do
+    it "strips __turbofan_* fields from inputs before passing to step" do
+      received_inputs = nil
+      spy = make_step { |inputs, _ctx|
+        received_inputs = inputs
+        {}
+      }
+
+      run_wrapper(spy, env: {
+        "TURBOFAN_INPUT" => '{"inputs":[{"gkey":"9q5ct","__turbofan_size":"l","__turbofan_other":"x"}]}'
+      })
+
+      expect(received_inputs).to eq([{"gkey" => "9q5ct"}])
+    end
+
+    it "does not strip single-underscore fields" do
+      received_inputs = nil
+      spy = make_step { |inputs, _ctx|
+        received_inputs = inputs
+        {}
+      }
+
+      run_wrapper(spy, env: {
+        "TURBOFAN_INPUT" => '{"inputs":[{"_user_field":"keep","__turbofan_size":"strip"}]}'
+      })
+
+      expect(received_inputs).to eq([{"_user_field" => "keep"}])
     end
   end
 

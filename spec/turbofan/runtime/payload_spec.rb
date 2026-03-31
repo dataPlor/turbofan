@@ -29,7 +29,7 @@ RSpec.describe Turbofan::Runtime::Payload do
 
       parsed = JSON.parse(serialized)
       expect(parsed).to eq({"count" => 42, "path" => "s3://bucket/output"})
-      expect(parsed).not_to have_key("_turbofan_s3_ref")
+      expect(parsed).not_to have_key("__turbofan_s3_ref")
     end
 
     it "writes to S3 even for small payloads" do
@@ -84,7 +84,7 @@ RSpec.describe Turbofan::Runtime::Payload do
       end
     end
 
-    context "when input contains _turbofan_s3_ref" do
+    context "when input contains __turbofan_s3_ref" do
       let(:s3_key) { "#{execution_id}/#{step_name}/output.json" }
       let(:s3_ref) { "s3://#{bucket}/#{s3_key}" }
       let(:original_data) { {"count" => 42, "results" => [1, 2, 3]} }
@@ -95,15 +95,15 @@ RSpec.describe Turbofan::Runtime::Payload do
         allow(s3_client).to receive(:get_object).and_return(s3_response)
       end
 
-      it "detects the _turbofan_s3_ref and hydrates from S3" do
-        input = {"_turbofan_s3_ref" => s3_ref}
+      it "detects the __turbofan_s3_ref and hydrates from S3" do
+        input = {"__turbofan_s3_ref" => s3_ref}
         result = described_class.deserialize(input, s3_client: s3_client)
 
         expect(result).to eq(original_data)
       end
 
       it "calls S3 get_object with the correct bucket and key" do
-        input = {"_turbofan_s3_ref" => s3_ref}
+        input = {"__turbofan_s3_ref" => s3_ref}
         described_class.deserialize(input, s3_client: s3_client)
 
         expect(s3_client).to have_received(:get_object).with(
@@ -121,7 +121,7 @@ RSpec.describe Turbofan::Runtime::Payload do
       end
 
       it "raises an error with a descriptive message" do
-        input = {"_turbofan_s3_ref" => "s3://#{bucket}/missing/key.json"}
+        input = {"__turbofan_s3_ref" => "s3://#{bucket}/missing/key.json"}
 
         expect {
           described_class.deserialize(input, s3_client: s3_client)

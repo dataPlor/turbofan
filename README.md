@@ -310,7 +310,7 @@ The chunking Lambda handles the splitting. A Step Functions **Map state** submit
 - Inline Map supports up to 40 iterations (400,000 items with `batch_size 1`, or 40M items with `batch_size 100`)
 - When one parent's Batch job fails, all other parents are cancelled (fail-fast behavior)
 
-When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `_turbofan_size`, and each size gets its own set of parent array jobs with the appropriate CPU/RAM allocation. Each size can declare its own `batch_size` to optimize packing:
+When the fan-out step has `size` definitions, Turbofan creates a **routed fan-out**: items are grouped by `__turbofan_size`, and each size gets its own set of parent array jobs with the appropriate CPU/RAM allocation. Each size can declare its own `batch_size` to optimize packing:
 
 ```ruby
 class ProcessPartition
@@ -333,12 +333,12 @@ Steps declare JSON Schema files for input and output validation. At DAG build ti
 
 ### Routers
 
-Steps with multiple size profiles (`:s`, `:m`, `:l`, etc.) use a router to classify items by size. Each size generates a separate Batch job definition and queue with different CPU/RAM allocations. During routed fan-out, the chunking Lambda groups items by their `_turbofan_size` field and creates per-size Batch array jobs.
+Steps with multiple size profiles (`:s`, `:m`, `:l`, etc.) use a router to classify items by size. Each size generates a separate Batch job definition and queue with different CPU/RAM allocations. During routed fan-out, the chunking Lambda groups items by their `__turbofan_size` field and creates per-size Batch array jobs.
 
 ## Features
 
 - **Fan-out at scale** — Batch array jobs with up to 10,000 children, automatic chunking Lambda for larger datasets
-- **Routed fan-out** — Steps with multiple `size` profiles route items to per-size Batch array jobs with different CPU/RAM allocations. Items are grouped by `_turbofan_size` and each size gets its own job definition and queue.
+- **Routed fan-out** — Steps with multiple `size` profiles route items to per-size Batch array jobs with different CPU/RAM allocations. Items are grouped by `__turbofan_size` and each size gets its own job definition and queue.
 - **Concurrency control** — Consumable resources enforce database connection limits at the Batch scheduler level
 - **Content-addressed deploys** — Docker images tagged by SHA256 of source files; unchanged steps aren't rebuilt
 - **Schema validation** — Build-time edge compatibility checks and runtime input/output validation
@@ -399,7 +399,7 @@ The test exercises:
    - `read_visits`: `row_count > 0`, `source == "s3"` — proves S3 read-only IAM policy and S3 client injection work
    - `classify`: `classification == "food_and_beverage"`, `language == "python"` — proves external Python container S3 protocol and parallel branch execution work
    - `build_items`: `item_count == 9` — proves parallel join collects outputs from both branches
-   - `score_items`: per-size chunk outputs for sizes `s`, `m`, `l` — proves routed fan-out routes items by `_turbofan_size`, creates per-size Batch array jobs, and each job receives `TURBOFAN_SIZE` env var
+   - `score_items`: per-size chunk outputs for sizes `s`, `m`, `l` — proves routed fan-out routes items by `__turbofan_size`, creates per-size Batch array jobs, and each job receives `TURBOFAN_SIZE` env var
    - `aggregate`: `total_scored == 9`, `chunks_received == 6` — proves routed fan-out produces 6 chunks (3 sizes × 2 chunks each with `batch_size 2`) and fan-in collection reassembles correctly
 5. **External S3 write verification** — verifies `writes_to` IAM policy allows writing to an external S3 bucket
 6. **CloudWatch Logs verification** — verifies structured JSON log entry from `context.logger` appears in CloudWatch
@@ -942,8 +942,8 @@ end
 
 When a step has `size` definitions and is wrapped in `fan_out()`, Turbofan generates a **routed fan-out** instead of a standard fan-out. The flow is:
 
-1. The **preceding step** annotates each output item with a `_turbofan_size` field indicating which size it should be routed to.
-2. The **chunking Lambda** reads items, groups them by `_turbofan_size`, writes per-size input files to S3 (`{pipeline}-{stage}/{step}/input/{size}/{index}.json`), and returns `{"sizes": {"s": {"count": 2}, "m": {"count": 1}}}`.
+1. The **preceding step** annotates each output item with a `__turbofan_size` field indicating which size it should be routed to.
+2. The **chunking Lambda** reads items, groups them by `__turbofan_size`, writes per-size input files to S3 (`{pipeline}-{stage}/{step}/input/{size}/{index}.json`), and returns `{"sizes": {"s": {"count": 2}, "m": {"count": 1}}}`.
 3. The **ASL state machine** generates a Parallel state (`{step}_routed`) with one branch per size. Each branch:
    - References the correctly-sized Batch job definition and queue (e.g., `jobdef-{step}-s`)
    - Sets `TURBOFAN_SIZE` env var so the step knows which size it's running as
@@ -1133,7 +1133,7 @@ Handles serialization of step outputs to S3.
 | Method | Description |
 |--------|-------------|
 | `Payload.serialize(result, s3_client:, bucket:, execution_id:, step_name:)` | Writes JSON to `{pipeline}-{stage}/{execution_id}/{step_name}/output.json` in S3. Returns the JSON string. |
-| `Payload.deserialize(input, s3_client:)` | If input contains `_turbofan_s3_ref`, fetches the referenced S3 object. Otherwise returns input unchanged. |
+| `Payload.deserialize(input, s3_client:)` | If input contains `__turbofan_s3_ref`, fetches the referenced S3 object. Otherwise returns input unchanged. |
 
 ---
 
@@ -1376,7 +1376,7 @@ asl.to_json   # => JSON string
 ```
 
 Generated states:
-- **`{step_name}_chunk`** — Lambda task that chunks fan-out input into S3 (only for fan-out steps). For routed fan-out, passes `routed: true` and `batch_sizes` hash to the Lambda, which groups items by `_turbofan_size`, chunks each group with its per-size batch_size, and splits into parents. Returns `{"sizes": {"s": {"parents": [...]}, ...}}`.
+- **`{step_name}_chunk`** — Lambda task that chunks fan-out input into S3 (only for fan-out steps). For routed fan-out, passes `routed: true` and `batch_sizes` hash to the Lambda, which groups items by `__turbofan_size`, chunks each group with its per-size batch_size, and splits into parents. Returns `{"sizes": {"s": {"parents": [...]}, ...}}`.
 - **`{step_name}`** — Batch `submitJob.sync` task (or Map state iterating parents for non-routed fan-out)
 - **`{step_name}_routed`** — Parallel state with one branch per size (only for routed fan-out steps). Each branch contains a **Map state** that iterates that size's parents. Each Map iteration submits a Batch array job with the correctly-sized job definition and queue, and sets `TURBOFAN_SIZE` and `TURBOFAN_PARENT_INDEX` env vars.
 - **`Parallel`** — Parallel state for DAG forks (steps with the same parent that can execute concurrently)
