@@ -101,7 +101,7 @@ module Turbofan
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
           begin
             registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root)
+            build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root, steps: steps)
           rescue => e
             warn("Image build/push failed: #{e.message}")
             warn("Rolling back stack #{stack_name}...")
@@ -112,15 +112,16 @@ module Turbofan
         else
           # Subsequent deploy: build/push images first, then update stack
           registry = Turbofan::Deploy::ImageBuilder.authenticate_ecr(ecr_client)
-          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root)
+          build_and_push_all(step_dirs: step_dirs, schemas_dir: schemas_dir, stack_name: cfn_prefix, registry: registry, ecr_client: ecr_client, image_tags: image_tags, step_deps: step_deps, project_root: project_root, steps: steps)
           Turbofan::Deploy::StackManager.deploy(cf_client, stack_name: stack_name, template_body: template_body, artifacts: artifacts)
         end
 
         puts "Deploy complete: #{stack_name}"
       end
 
-      def self.build_and_push_all(step_dirs:, schemas_dir:, stack_name:, registry:, ecr_client:, image_tags:, step_deps: {}, project_root: Dir.pwd)
+      def self.build_and_push_all(step_dirs:, schemas_dir:, stack_name:, registry:, ecr_client:, image_tags:, step_deps: {}, project_root: Dir.pwd, steps: {})
         configs = step_dirs.map do |step_name, step_dir|
+          step_class = steps[step_name]
           {
             step_dir: step_dir,
             schemas_dir: schemas_dir,
@@ -129,7 +130,8 @@ module Turbofan
             repository_uri: "#{registry}/#{stack_name}-ecr-#{step_name}",
             tag: image_tags[step_name],
             external_deps: step_deps.fetch(step_name, []),
-            project_root: project_root
+            project_root: project_root,
+            lambda: step_class&.turbofan_lambda? || false
           }
         end
         Turbofan::Deploy::ImageBuilder.build_and_push_all(step_configs: configs)

@@ -79,6 +79,33 @@ module Turbofan
         false
       end
 
+      # Wrapping Dockerfile for Lambda steps. Applied as a second build on top
+      # of the user's image. Adds aws_lambda_ric and sets the Lambda entrypoint.
+      # The user's Dockerfile stays execution-model-agnostic.
+      LAMBDA_WRAPPER = <<~DOCKERFILE
+        ARG BASE_IMAGE
+        FROM ${BASE_IMAGE}
+        RUN gem install aws_lambda_ric
+        ENTRYPOINT ["/usr/local/bin/aws_lambda_ric"]
+        CMD ["turbofan/runtime/lambda_handler.Turbofan::Runtime::LambdaHandler.process"]
+      DOCKERFILE
+
+      def self.wrap_for_lambda(repository_uri:, tag:)
+        require "tempfile"
+        base_image = "#{repository_uri}:#{tag}"
+        wrapper = Tempfile.new(["lambda-wrapper", ".Dockerfile"])
+        wrapper.write(LAMBDA_WRAPPER)
+        wrapper.close
+        run_cmd("docker", "build",
+          "--provenance=false",
+          "--build-arg", "BASE_IMAGE=#{base_image}",
+          "-f", wrapper.path,
+          "-t", base_image,
+          ".")
+      ensure
+        wrapper&.unlink
+      end
+
       def self.build(step_dir, schemas_dir, tag:, repository_uri:, external_deps: [], project_root: Dir.pwd)
         deps_dir = DependencyResolver.prepare_build_context(external_deps, project_root)
 
@@ -122,7 +149,7 @@ module Turbofan
         sha.empty? ? nil : "git-#{sha}"
       end
 
-      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd)
+      def self.build_and_push(step_dir:, schemas_dir:, ecr_client:, repository_name:, repository_uri:, tag: nil, external_deps: [], project_root: Dir.pwd, lambda: false)
         tag ||= content_tag(step_dir, schemas_dir, external_deps: external_deps, project_root: project_root)
 
         if image_exists?(ecr_client, repository_name, tag)
@@ -131,6 +158,7 @@ module Turbofan
         end
 
         build(step_dir, schemas_dir, tag: tag, repository_uri: repository_uri, external_deps: external_deps, project_root: project_root)
+        wrap_for_lambda(repository_uri: repository_uri, tag: tag) if binding.local_variable_get(:lambda)
         push(tag: tag, repository_uri: repository_uri)
 
         git_tag = git_sha
