@@ -381,7 +381,7 @@ end
 
       def ecr_image_uri(prefix, step_name, image_tag)
         account_id = Turbofan.config.aws_account_id
-        region = Turbofan.config.region || "us-east-1"
+        region = Turbofan.config.default_region || "us-east-1"
         tag = image_tag || "latest"
         "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-#{step_name}:#{tag}"
       end
