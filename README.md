@@ -146,6 +146,16 @@ This separation means:
 - The interchange format can carry metadata without changing the step API
 - External containers (Python, Rust, etc.) read `envelope["inputs"]` and write `{"inputs": [...]}` — one protocol for all languages
 
+#### 11. Reserved `__` field namespace
+
+Keys starting with double underscore (`__`) in input items are reserved for framework transport. The runtime strips them before schema validation and before passing items to `step.call`. Step authors never see these fields.
+
+Currently used:
+- `__turbofan_size` — routing tag set by the router, consumed by the chunking Lambda to group items by size
+- `__turbofan_s3_ref` — S3 indirection for large payloads, resolved transparently by the runtime
+
+Single-underscore keys (e.g., `_my_field`) are user data and pass through unchanged.
+
 ### Data Flow Between Steps
 
 **Small payloads (<128KB):** Envelopes flow natively through Step Functions state. Debuggable in the AWS console.
