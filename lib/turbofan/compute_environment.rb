@@ -135,6 +135,14 @@ module Turbofan
         "#{stack_name(stage)}-arn"
       end
 
+      def queue_name(stage)
+        "turbofan-ce-#{slug}-#{stage}-queue"
+      end
+
+      def queue_export_name(stage)
+        "#{stack_name(stage)}-queue-name"
+      end
+
       def generate_template(stage:)
         account_id = Turbofan.config.aws_account_id
         raise "Turbofan.config.aws_account_id is required for CE template generation" unless account_id
@@ -202,12 +210,31 @@ module Turbofan
                   turbofan:managed: 'true'
                   turbofan:compute-environment: #{slug}
 
+            JobQueue:
+              Type: AWS::Batch::JobQueue
+              Properties:
+                JobQueueName: turbofan-ce-#{slug}-#{stage}-queue
+                ComputeEnvironmentOrder:
+                  - Order: 1
+                    ComputeEnvironment:
+                      Ref: ComputeEnvironment
+                Priority: 1
+                State: ENABLED
+                Tags:
+                  turbofan:managed: 'true'
+                  turbofan:compute-environment: #{slug}
+                  turbofan:stage: #{stage}
+
           Outputs:
             ComputeEnvironmentArn:
               Value:
                 Ref: ComputeEnvironment
               Export:
                 Name: turbofan-ce-#{slug}-#{stage}-arn
+            JobQueueName:
+              Value: turbofan-ce-#{slug}-#{stage}-queue
+              Export:
+                Name: turbofan-ce-#{slug}-#{stage}-queue-name
         YAML
       end
     end

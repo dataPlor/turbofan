@@ -481,32 +481,10 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     end
   end
 
-  describe "job queue references CE via Fn::ImportValue" do
-    let(:queue_key) { template["Resources"].keys.find { |k| k.start_with?("JobQueue") } }
-    let(:queue) { template["Resources"][queue_key] }
-
-    it "creates a per-step job queue" do
-      expect(queue_key).to eq("JobQueueProcess")
-    end
-
-    it "names the queue with step name: turbofan-{pipeline}-{stage}-queue-{step}" do
-      expect(queue["Properties"]["JobQueueName"]).to eq("turbofan-test-pipeline-production-queue-process")
-    end
-
-    it "references the CE via Fn::ImportValue instead of Ref" do
-      compute_envs = queue["Properties"]["ComputeEnvironmentOrder"]
-      expect(compute_envs).not_to be_nil
-      expect(compute_envs.size).to be >= 1
-      ce_ref = compute_envs.first["ComputeEnvironment"]
-      expect(ce_ref).to be_a(Hash)
-      expect(ce_ref).to have_key("Fn::ImportValue")
-    end
-
-    it "imports the CE export_name for the step's compute_environment" do
-      compute_envs = queue["Properties"]["ComputeEnvironmentOrder"]
-      ce_ref = compute_envs.first["ComputeEnvironment"]
-      import_value = ce_ref["Fn::ImportValue"]
-      expect(import_value).to eq(ce_class.export_name("production"))
+  describe "job queues live in CE stacks, not pipeline stacks" do
+    it "does not generate any JobQueue resources" do
+      queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
+      expect(queue_keys).to be_empty
     end
 
     context "with multiple steps" do
@@ -557,16 +535,9 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         ).generate
       end
 
-      it "creates one queue per step" do
+      it "does not generate any JobQueue resources" do
         queue_keys = multi_template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys).to contain_exactly("JobQueueExtract", "JobQueueTransform")
-      end
-
-      it "names each queue with its step name" do
-        extract_q = multi_template["Resources"]["JobQueueExtract"]
-        transform_q = multi_template["Resources"]["JobQueueTransform"]
-        expect(extract_q["Properties"]["JobQueueName"]).to eq("turbofan-multi-production-queue-extract")
-        expect(transform_q["Properties"]["JobQueueName"]).to eq("turbofan-multi-production-queue-transform")
+        expect(queue_keys).to be_empty
       end
     end
   end
@@ -607,14 +578,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       ).generate
     end
 
-    it "uses pipeline CE when step has no CE" do
-      queue_key = default_ce_template["Resources"].keys.find { |k| k.start_with?("JobQueue") }
-      queue = default_ce_template["Resources"][queue_key]
-      ce_ref = queue["Properties"]["ComputeEnvironmentOrder"].first["ComputeEnvironment"]
-      expect(ce_ref).to eq({"Fn::ImportValue" => ce_class.export_name("production")})
+    it "uses pipeline CE queue name in ASL when step has no CE" do
+      sfn = default_ce_template["Resources"].values.find { |r| r["Type"] == "AWS::StepFunctions::StateMachine" }
+      definition = JSON.parse(sfn["Properties"]["DefinitionString"]["Fn::Sub"])
+      job_queue = definition["States"]["default_ce_step"].dig("Parameters", "JobQueue")
+      expect(job_queue).to eq(ce_class.queue_name("production"))
     end
 
-    it "step CE overrides pipeline CE" do
+    it "step CE overrides pipeline CE in ASL queue reference" do
       other_ce = Class.new { include Turbofan::ComputeEnvironment }
       stub_const("ComputeEnvironments::OtherCe", other_ce)
 
@@ -646,10 +617,10 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         config: config
       ).generate
 
-      queue_key = tmpl["Resources"].keys.find { |k| k.start_with?("JobQueue") }
-      queue = tmpl["Resources"][queue_key]
-      ce_ref = queue["Properties"]["ComputeEnvironmentOrder"].first["ComputeEnvironment"]
-      expect(ce_ref).to eq({"Fn::ImportValue" => other_ce.export_name("production")})
+      sfn = tmpl["Resources"].values.find { |r| r["Type"] == "AWS::StepFunctions::StateMachine" }
+      definition = JSON.parse(sfn["Properties"]["DefinitionString"]["Fn::Sub"])
+      job_queue = definition["States"]["own_ce_step"].dig("Parameters", "JobQueue")
+      expect(job_queue).to eq(other_ce.queue_name("production"))
     end
   end
 
@@ -704,7 +675,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         # Check any name-like property
         name_fields = %w[
           RepositoryName
-          StateMachineName JobQueueName
+          StateMachineName
         ]
         name_fields.each do |field|
           next unless props.key?(field)

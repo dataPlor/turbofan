@@ -136,16 +136,9 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     end
 
     describe "job queues per step" do
-      it "generates one queue per step" do
+      it "does not generate queue resources (queues live in CE stacks)" do
         queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys.size).to eq(1)
-      end
-
-      it "names queues without size suffix: queue-{step}" do
-        queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        queue_names = queue_keys.map { |k| template["Resources"][k]["Properties"]["JobQueueName"] }
-
-        expect(queue_names).to include("turbofan-multi-size-production-queue-process")
+        expect(queue_keys.size).to eq(0)
       end
     end
 
@@ -154,34 +147,21 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         ce_keys = template["Resources"].keys.select { |k| k.start_with?("ComputeEnvironment") }
         expect(ce_keys.size).to eq(0)
       end
-
-      it "all queues reference the same compute environment via Fn::ImportValue" do
-        queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        ce_refs = queue_keys.map { |k|
-          template["Resources"][k]["Properties"]["ComputeEnvironmentOrder"]
-            .first["ComputeEnvironment"]
-        }
-
-        expect(ce_refs.uniq.size).to eq(1)
-        expect(ce_refs.first).to have_key("Fn::ImportValue")
-      end
     end
 
     describe "resource naming convention" do
-      it "follows turbofan-{pipeline}-{stage}-{component}-{step}-{size}" do
+      it "follows turbofan-{pipeline}-{stage}-jobdef-{step}-{size}-{hash} for job definitions" do
         jd_keys = template["Resources"].keys.select { |k| k.start_with?("JobDef") }
 
         jd_keys.each do |key|
           name = template["Resources"][key]["Properties"]["JobDefinitionName"]
           expect(name).to match(/\Aturbofan-multi-size-production-jobdef-process-(s|m|l)-[0-9a-f]{6}\z/)
         end
+      end
 
+      it "does not generate queue resources in the pipeline template" do
         queue_keys = template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-
-        queue_keys.each do |key|
-          name = template["Resources"][key]["Properties"]["JobQueueName"]
-          expect(name).to match(/\Aturbofan-multi-size-production-queue-process\z/)
-        end
+        expect(queue_keys).to be_empty
       end
     end
 
@@ -231,16 +211,9 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         expect(name).not_to match(/-[sml]-[0-9a-f]+\z/)
       end
 
-      it "generates exactly one queue for a single-size step" do
+      it "does not generate queue resources for a single-size step" do
         queue_keys = single_template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys.size).to eq(1)
-      end
-
-      it "does not include a size suffix in the queue name" do
-        queue_key = single_template["Resources"].keys.find { |k| k.start_with?("JobQueue") }
-        name = single_template["Resources"][queue_key]["Properties"]["JobQueueName"]
-        expect(name).to eq("turbofan-single-size-production-queue-process")
-        expect(name).not_to match(/-[sml]\z/)
+        expect(queue_keys.size).to eq(0)
       end
     end
 
@@ -380,9 +353,9 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         expect(jd_keys.size).to eq(3)
       end
 
-      it "generates 1 queue for single-size + 1 for multi-size = 2 total" do
+      it "does not generate queue resources in a mixed pipeline" do
         queue_keys = mixed_template["Resources"].keys.select { |k| k.start_with?("JobQueue") }
-        expect(queue_keys.size).to eq(2)
+        expect(queue_keys.size).to eq(0)
       end
 
       it "single-size step job def has no size suffix" do

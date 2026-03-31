@@ -64,8 +64,16 @@ module Turbofan
 
           {
             job_definition: "#{@prefix}-jobdef-#{jobdef_suffix}-#{config_hash_for(step_class)}",
-            job_queue: "#{@prefix}-queue-#{step_name}"
+            job_queue: resolve_queue_name(step_class)
           }
+        end
+
+        def resolve_queue_name(step_class)
+          ce_sym = step_class&.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+          return "#{@prefix}-queue" unless ce_sym
+
+          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
+          ce_class.queue_name(@stage)
         end
 
         def config_hash_for(step_class)
@@ -224,7 +232,7 @@ module Turbofan
                   "tolerated_failure_rate" => tolerance,
                   "execution_id.$" => "$$.Execution.Id",
                   "job_name.$" => "States.Format('#{@prefix}-#{step_name}-parent{}', $.index)",
-                  "job_queue" => "#{@prefix}-queue-#{step_name}"
+                  "job_queue" => refs[:job_queue]
                 }
               },
               "ResultPath" => "$.tolerance_check",
@@ -400,13 +408,15 @@ module Turbofan
               {"Name" => "TURBOFAN_PARENT_INDEX", "Value.$" => "States.Format('{}', $.index)"}
             ]
 
+            queue_name = resolve_queue_name(step_class)
+
             inner_task = {
               "Type" => "Task",
               "Resource" => BATCH_RESOURCE,
               "Parameters" => {
                 "JobDefinition" => "#{@prefix}-jobdef-#{step_name}-#{size_name}-#{config_hash}",
                 "JobName.$" => "States.Format('#{@prefix}-#{step_name}-#{size_name}-parent{}', $.index)",
-                "JobQueue" => "#{@prefix}-queue-#{step_name}",
+                "JobQueue" => queue_name,
                 "ContainerOverrides" => {"Environment" => env},
                 "ArrayProperties" => {"Size.$" => "$.size"}
               },

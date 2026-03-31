@@ -198,7 +198,7 @@ RSpec.describe "tolerated_failure_rate", :schemas do
         check = asl["States"]["process"].dig("ItemProcessor", "States", "process_check_tolerance")
         payload = check.dig("Parameters", "Payload")
         expect(payload["job_name.$"]).to include("process")
-        expect(payload["job_queue"]).to include("process")
+        expect(payload["job_queue"]).to eq("turbofan-ce-test-ce-production-queue")
       end
 
       it "check_tolerance passes real_size for accurate rate calculation" do

@@ -109,7 +109,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       queues = routed_state["Branches"].map { |b|
         b["States"].values.first.dig("ItemProcessor", "States").values.first.dig("Parameters", "JobQueue")
       }
-      expect(queues).to all(eq("#{prefix}-queue-process"))
+      expect(queues).to all(eq("turbofan-ce-test-ce-production-queue"))
     end
 
     it "each branch sets TURBOFAN_SIZE env var" do

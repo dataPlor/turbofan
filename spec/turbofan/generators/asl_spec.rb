@@ -67,7 +67,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "references the correct job queue" do
       state = asl["States"]["process"]
       params = state["Parameters"]
-      expect(params["JobQueue"]).to include("process")
+      expect(params["JobQueue"]).to eq("turbofan-ce-test-ce-production-queue")
     end
 
     it "sets a job name" do
@@ -255,7 +255,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         inner_task = map_state.dig("ItemProcessor", "States").values.first
         inner_task.dig("Parameters", "JobQueue")
       }
-      expect(queues).to all(eq("turbofan-multi-size-asl-production-queue-process"))
+      expect(queues).to all(eq("turbofan-ce-test-ce-production-queue"))
     end
 
     it "each branch sets TURBOFAN_SIZE env var" do
@@ -316,10 +316,10 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(job_def).to start_with("turbofan-single-size-asl-production-jobdef-process-")
     end
 
-    it "references unsuffixed queue when no sizes declared" do
+    it "references CE-based queue when no sizes declared" do
       process_state = asl["States"]["process"]
       job_queue = process_state.dig("Parameters", "JobQueue")
-      expect(job_queue).to eq("turbofan-single-size-asl-production-queue-process")
+      expect(job_queue).to eq("turbofan-ce-test-ce-production-queue")
     end
   end
 

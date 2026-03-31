@@ -133,7 +133,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       it "references the correct job queue in Map inner task" do
         inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
         job_queue = inner_task.dig("Parameters", "JobQueue")
-        expect(job_queue).to include("process")
+        expect(job_queue).to eq("turbofan-ce-test-ce-production-queue")
       end
     end
 

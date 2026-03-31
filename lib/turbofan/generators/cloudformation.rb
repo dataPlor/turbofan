@@ -1,7 +1,6 @@
 require "json"
 require_relative "asl"
 require_relative "cloudformation/job_definition"
-require_relative "cloudformation/job_queue"
 require_relative "cloudformation/iam"
 require_relative "cloudformation/ecr"
 require_relative "cloudformation/logs"
@@ -65,14 +64,6 @@ module Turbofan
 
           # Check if this step uses consumable resources
           consumable_resource_refs = find_consumable_resource_refs(sclass, prefix)
-
-          # One queue per step (shared across all sizes)
-          resources.merge!(JobQueue.generate(
-            prefix: prefix,
-            step_name: sname,
-            compute_environment_ref: ce_ref,
-            tags: all_resource_tags
-          ))
 
           # One job definition per size (or one if unsized)
           sizes = sclass.turbofan_sizes.any? ? sclass.turbofan_sizes : {nil => nil}
