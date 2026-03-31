@@ -73,7 +73,7 @@ User Code (Steps, Pipelines, Resources)
 | Turbofan Concept | AWS Service |
 |-----------------|-------------|
 | Pipeline orchestration | Step Functions (state machine) |
-| Step execution | Batch (job definitions, job queues, array jobs) |
+| Step execution | Batch (default), Lambda, or Fargate — per-step `execution` DSL |
 | Compute pools | Batch compute environments (EC2 Spot) |
 | Fan-out chunking | Lambda (splits input, writes chunks to S3) |
 | Concurrency control | Batch consumable resources |
@@ -713,6 +713,7 @@ Include this module in a class to define a step.
 class ValidatePlaces
   include Turbofan::Step
 
+  execution :batch
   compute_environment :compute_bound_with_nvme
   cpu 2
   ram 4096
@@ -744,9 +745,10 @@ end
 
 | Method | Required | Default | Description |
 |--------|----------|---------|-------------|
+| `execution(model)` | Yes | — | Execution model: `:batch`, `:lambda`, or `:fargate`. Determines how the step runs — as a Batch job, Lambda function, or Fargate task. See [Execution Models](#execution-models) below. |
 | `compute_environment(symbol)` | Yes | — | Symbol referencing a compute environment (e.g., `:compute_bound_with_nvme`). Resolved to a class via `ComputeEnvironment.resolve(sym)` at check/deploy time. |
-| `cpu(value)` | Yes* | — | vCPU count. Required unless `size` is used. Must be a positive number. |
-| `ram(value)` | Yes* | — | Memory in MB. Required unless `size` is used. Must be a positive number. |
+| `cpu(value)` | Yes* | — | vCPU count. Required for `:batch` and `:fargate` (unless `size` is used). Ignored for `:lambda`. |
+| `ram(value)` | Yes* | — | Memory in GB. Required for all execution models (unless `size` is used). For `:lambda`, max 10 GB. Framework converts to MB for Lambda/Fargate configs. |
 | `input_schema(filename)` | Yes | — | JSON Schema filename relative to `turbofans/schemas/`. |
 | `output_schema(filename)` | Yes | — | JSON Schema filename for output validation. |
 | `size(name, cpu:, ram:)` | No | `{}` | Named size profile. Can be called multiple times. Each generates a separate Batch job definition and queue. Mutually exclusive with top-level `cpu`/`ram` (use one or the other). |
@@ -758,6 +760,57 @@ end
 | `inject_secret(name, from:)` | No | `[]` | Inline secret injected as an environment variable. `name` is the env var name, `from:` is a Secrets Manager ARN. (Alias: `secret` is accepted for backward compatibility.) |
 | `tags(hash)` | No | `{}` | Custom tags merged with pipeline tags. |
 | `docker_image(uri)` | No | `nil` | ECR URI for a pre-built external container. When set, Turbofan skips the Docker build for this step. |
+
+#### Execution Models
+
+Every step declares how it runs via `execution`:
+
+| Model | Infrastructure | Startup | Max Duration | Max Memory | Use When |
+|-------|---------------|---------|-------------|-----------|----------|
+| `:batch` | EC2 Spot via Batch | 2-3 min | Unlimited | Instance-limited | Fan-out, long-running jobs, NVMe needed |
+| `:lambda` | Lambda (container image) | <5 sec | 15 min | 10 GB | Short preprocessing, filters, enrichment |
+| `:fargate` | Fargate | 30-60 sec | Unlimited | 30 GB | Medium jobs, predictable startup, no spot interruptions |
+
+All three use the same Docker image (ECR), same `call(inputs, context)` contract, and same S3 interchange. The framework handles infrastructure differences at deploy time.
+
+```ruby
+# Batch: fan-out, long-running
+class ProcessPartitions
+  include Turbofan::Step
+  execution :batch
+  compute_environment :compute_bound
+  cpu 4
+  ram 8
+  # ...
+end
+
+# Lambda: fast preprocessing (coming soon)
+class FilterGkeys
+  include Turbofan::Step
+  execution :lambda
+  compute_environment :compute_bound
+  ram 4
+  # cpu is ignored for Lambda (scales with ram)
+  # ...
+end
+
+# Fargate: predictable execution (coming soon)
+class ExportResults
+  include Turbofan::Step
+  execution :fargate
+  compute_environment :compute_bound
+  cpu 2
+  ram 4
+  # ...
+end
+```
+
+**Constraints:**
+- `fan_out` only works with `execution :batch` (Batch array jobs)
+- `:lambda` requires `ram`, ignores `cpu` (Lambda scales CPU with memory)
+- `:lambda` max `ram` is 10 GB
+- `:fargate` requires both `cpu` and `ram`
+- `:lambda` and `:fargate` ASL generation is not yet implemented — `execution :batch` is the only fully functional model today
 
 #### The `call` Method
 
