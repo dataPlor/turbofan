@@ -455,6 +455,7 @@ end
               "Architectures" => ["arm64"],
               "Timeout" => [timeout, 900].min,
               "MemorySize" => [memory_mb, 10240].min,
+              "EphemeralStorage" => {"Size" => 10240},
               "ImageConfig" => {
                 "EntryPoint" => ["/usr/local/bin/aws_lambda_ric"],
                 "Command" => ["turbofan/runtime/lambda_handler.Turbofan::Runtime::LambdaHandler.process"],
