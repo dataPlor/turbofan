@@ -83,6 +83,7 @@ module Turbofan
         deps_dir = DependencyResolver.prepare_build_context(external_deps, project_root)
 
         cmd = ["docker", "build",
+          "--provenance=false",
           "--build-context", "schemas=#{schemas_dir}",
           "--build-context", "deps=#{deps_dir}"]
         proxy_ca = ENV.fetch("TURBOFAN_PROXY_CA", "/usr/local/share/ca-certificates/proxy-ca.crt")
