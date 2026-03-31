@@ -11,6 +11,7 @@ module Turbofan
         validate_schema_files(steps, errors)
         validate_dag_consistency(pipeline, steps, errors)
         validate_batch_size(pipeline, steps, errors, warnings)
+        validate_routers(pipeline, steps, errors, warnings)
 
         Result.new(passed: errors.empty?, errors: errors, warnings: warnings, report: nil)
       end
@@ -40,6 +41,26 @@ module Turbofan
         end
       end
       private_class_method :validate_batch_size
+
+      def self.validate_routers(pipeline, steps, _errors, warnings)
+        begin
+          dag = pipeline.turbofan_dag
+        rescue ArgumentError, Turbofan::SchemaIncompatibleError
+          return
+        end
+
+        dag.steps.each do |dag_step|
+          next unless dag_step.fan_out?
+          step_class = steps[dag_step.name]
+          next unless step_class&.turbofan_sizes&.any?
+
+          router_path = File.join("steps", dag_step.name.to_s, "router", "router.rb")
+          unless File.exist?(router_path)
+            warnings << "Step :#{dag_step.name} is a routed fan-out but has no router at #{router_path}"
+          end
+        end
+      end
+      private_class_method :validate_routers
 
       def self.validate_dag_consistency(pipeline, steps, errors)
         begin

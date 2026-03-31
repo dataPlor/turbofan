@@ -967,5 +967,84 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         end
       end
     end
+
+    context "router validation" do
+      context "when routed fan-out step has no router file" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            size :s, cpu: 1, ram: 2
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "routed-no-router"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            size :s, cpu: 1, ram: 2
+            size :l, cpu: 4, ram: 8
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "warns when routed step has no router file" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.passed?).to be true # warning, not error
+          expect(result.warnings.any? { |w| w.include?(":process") && w.include?("no router") }).to be true
+        end
+      end
+
+      context "when non-routed fan-out step has no router" do
+        let(:pipeline_class) do
+          ce = ce_class
+          stub_const("Process", Class.new {
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          })
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "non-routed"
+            pipeline do
+              fan_out(process(trigger_input))
+            end
+          end
+        end
+
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            compute_environment :check_ce
+            cpu 1
+            ram 2
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        it "does not warn for non-routed fan-out" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.warnings.none? { |w| w.include?("router") }).to be true
+        end
+      end
+    end
   end
 end
