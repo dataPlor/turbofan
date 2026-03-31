@@ -207,32 +207,4 @@ RSpec.describe Turbofan::Generators::CloudFormation, "image_tags", :schemas do #
     end
   end
 
-  describe "ECR lifecycle policy updates" do
-    let(:template) do
-      described_class.new(
-        pipeline: pipeline_class,
-        steps: {process: step_class},
-        stage: "production",
-        config: config
-      ).generate
-    end
-
-    let(:ecr_key) { template["Resources"].keys.find { |k| k.start_with?("ECR") } }
-    let(:lifecycle_rules) { JSON.parse(template["Resources"][ecr_key]["Properties"]["LifecyclePolicy"]["LifecyclePolicyText"])["rules"] }
-
-    it "uses sha- prefix in tagged rule" do
-      tagged_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "tagged" }
-      expect(tagged_rule["selection"]["tagPrefixList"]).to eq(["sha-"])
-    end
-
-    it "keeps 30 tagged images" do
-      tagged_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "tagged" }
-      expect(tagged_rule["selection"]["countNumber"]).to eq(30)
-    end
-
-    it "still expires untagged images after 7 days" do
-      untagged_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "untagged" }
-      expect(untagged_rule["selection"]["countNumber"]).to eq(7)
-    end
-  end
 end

@@ -3,6 +3,7 @@ require "stringio"
 
 RSpec.describe Turbofan::CLI::Destroy do
   let(:cf_client) { instance_double(Aws::CloudFormation::Client) }
+  let(:ecr_client) { instance_double(Aws::ECR::Client) }
   let(:input) { StringIO.new }
   let(:output) { StringIO.new }
 
@@ -17,6 +18,9 @@ RSpec.describe Turbofan::CLI::Destroy do
   before do
     Turbofan::CLI::Prompt.input = input
     Turbofan::CLI::Prompt.output = output
+    allow(ecr_client).to receive(:describe_repositories).and_return(
+      double(repositories: [])
+    )
     allow(cf_client).to receive(:describe_stacks)
       .and_return(double(stacks: [double(stack_status: "CREATE_COMPLETE")]))
     allow(cf_client).to receive(:describe_stack_resources)
@@ -47,7 +51,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type(stack_name, "y")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).to have_received(:delete_stack).with(stack_name: stack_name)
@@ -57,7 +61,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type(stack_name, "y")
 
         stdout = capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(stdout).to include("ComputeEnvironment")
@@ -73,7 +77,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type("wrong-input")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).not_to have_received(:delete_stack)
@@ -83,7 +87,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type("wrong-input")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).not_to have_received(:describe_stack_resources)
@@ -97,7 +101,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type(stack_name, "n")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).not_to have_received(:delete_stack)
@@ -107,7 +111,7 @@ RSpec.describe Turbofan::CLI::Destroy do
     context "without --force in non-TTY" do
       it "raises an error about using --force" do
         expect {
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         }.to raise_error(Thor::Error, /--force/)
       end
     end
@@ -115,7 +119,7 @@ RSpec.describe Turbofan::CLI::Destroy do
     context "with --force" do
       it "deletes without any prompts" do
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).to have_received(:delete_stack).with(stack_name: stack_name)
@@ -131,7 +135,7 @@ RSpec.describe Turbofan::CLI::Destroy do
     context "without --force in non-TTY" do
       it "raises an error about using --force" do
         expect {
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         }.to raise_error(Thor::Error, /--force/)
       end
     end
@@ -139,7 +143,7 @@ RSpec.describe Turbofan::CLI::Destroy do
     context "with --force" do
       it "deletes without any prompts" do
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).to have_received(:delete_stack).with(stack_name: stack_name)
@@ -158,7 +162,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type("y")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).to have_received(:delete_stack).with(stack_name: stack_name)
@@ -173,7 +177,7 @@ RSpec.describe Turbofan::CLI::Destroy do
         type("n")
 
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).not_to have_received(:delete_stack)
@@ -183,7 +187,7 @@ RSpec.describe Turbofan::CLI::Destroy do
     context "with --force" do
       it "deletes without any prompts" do
         capture_stdout do
-          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client)
+          described_class.call(pipeline_name: "my_pipeline", stage: stage, force: true, cf_client: cf_client, ecr_client: ecr_client)
         end
 
         expect(cf_client).to have_received(:delete_stack).with(stack_name: stack_name)
@@ -199,7 +203,7 @@ RSpec.describe Turbofan::CLI::Destroy do
       type("y")
 
       capture_stdout do
-        described_class.call(pipeline_name: "my_pipeline", stage: "dev", cf_client: cf_client)
+        described_class.call(pipeline_name: "my_pipeline", stage: "dev", cf_client: cf_client, ecr_client: ecr_client)
       end
 
       expect(output.string).to include("Delete 3 resources?")
@@ -209,7 +213,7 @@ RSpec.describe Turbofan::CLI::Destroy do
   describe "pipeline name with underscores" do
     it "converts underscores to dashes in the stack name" do
       capture_stdout do
-        described_class.call(pipeline_name: "my_cool_pipeline", stage: "test1", force: true, cf_client: cf_client)
+        described_class.call(pipeline_name: "my_cool_pipeline", stage: "test1", force: true, cf_client: cf_client, ecr_client: ecr_client)
       end
 
       expect(cf_client).to have_received(:describe_stack_resources)
@@ -220,7 +224,7 @@ RSpec.describe Turbofan::CLI::Destroy do
   describe "CloudFormation stack deletion" do
     it "calls delete_stack with correct stack name" do
       capture_stdout do
-        described_class.call(pipeline_name: "my_pipeline", stage: "test1", force: true, cf_client: cf_client)
+        described_class.call(pipeline_name: "my_pipeline", stage: "test1", force: true, cf_client: cf_client, ecr_client: ecr_client)
       end
 
       expect(cf_client).to have_received(:delete_stack).with(

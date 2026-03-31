@@ -140,14 +140,11 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
 
     let(:template) { generator.generate }
 
-    it "generates an ECR repository only for the normal step" do
+    it "does not generate any ECR repositories (ECR is managed by image builder)" do
       ecr_keys = template["Resources"].keys.select { |k|
         template["Resources"][k]["Type"] == "AWS::ECR::Repository"
       }
-      expect(ecr_keys.size).to eq(1)
-      ecr_name = template["Resources"][ecr_keys.first]["Properties"]["RepositoryName"]
-      expect(ecr_name).to include("extract")
-      expect(ecr_name).not_to include("transform")
+      expect(ecr_keys).to be_empty
     end
 
     it "uses Fn::Sub ECR URI for the normal step" do

@@ -34,13 +34,10 @@ module Turbofan
           return unless Turbofan::CLI::Prompt.yes?("Delete #{resources.size} resources?", default: false)
         end
 
-        # Empty ECR repos before deletion (CloudFormation can't delete non-empty repos)
-        ecr_repos = resources.select { |r| r.resource_type == "AWS::ECR::Repository" }
-        ecr_client ||= Aws::ECR::Client.new if ecr_repos.any?
-        ecr_repos.each do |r|
-          $stdout.puts "  Emptying ECR repository: #{r.physical_resource_id}"
-          Turbofan::Deploy::ImageBuilder.empty_repository(ecr_client, r.physical_resource_id)
-        end
+        # Clean up ECR repos by naming convention (repos are managed by image builder, not CFN)
+        prefix = "turbofan-#{dash_name}-#{stage}"
+        ecr_client ||= Aws::ECR::Client.new
+        cleanup_ecr_repos(ecr_client, prefix)
 
         cf_client.delete_stack(stack_name: stack_name)
         $stdout.puts "Waiting for stack deletion..."
@@ -49,6 +46,23 @@ module Turbofan
         )
         $stdout.puts "Stack #{stack_name} deleted."
       end
+
+      def self.cleanup_ecr_repos(ecr_client, prefix)
+        ecr_prefix = "#{prefix}-ecr-"
+        repos = ecr_client.describe_repositories.repositories.select { |r|
+          r.repository_name.start_with?(ecr_prefix)
+        }
+        repos.each do |repo|
+          $stdout.puts "  Deleting ECR repository: #{repo.repository_name}"
+          Turbofan::Deploy::ImageBuilder.empty_repository(ecr_client, repo.repository_name)
+          ecr_client.delete_repository(repository_name: repo.repository_name)
+        rescue Aws::ECR::Errors::RepositoryNotFoundException
+          nil # already deleted
+        end
+      rescue Aws::ECR::Errors::ServiceError => e
+        $stdout.puts "  Warning: ECR cleanup failed: #{e.message}"
+      end
+      private_class_method :cleanup_ecr_repos
     end
   end
 end

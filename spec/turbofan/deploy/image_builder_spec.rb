@@ -86,13 +86,19 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       expect(described_class.image_exists?(ecr_client, "my-repo", "sha-abc123")).to be false
     end
 
-    it "raises on other errors" do
+    it "creates the repository and returns false when RepositoryNotFoundException is raised" do
       allow(ecr_client).to receive(:describe_images).and_raise(
         Aws::ECR::Errors::RepositoryNotFoundException.new(nil, "Repo not found")
       )
-      expect {
-        described_class.image_exists?(ecr_client, "my-repo", "sha-abc123")
-      }.to raise_error(Aws::ECR::Errors::RepositoryNotFoundException)
+      allow(ecr_client).to receive(:create_repository)
+      allow(ecr_client).to receive(:put_lifecycle_policy)
+
+      expect(described_class.image_exists?(ecr_client, "my-repo", "sha-abc123")).to be false
+      expect(ecr_client).to have_received(:create_repository).with(
+        repository_name: "my-repo",
+        image_scanning_configuration: {scan_on_push: true}
+      )
+      expect(ecr_client).to have_received(:put_lifecycle_policy)
     end
   end
 

@@ -106,52 +106,6 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     end
   end
 
-  describe "ECR repository" do
-    let(:ecr_key) { template["Resources"].keys.find { |k| k.start_with?("ECR") } }
-    let(:ecr) { template["Resources"][ecr_key] }
-
-    it "creates an ECR repository resource" do
-      expect(ecr_key).not_to be_nil
-    end
-
-    it "names the repository following conventions" do
-      expect(ecr["Properties"]["RepositoryName"]).to eq("turbofan-test-pipeline-production-ecr-process")
-    end
-
-    it "sets image scanning on push" do
-      expect(ecr["Properties"]["ImageScanningConfiguration"]).to eq({"ScanOnPush" => true})
-    end
-
-    describe "lifecycle policy" do
-      let(:lifecycle_rules) { JSON.parse(ecr["Properties"]["LifecyclePolicy"]["LifecyclePolicyText"])["rules"] }
-
-      it "has two lifecycle rules" do
-        expect(lifecycle_rules.size).to eq(2)
-      end
-
-      it "has a tagged rule that keeps last 30 images with sha- prefix" do
-        tagged_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "tagged" }
-        expect(tagged_rule).not_to be_nil
-        expect(tagged_rule["selection"]["countType"]).to eq("imageCountMoreThan")
-        expect(tagged_rule["selection"]["countNumber"]).to eq(30)
-        expect(tagged_rule["selection"]["tagPrefixList"]).to eq(["sha-"])
-      end
-
-      it "has an untagged rule that expires after 7 days" do
-        untagged_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "untagged" }
-        expect(untagged_rule).not_to be_nil
-        expect(untagged_rule["selection"]["countType"]).to eq("sinceImagePushed")
-        expect(untagged_rule["selection"]["countUnit"]).to eq("days")
-        expect(untagged_rule["selection"]["countNumber"]).to eq(7)
-      end
-
-      it "does not have a rule with tagStatus: any" do
-        any_rule = lifecycle_rules.find { |r| r["selection"]["tagStatus"] == "any" }
-        expect(any_rule).to be_nil
-      end
-    end
-  end
-
   describe "job definition" do
     let(:jd_key) { template["Resources"].keys.find { |k| k.start_with?("JobDef") } }
     let(:jd) { template["Resources"][jd_key] }
@@ -680,7 +634,6 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         props = resource["Properties"] || {}
         # Check any name-like property
         name_fields = %w[
-          RepositoryName
           StateMachineName
         ]
         name_fields.each do |field|

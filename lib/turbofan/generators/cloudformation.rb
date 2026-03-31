@@ -2,7 +2,6 @@ require "json"
 require_relative "asl"
 require_relative "cloudformation/job_definition"
 require_relative "cloudformation/iam"
-require_relative "cloudformation/ecr"
 require_relative "cloudformation/logs"
 require_relative "cloudformation/dashboard"
 require_relative "cloudformation/sns"
@@ -55,10 +54,8 @@ module Turbofan
           # Build per-step tags (all_resource_tags + step-specific tags)
           step_tags = all_resource_tags + step_specific_tags(sname) + custom_step_tags(sclass)
 
-          # ECR - only for non-external steps
-          unless sclass.turbofan_external?
-            resources.merge!(Ecr.generate(prefix: prefix, step_name: sname, tags: step_tags))
-          end
+          # ECR repos are managed by the image builder (SAM-style), not CloudFormation.
+          # See ImageBuilder::ECR_LIFECYCLE_POLICY for details.
 
           # Log group
           resources.merge!(Logs.generate(prefix: prefix, step_name: sname, tags: step_tags))

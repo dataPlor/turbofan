@@ -237,16 +237,10 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       end
     end
 
-    it "generates ECR repos only for non-external steps (not classify)" do
+    it "does not generate any ECR repos (ECR is managed by image builder)" do
       resources = cfn["Resources"]
-      expect(resources).to have_key("ECRRetryDemo")
-      expect(resources).to have_key("ECRControlledStep")
-      expect(resources).to have_key("ECRFetchBrand")
-      expect(resources).to have_key("ECRReadVisits")
-      expect(resources).not_to have_key("ECRClassify")
-      expect(resources).to have_key("ECRBuildItems")
-      expect(resources).to have_key("ECRScoreItems")
-      expect(resources).to have_key("ECRAggregate")
+      ecr_keys = resources.keys.select { |k| resources[k]["Type"] == "AWS::ECR::Repository" }
+      expect(ecr_keys).to be_empty
     end
 
     it "uses the external docker_image for classify job definition" do

@@ -90,12 +90,6 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
       expect(tags_hash["turbofan:step"]).to eq("process")
     end
 
-    it "includes turbofan:step on ECR repository resources" do
-      ecr_key = template["Resources"].keys.find { |k| k.start_with?("ECR") }
-      tags_hash = described_class.tags_hash(template["Resources"][ecr_key]["Properties"]["Tags"])
-      expect(tags_hash["turbofan:step"]).to eq("process")
-    end
-
     it "includes turbofan:step on log group resources" do
       log_key = template["Resources"].keys.find { |k| k.start_with?("LogGroup") }
       tags_hash = described_class.tags_hash(template["Resources"][log_key]["Properties"]["Tags"])

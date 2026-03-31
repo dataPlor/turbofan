@@ -8,6 +8,38 @@ require_relative "dependency_resolver"
 module Turbofan
   module Deploy
     class ImageBuilder
+      # ECR repos are owned by the image builder, not CloudFormation.
+      # This follows SAM's --resolve-image-repos pattern: repos are deployment
+      # plumbing with near-zero config drift risk. Creating them here avoids
+      # the chicken-and-egg problem where CFN can't create repos before images
+      # are pushed, but images can't be pushed before repos exist.
+      # turbofan destroy cleans up repos by naming convention.
+      ECR_LIFECYCLE_POLICY = {
+        "rules" => [
+          {
+            "rulePriority" => 1,
+            "description" => "Keep last 30 tagged images",
+            "selection" => {
+              "tagStatus" => "tagged",
+              "tagPrefixList" => ["sha-"],
+              "countType" => "imageCountMoreThan",
+              "countNumber" => 30
+            },
+            "action" => {"type" => "expire"}
+          },
+          {
+            "rulePriority" => 2,
+            "description" => "Expire untagged images after 7 days",
+            "selection" => {
+              "tagStatus" => "untagged",
+              "countType" => "sinceImagePushed",
+              "countUnit" => "days",
+              "countNumber" => 7
+            },
+            "action" => {"type" => "expire"}
+          }
+        ]
+      }.to_json.freeze
       def self.content_tag(step_dir, schemas_dir, external_deps: [], project_root: Dir.pwd)
         digest = Digest::SHA256.new
         [step_dir, schemas_dir].each do |dir|
@@ -35,8 +67,15 @@ module Turbofan
       rescue Aws::ECR::Errors::ImageNotFoundException
         false
       rescue Aws::ECR::Errors::RepositoryNotFoundException
-        ecr_client.create_repository(repository_name: repository_name)
-        puts "Created ECR repository: #{repository_name}"
+        ecr_client.create_repository(
+          repository_name: repository_name,
+          image_scanning_configuration: {scan_on_push: true}
+        )
+        ecr_client.put_lifecycle_policy(
+          repository_name: repository_name,
+          lifecycle_policy_text: ECR_LIFECYCLE_POLICY
+        )
+        puts "  Created ECR repository: #{repository_name}"
         false
       end
 
