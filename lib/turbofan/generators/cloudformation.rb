@@ -87,7 +87,7 @@ module Turbofan
             memory_mb = ((sclass.turbofan_default_ram || 1) * 1024).to_i
             timeout_val = sclass.turbofan_timeout || 900
             resources.merge!(lambda_step_function(
-              prefix: prefix, step_name: sname, image_uri: image_uri,
+              prefix: prefix, step_name: sname, step_class: sclass, image_uri: image_uri,
               memory_mb: memory_mb, timeout: timeout_val,
               tags: step_tags, log_group_ref: {"Ref" => log_group_key}
             ))
@@ -383,9 +383,18 @@ end
         "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-ecr-#{step_name}:#{tag}"
       end
 
-      def lambda_step_function(prefix:, step_name:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
+      def lambda_step_function(prefix:, step_name:, step_class:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
         resource_name = "LambdaStep#{Naming.pascal_case(step_name)}"
         role_name = "LambdaStepRole#{Naming.pascal_case(step_name)}"
+
+        # S3 resources: pipeline bucket + uses/writes_to S3 URIs from the step
+        s3_resources = ["arn:aws:s3:::#{Turbofan.config.bucket}/*"]
+        (step_class.uses_s3 + step_class.writes_to_s3).each do |dep|
+          bucket = dep[:uri].sub("s3://", "").split("/").first
+          s3_resources << "arn:aws:s3:::#{bucket}/*"
+          s3_resources << "arn:aws:s3:::#{bucket}"
+        end
+        s3_resources.uniq!
 
         {
           role_name => {
@@ -414,8 +423,8 @@ end
                     "Statement" => [
                       {
                         "Effect" => "Allow",
-                        "Action" => ["s3:GetObject", "s3:PutObject"],
-                        "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
+                        "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+                        "Resource" => s3_resources
                       }
                     ]
                   }
