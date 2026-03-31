@@ -387,14 +387,33 @@ end
         resource_name = "LambdaStep#{Naming.pascal_case(step_name)}"
         role_name = "LambdaStepRole#{Naming.pascal_case(step_name)}"
 
-        # S3 resources: pipeline bucket + uses/writes_to S3 URIs from the step
-        s3_resources = ["arn:aws:s3:::#{Turbofan.config.bucket}/*"]
-        (step_class.uses_s3 + step_class.writes_to_s3).each do |dep|
-          bucket = dep[:uri].sub("s3://", "").split("/").first
-          s3_resources << "arn:aws:s3:::#{bucket}/*"
-          s3_resources << "arn:aws:s3:::#{bucket}"
+        # S3 policies: pipeline bucket (read-write) + uses (read-only) + writes_to (read-write)
+        s3_statements = [
+          {
+            "Effect" => "Allow",
+            "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+            "Resource" => [
+              "arn:aws:s3:::#{Turbofan.config.bucket}",
+              "arn:aws:s3:::#{Turbofan.config.bucket}/*"
+            ]
+          }
+        ]
+        read_arns = step_class.uses_s3.flat_map { |dep| Turbofan::S3Uri.new(dep[:uri]).to_arns }
+        if read_arns.any?
+          s3_statements << {
+            "Effect" => "Allow",
+            "Action" => ["s3:GetObject", "s3:ListBucket"],
+            "Resource" => read_arns
+          }
         end
-        s3_resources.uniq!
+        write_arns = step_class.writes_to_s3.flat_map { |dep| Turbofan::S3Uri.new(dep[:uri]).to_arns }
+        if write_arns.any?
+          s3_statements << {
+            "Effect" => "Allow",
+            "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+            "Resource" => write_arns
+          }
+        end
 
         {
           role_name => {
@@ -420,13 +439,7 @@ end
                   "PolicyName" => "S3Access",
                   "PolicyDocument" => {
                     "Version" => "2012-10-17",
-                    "Statement" => [
-                      {
-                        "Effect" => "Allow",
-                        "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
-                        "Resource" => s3_resources
-                      }
-                    ]
+                    "Statement" => s3_statements
                   }
                 }
               ]
