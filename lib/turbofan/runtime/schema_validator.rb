@@ -12,7 +12,8 @@ module Turbofan
 
         schemer = JSONSchemer.schema(schema)
         inputs.each do |item|
-          errors = schemer.validate(item).to_a
+          clean = item.is_a?(Hash) ? item.reject { |k, _| k.start_with?("__") } : item
+          errors = schemer.validate(clean).to_a
           next if errors.empty?
 
           raise Turbofan::SchemaValidationError,

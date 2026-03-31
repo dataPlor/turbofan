@@ -37,7 +37,6 @@ module Turbofan
           return
         end
 
-        inputs = inputs.map { |item| item.is_a?(Hash) ? item.reject { |k, _| k.start_with?("__") } : item }
         SchemaValidator.validate_input!(@step_class, inputs)
         result = @step_class.new.call(inputs, context)
         SchemaValidator.validate_output!(@step_class, result)

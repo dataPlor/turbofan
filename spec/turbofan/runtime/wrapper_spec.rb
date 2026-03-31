@@ -785,8 +785,8 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
   end
 
-  describe "framework field stripping" do
-    it "strips __turbofan_* fields from inputs before passing to step" do
+  describe "framework field handling" do
+    it "passes __turbofan_* fields through to step (not stripped)" do
       received_inputs = nil
       spy = make_step { |inputs, _ctx|
         received_inputs = inputs
@@ -794,24 +794,39 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       }
 
       run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"inputs":[{"gkey":"9q5ct","__turbofan_size":"l","__turbofan_other":"x"}]}'
+        "TURBOFAN_INPUT" => '{"inputs":[{"gkey":"9q5ct","__turbofan_size":"l"}]}'
       })
 
-      expect(received_inputs).to eq([{"gkey" => "9q5ct"}])
+      expect(received_inputs).to eq([{"gkey" => "9q5ct", "__turbofan_size" => "l"}])
     end
 
-    it "does not strip single-underscore fields" do
-      received_inputs = nil
-      spy = make_step { |inputs, _ctx|
-        received_inputs = inputs
-        {}
-      }
+    it "does not fail schema validation on __ fields even with additionalProperties: false" do
+      schemas_dir = Dir.mktmpdir("turbofan-strict-schema")
+      Turbofan.schemas_path = schemas_dir
+      File.write(File.join(schemas_dir, "strict_input.json"), JSON.generate({
+        "type" => "object",
+        "properties" => {"gkey" => {"type" => "string"}},
+        "additionalProperties" => false
+      }))
+      File.write(File.join(schemas_dir, "passthrough.json"), '{"type": "object"}')
 
-      run_wrapper(spy, env: {
-        "TURBOFAN_INPUT" => '{"inputs":[{"_user_field":"keep","__turbofan_size":"strip"}]}'
-      })
+      strict_step = Class.new do
+        include Turbofan::Step
+        compute_environment :test_ce
+        cpu 1
+        input_schema "strict_input.json"
+        output_schema "passthrough.json"
+        def self.name = "StrictStep"
+        def call(_inputs, _ctx) = {}
+      end
 
-      expect(received_inputs).to eq([{"_user_field" => "keep"}])
+      expect {
+        run_wrapper(strict_step, env: {
+          "TURBOFAN_INPUT" => '{"inputs":[{"gkey":"9q5ct","__turbofan_size":"l"}]}'
+        })
+      }.not_to raise_error
+
+      FileUtils.rm_rf(schemas_dir)
     end
   end
 
