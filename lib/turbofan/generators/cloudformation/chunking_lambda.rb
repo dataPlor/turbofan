@@ -233,6 +233,7 @@ module Turbofan
                 "Runtime" => LAMBDA_RUNTIME,
                 "Handler" => "index.handler",
                 "Timeout" => 300,
+                "MemorySize" => 1024,
                 "Role" => {"Fn::GetAtt" => ["ChunkingLambdaRole", "Arn"]},
                 "Code" => {
                   "S3Bucket" => Turbofan.config.bucket,
