@@ -257,7 +257,7 @@ module Turbofan
             "ChunkingLambdaRole" => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-chunking-lambda-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-chunking-lambda-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",

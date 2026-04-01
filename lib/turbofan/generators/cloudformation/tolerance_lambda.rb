@@ -207,7 +207,7 @@ module Turbofan
             "ToleranceLambdaRole" => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-tolerance-lambda-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-tolerance-lambda-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",

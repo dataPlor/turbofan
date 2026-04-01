@@ -72,7 +72,7 @@ module Turbofan
             "JobRole" => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-job-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-job-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",
@@ -111,7 +111,7 @@ module Turbofan
             "ExecutionRole" => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-execution-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-execution-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",
@@ -260,7 +260,7 @@ module Turbofan
             "SfnRole" => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-sfn-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-sfn-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",

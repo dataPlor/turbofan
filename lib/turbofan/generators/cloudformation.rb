@@ -288,7 +288,7 @@ end
         resources[exec_role_name] = {
           "Type" => "AWS::IAM::Role",
           "Properties" => {
-            "RoleName" => "#{prefix}-fargate-exec-#{step_name}",
+            "RoleName" => Naming.iam_role_name("#{prefix}-fargate-exec-#{step_name}"),
             "Tags" => CloudFormation.tags_hash(tags),
             "AssumeRolePolicyDocument" => {
               "Version" => "2012-10-17",
@@ -310,7 +310,7 @@ end
         resources[task_role_name] = {
           "Type" => "AWS::IAM::Role",
           "Properties" => {
-            "RoleName" => "#{prefix}-fargate-task-#{step_name}",
+            "RoleName" => Naming.iam_role_name("#{prefix}-fargate-task-#{step_name}"),
             "Tags" => CloudFormation.tags_hash(tags),
             "AssumeRolePolicyDocument" => {
               "Version" => "2012-10-17",
@@ -419,7 +419,7 @@ end
           role_name => {
             "Type" => "AWS::IAM::Role",
             "Properties" => {
-              "RoleName" => "#{prefix}-lambda-#{step_name}-role",
+              "RoleName" => Naming.iam_role_name("#{prefix}-lambda-#{step_name}-role"),
               "Tags" => tags.is_a?(Array) ? tags : tags.map { |k, v| {"Key" => k, "Value" => v} },
               "AssumeRolePolicyDocument" => {
                 "Version" => "2012-10-17",
@@ -540,7 +540,7 @@ end
           "GuardLambdaRole" => {
             "Type" => "AWS::IAM::Role",
             "Properties" => {
-              "RoleName" => "#{prefix}-guard-lambda-role",
+              "RoleName" => Naming.iam_role_name("#{prefix}-guard-lambda-role"),
               "Tags" => tags,
               "AssumeRolePolicyDocument" => {
                 "Version" => "2012-10-17",

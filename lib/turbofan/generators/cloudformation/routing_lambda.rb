@@ -214,7 +214,7 @@ module Turbofan
             resource_name => {
               "Type" => "AWS::IAM::Role",
               "Properties" => {
-                "RoleName" => "#{prefix}-routing-#{step_name}-role",
+                "RoleName" => Naming.iam_role_name("#{prefix}-routing-#{step_name}-role"),
                 "Tags" => tags,
                 "AssumeRolePolicyDocument" => {
                   "Version" => "2012-10-17",
