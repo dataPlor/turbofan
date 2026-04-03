@@ -603,6 +603,72 @@ RSpec.describe Turbofan::Pipeline, :schemas do
     end
   end
 
+  describe "pipeline with fan_in: false" do
+    let(:pipeline_class) do
+      stub_const("Export", Class.new {
+        include Turbofan::Step
+
+        execution :batch
+        compute_environment :test_ce
+        cpu 1
+
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      })
+      stub_const("Compute", Class.new {
+        include Turbofan::Step
+
+        execution :batch
+        compute_environment :test_ce
+        cpu 1
+        batch_size 100
+
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      })
+      stub_const("LoadObs", Class.new {
+        include Turbofan::Step
+
+        execution :batch
+        compute_environment :test_ce
+        cpu 1
+
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      })
+      Class.new do
+        include Turbofan::Pipeline
+
+        pipeline_name "fan-in-false"
+
+        pipeline do
+          ex = export(trigger_input)
+          computed = fan_out(compute(ex), fan_in: false)
+          load_obs(computed)
+        end
+      end
+    end
+
+    it "stores fan_in: false on the fan-out step" do
+      dag = pipeline_class.turbofan_dag
+      compute_step = dag.steps.find { |s| s.name == :compute }
+      expect(compute_step.fan_in).to be false
+    end
+
+    it "preserves DAG edge from fan-out to dependent step" do
+      dag = pipeline_class.turbofan_dag
+      expect(dag.edges).to include(from: :compute, to: :load_obs)
+    end
+
+    it "defaults fan_in to true on other steps" do
+      dag = pipeline_class.turbofan_dag
+      export_step = dag.steps.find { |s| s.name == :export }
+      load_step = dag.steps.find { |s| s.name == :load_obs }
+      expect(export_step.fan_in).to be true
+      expect(load_step.fan_in).to be true
+    end
+  end
+
   describe "compute_environment DSL" do
     let(:ce_class) do
       klass = Class.new { include Turbofan::ComputeEnvironment }

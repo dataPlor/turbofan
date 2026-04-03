@@ -39,7 +39,10 @@ module Turbofan
         def step_env(step, first:, prev_step_name:, prev_step: nil, prev_step_names: nil)
           env = base_env
 
-          if first && !step.fan_out?
+          if prev_step&.fan_out? && prev_step.fan_in == false
+            # fan_in: false — step receives trigger input, skips fan-out output collection
+            env << {"Name" => "TURBOFAN_INPUT", "Value.$" => "States.JsonToString($.input)"}
+          elsif first && !step.fan_out?
             env << {"Name" => "TURBOFAN_INPUT", "Value.$" => "States.JsonToString($.input)"}
           elsif prev_step_names
             env << {"Name" => "TURBOFAN_PREV_STEPS", "Value" => prev_step_names.map(&:to_s).join(",")}
@@ -49,7 +52,7 @@ module Turbofan
 
           env << {"Name" => "TURBOFAN_STEP_NAME", "Value" => step.name.to_s}
 
-          if prev_step&.fan_out?
+          if prev_step&.fan_out? && prev_step.fan_in != false
             if routed_fan_out?(prev_step)
               sizes = resolve_step_class(prev_step.name).turbofan_sizes
               env << {"Name" => "TURBOFAN_PREV_FAN_OUT_SIZES", "Value" => sizes.keys.map(&:to_s).join(",")}

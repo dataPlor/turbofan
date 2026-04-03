@@ -303,4 +303,16 @@ RSpec.describe Turbofan::DagStep do
         .to raise_error(ArgumentError, /use batch_size: instead/)
     end
   end
+
+  describe "#fan_in" do
+    it "defaults to true" do
+      step = described_class.new(:process)
+      expect(step.fan_in).to be true
+    end
+
+    it "can be set to false" do
+      step = described_class.new(:process, fan_in: false)
+      expect(step.fan_in).to be false
+    end
+  end
 end

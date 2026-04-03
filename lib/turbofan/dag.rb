@@ -1,14 +1,14 @@
 require "tsort"
 
 module Turbofan
-  DagStep = Struct.new(:name, :fan_out, :tolerated_failure_rate, :fan_out_timeout, keyword_init: true) do
-    def initialize(name, fan_out: false, tolerated_failure_rate: 0, **rest)
+  DagStep = Struct.new(:name, :fan_out, :tolerated_failure_rate, :fan_out_timeout, :fan_in, keyword_init: true) do
+    def initialize(name, fan_out: false, tolerated_failure_rate: 0, fan_in: true, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "batch_size has moved to the Step class. Use `batch_size N` in your Step definition." if rest.key?(:batch_size)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
 
-      super(name: name, fan_out: fan_out, tolerated_failure_rate: tolerated_failure_rate, fan_out_timeout: nil)
+      super(name: name, fan_out: fan_out, tolerated_failure_rate: tolerated_failure_rate, fan_out_timeout: nil, fan_in: fan_in)
     end
 
     def fan_out?
@@ -155,7 +155,7 @@ module Turbofan
       @trigger_input_override = previous
     end
 
-    def fan_out(proxy, tolerated_failure_rate: 0, timeout: nil, **rest)
+    def fan_out(proxy, tolerated_failure_rate: 0, timeout: nil, fan_in: true, **rest)
       raise ArgumentError, "batch_size has moved to the Step class. Use `batch_size N` in your Step definition." if rest.key?(:batch_size)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
@@ -169,6 +169,7 @@ module Turbofan
       step.fan_out = true
       step.tolerated_failure_rate = tolerated_failure_rate
       step.fan_out_timeout = timeout
+      step.fan_in = fan_in
       proxy
     end
 

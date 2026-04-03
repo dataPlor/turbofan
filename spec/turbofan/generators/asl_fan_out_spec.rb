@@ -761,6 +761,86 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       end
     end
 
+    describe "fan_in: false suppresses output collection" do
+      let(:pipeline_class) do
+        stub_const("Export", Class.new {
+          include Turbofan::Step
+
+          execution :batch
+          compute_environment :test_ce
+          cpu 1
+
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        stub_const("Compute", Class.new {
+          include Turbofan::Step
+
+          execution :batch
+          compute_environment :test_ce
+          cpu 1
+          batch_size 100
+
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        stub_const("LoadObs", Class.new {
+          include Turbofan::Step
+
+          execution :batch
+          compute_environment :test_ce
+          cpu 1
+
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        })
+        Class.new do
+          include Turbofan::Pipeline
+
+          pipeline_name "fan-in-false"
+
+          pipeline do
+            ex = export(trigger_input)
+            computed = fan_out(compute(ex), fan_in: false)
+            load_obs(computed)
+          end
+        end
+      end
+
+      let(:generator) { described_class.new(pipeline: pipeline_class, stage: "production") }
+      let(:asl) { generator.generate }
+
+      it "preserves DAG dependency (Map state runs before load_obs)" do
+        expect(asl["States"]["compute"]["Next"]).to eq("load_obs")
+      end
+
+      it "does NOT set TURBOFAN_PREV_FAN_OUT_PARENTS on the fan_in: false step" do
+        env = asl["States"]["load_obs"].dig("Parameters", "ContainerOverrides", "Environment")
+        parents_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_FAN_OUT_PARENTS" }
+        expect(parents_var).to be_nil
+      end
+
+      it "does NOT set TURBOFAN_PREV_STEP on the fan_in: false step" do
+        env = asl["States"]["load_obs"].dig("Parameters", "ContainerOverrides", "Environment")
+        prev_step_var = env.find { |e| e["Name"] == "TURBOFAN_PREV_STEP" }
+        expect(prev_step_var).to be_nil
+      end
+
+      it "sets TURBOFAN_INPUT to pass trigger input instead" do
+        env = asl["States"]["load_obs"].dig("Parameters", "ContainerOverrides", "Environment")
+        input_var = env.find { |e| e["Name"] == "TURBOFAN_INPUT" }
+        expect(input_var).not_to be_nil
+        expect(input_var["Value.$"]).to eq("States.JsonToString($.input)")
+      end
+
+      it "still chains the full pipeline correctly" do
+        expect(asl["States"]["export"]["Next"]).to eq("compute_chunk")
+        expect(asl["States"]["compute_chunk"]["Next"]).to eq("compute")
+        expect(asl["States"]["compute"]["Next"]).to eq("load_obs")
+        expect(asl["States"]["load_obs"]["Next"]).to match(/success/i)
+      end
+    end
+
     describe "fan-out as only step" do
       let(:pipeline_class) do
         stub_const("Process", Class.new {
