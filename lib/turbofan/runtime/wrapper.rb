@@ -16,10 +16,10 @@ module Turbofan
       def run
         $stdout.sync = true
         Turbofan.schemas_path ||= ENV["TURBOFAN_SCHEMAS_PATH"]
-        nvme_path = setup_nvme
-        set_tmpdir(nvme_path) if nvme_path
-        context = build_context(nvme_path)
-        install_sigterm_handler(context, nvme_path: nvme_path)
+        storage_path = setup_storage
+        set_tmpdir(storage_path) if storage_path
+        context = build_context(storage_path)
+        install_sigterm_handler(context, storage_path: storage_path)
         attach_resources(context)
         Lineage.emit(Lineage.start_event(context: context, step_class: @step_class), context: context)
 
@@ -56,7 +56,7 @@ module Turbofan
         end
         raise
       ensure
-        cleanup_nvme(nvme_path)
+        cleanup_storage(storage_path)
         begin
           context&.metrics&.flush
         rescue => flush_err
@@ -66,31 +66,39 @@ module Turbofan
 
       private
 
-      def set_tmpdir(nvme_path)
-        tmp_dir = File.join(nvme_path, "tmp")
+      def set_tmpdir(storage_path)
+        tmp_dir = File.join(storage_path, "tmp")
         FileUtils.mkdir_p(tmp_dir)
         ENV["TMPDIR"] = tmp_dir
       end
 
-      def setup_nvme
+      def setup_storage
         mount = Turbofan::ComputeEnvironment::NVME_MOUNT_PATH
         job_id = ENV["AWS_BATCH_JOB_ID"] || "local-#{Process.pid}"
         attempt = ENV.fetch("AWS_BATCH_JOB_ATTEMPT", "1")
-        path = "#{mount}/#{job_id}-attempt#{attempt}"
 
         if File.directory?(mount)
+          # Batch with NVMe instance storage
+          path = "#{mount}/#{job_id}-attempt#{attempt}"
           FileUtils.mkdir_p(path)
-          ENV["TURBOFAN_NVME_PATH"] = path
+          ENV["TURBOFAN_STORAGE_PATH"] = path
           df = `df -h #{mount} 2>/dev/null`.lines.last&.strip
-          warn("[Turbofan] NVMe available: #{path} (#{df})")
+          warn("[Turbofan] Storage: NVMe at #{path} (#{df})")
+          path
+        elsif ENV.key?("ECS_CONTAINER_METADATA_URI_V4")
+          # Fargate ephemeral storage
+          path = "/tmp/turbofan-#{job_id}-attempt#{attempt}"
+          FileUtils.mkdir_p(path)
+          ENV["TURBOFAN_STORAGE_PATH"] = path
+          warn("[Turbofan] Storage: Fargate ephemeral at #{path}")
           path
         else
-          warn("[Turbofan] NVMe not available at #{mount} — file-backed DuckDB will use TMPDIR")
+          warn("[Turbofan] No local storage detected — file-backed DuckDB will use TMPDIR")
           nil
         end
       end
 
-      def build_context(nvme_path)
+      def build_context(storage_path)
         Context.new(
           execution_id: ENV.fetch("TURBOFAN_EXECUTION_ID", "local-#{Process.pid}"),
           attempt_number: ENV.fetch("AWS_BATCH_JOB_ATTEMPT", "1").to_i,
@@ -98,7 +106,7 @@ module Turbofan
           stage: ENV.fetch("TURBOFAN_STAGE", "development"),
           pipeline_name: ENV.fetch("TURBOFAN_PIPELINE", "unknown"),
           array_index: ENV.key?("AWS_BATCH_JOB_ARRAY_INDEX") ? ENV["AWS_BATCH_JOB_ARRAY_INDEX"].to_i : nil,
-          nvme_path: nvme_path,
+          storage_path: storage_path,
           uses: @step_class.turbofan_uses,
           writes_to: @step_class.turbofan_writes_to,
           size: ENV["TURBOFAN_SIZE"],
@@ -106,11 +114,11 @@ module Turbofan
         )
       end
 
-      def install_sigterm_handler(context, nvme_path: nil)
+      def install_sigterm_handler(context, storage_path: nil)
         trap("TERM") do
           context.interrupt!
           context.logger.info("SIGTERM received, shutting down")
-          cleanup_nvme(nvme_path)
+          cleanup_storage(storage_path)
           exit(143)
         end
       end
@@ -119,7 +127,7 @@ module Turbofan
         ResourceAttacher.attach(context: context)
       end
 
-      def cleanup_nvme(path)
+      def cleanup_storage(path)
         FileUtils.rm_rf(path) if path && File.directory?(path)
       end
     end

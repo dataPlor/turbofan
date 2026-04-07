@@ -50,7 +50,7 @@ module WrapperTestHelper
 
   # Requires `let(:cloudwatch_client)` and `let(:s3_client)` in the calling spec.
   # Optionally responds to `duckdb_conn` and `secrets_client` for resource attachment tests.
-  def run_wrapper(step_klass, env: {}, nvme_base: nil)
+  def run_wrapper(step_klass, env: {}, storage_base: nil)
     saved_env = {}
     env.each do |k, v|
       saved_env[k] = ENV[k]
@@ -66,7 +66,7 @@ module WrapperTestHelper
       stage: env["TURBOFAN_STAGE"] || "development",
       pipeline_name: env["TURBOFAN_PIPELINE"] || "test-pipeline",
       array_index: env.key?("AWS_BATCH_JOB_ARRAY_INDEX") ? env["AWS_BATCH_JOB_ARRAY_INDEX"].to_i : nil,
-      nvme_path: nvme_base,
+      storage_path: storage_base,
       uses: step_klass.turbofan_uses,
       writes_to: step_klass.turbofan_writes_to,
       size: env["TURBOFAN_SIZE"]
@@ -87,7 +87,7 @@ module WrapperTestHelper
     )
     allow(context).to receive_messages(s3: s3_client, metrics: metrics)
 
-    allow(wrapper).to receive_messages(setup_nvme: nvme_base, build_context: context)
+    allow(wrapper).to receive_messages(setup_storage: storage_base, build_context: context)
 
     original_stdout = $stdout
     captured = StringIO.new

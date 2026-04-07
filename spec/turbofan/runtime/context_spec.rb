@@ -5,7 +5,7 @@ RSpec.describe Turbofan::Runtime::Context do
     defaults = {
       execution_id: "exec-1", attempt_number: 1, step_name: "process",
       stage: "production", pipeline_name: "test", array_index: nil,
-      nvme_path: nil, uses: [], writes_to: []
+      storage_path: nil, uses: [], writes_to: []
     }
     described_class.new(**defaults.merge(overrides))
   end
@@ -15,7 +15,7 @@ RSpec.describe Turbofan::Runtime::Context do
       execution_id: "exec-abc123",
       step_name: "generate_csvs",
       pipeline_name: "test-pipeline",
-      nvme_path: "/mnt/nvme/job-123",
+      storage_path: "/mnt/nvme/job-123",
       uses: [{type: :resource, key: :duckdb}]
     )
   end
@@ -107,14 +107,14 @@ RSpec.describe Turbofan::Runtime::Context do
     end
   end
 
-  describe "#nvme_path" do
-    it "exposes the NVMe temp path" do
-      expect(context.nvme_path).to eq("/mnt/nvme/job-123")
+  describe "#storage_path" do
+    it "exposes the storage path" do
+      expect(context.storage_path).to eq("/mnt/nvme/job-123")
     end
 
-    it "is nil when NVMe is not used" do
-      ctx = build_context(nvme_path: nil)
-      expect(ctx.nvme_path).to be_nil
+    it "is nil when no local storage is available" do
+      ctx = build_context(storage_path: nil)
+      expect(ctx.storage_path).to be_nil
     end
   end
 
@@ -193,7 +193,7 @@ RSpec.describe Turbofan::Runtime::Context do
       expect(results.first).not_to be_nil
     end
 
-    context "with nvme_path" do
+    context "with storage_path" do
       before do
         skip "DuckDB gem not available" unless begin
           require "duckdb"
@@ -203,32 +203,32 @@ RSpec.describe Turbofan::Runtime::Context do
         end
       end
 
-      let(:nvme_dir) { Dir.mktmpdir("nvme") }
+      let(:storage_dir) { Dir.mktmpdir("storage") }
       let(:ctx) do
-        build_context(nvme_path: nvme_dir, uses: [{type: :resource, key: :places_read}])
+        build_context(storage_path: storage_dir, uses: [{type: :resource, key: :places_read}])
       end
 
       after do
-        FileUtils.remove_entry(nvme_dir)
+        FileUtils.remove_entry(storage_dir)
       end
 
-      it "creates DuckDB database file on nvme_path" do
+      it "creates DuckDB database file on storage_path" do
         ctx.duckdb
-        expect(File.exist?(File.join(nvme_dir, "duckdb.db"))).to be true
+        expect(File.exist?(File.join(storage_dir, "duckdb.db"))).to be true
       end
 
-      it "sets DuckDB temp_directory to nvme_path/tmp" do
+      it "sets DuckDB temp_directory to storage_path/tmp" do
         result = ctx.duckdb.execute("SELECT current_setting('temp_directory')")
-        expect(result.first.first).to eq(File.join(nvme_dir, "tmp"))
+        expect(result.first.first).to eq(File.join(storage_dir, "tmp"))
       end
 
-      it "creates tmp directory on nvme" do
+      it "creates tmp directory on storage_path" do
         ctx.duckdb
-        expect(Dir.exist?(File.join(nvme_dir, "tmp"))).to be true
+        expect(Dir.exist?(File.join(storage_dir, "tmp"))).to be true
       end
     end
 
-    context "without nvme_path" do
+    context "without storage_path" do
       before do
         skip "DuckDB gem not available" unless begin
           require "duckdb"

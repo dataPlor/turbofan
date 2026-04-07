@@ -164,7 +164,7 @@ RSpec.shared_context "when using integration pipeline setup" do
           "brand_name" => result.first["name"],
           "key" => inputs.first["key"],
           "source" => "postgres",
-          "nvme_used" => !context.nvme_path.nil?
+          "storage_available" => !context.storage_path.nil?
         }
       end
     end

@@ -27,7 +27,7 @@ class FetchBrand
       "brand_name" => result.first[0],
       "key" => inputs.first["key"],
       "source" => "postgres",
-      "nvme_used" => !context.nvme_path.nil?
+      "storage_available" => !context.storage_path.nil?
     }
   end
 end

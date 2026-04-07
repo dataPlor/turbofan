@@ -440,14 +440,14 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         context = Turbofan::Runtime::Context.new(
           execution_id: "test", attempt_number: 1, step_name: "SlowStep",
           stage: "dev", pipeline_name: "test", array_index: nil,
-          nvme_path: nil, uses: [], writes_to: []
+          storage_path: nil, uses: [], writes_to: []
         )
         cw = instance_double("Aws::CloudWatch::Client", put_metric_data: nil) # rubocop:disable RSpec/VerifiedDoubleReference
         metrics = Turbofan::Runtime::Metrics.new(
           cloudwatch_client: cw, pipeline_name: "test", stage: "dev", step_name: "SlowStep"
         )
         allow(context).to receive_messages(metrics: metrics, s3: nil)
-        allow(wrapper).to receive_messages(setup_nvme: nil, build_context: context)
+        allow(wrapper).to receive_messages(setup_storage: nil, build_context: context)
         allow(Turbofan::Runtime::InputResolver).to receive(:call).and_return({"inputs" => [{}]})
 
         write_pipe.puts("ready")
@@ -470,7 +470,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
   end
 
-  describe "NVMe temp directory management" do
+  describe "storage path management" do
     it "creates and cleans up a job-specific temp directory" do
       Dir.mktmpdir do |tmpdir|
         job_dir = File.join(tmpdir, "test-job")
@@ -478,22 +478,22 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
 
         run_wrapper(step_class, env: {
           "TURBOFAN_INPUT" => '{"items":1}'
-        }, nvme_base: job_dir)
+        }, storage_base: job_dir)
 
-        # After run, cleanup_nvme should have removed it
+        # After run, cleanup_storage should have removed it
         expect(File.directory?(job_dir)).to be false
       end
     end
 
-    it "handles nil nvme_path gracefully" do
+    it "handles nil storage path gracefully" do
       result = run_wrapper(step_class, env: {
         "TURBOFAN_INPUT" => '{"items":1}'
-      }, nvme_base: nil)
+      }, storage_base: nil)
 
       expect(result[:output]).not_to be_empty
     end
 
-    it "sets ENV['TMPDIR'] to nvme_path/tmp when NVMe is available" do
+    it "sets ENV['TMPDIR'] to storage_path/tmp when local storage is available" do
       Dir.mktmpdir do |tmpdir|
         job_dir = File.join(tmpdir, "test-job")
         FileUtils.mkdir_p(job_dir)
@@ -502,11 +502,11 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         begin
           run_wrapper(step_class, env: {
             "TURBOFAN_INPUT" => '{"items":1}'
-          }, nvme_base: job_dir)
+          }, storage_base: job_dir)
 
           expected_tmp = File.join(job_dir, "tmp")
           # The wrapper calls set_tmpdir before running, so the directory should have been created.
-          # After cleanup_nvme removes job_dir, TMPDIR still points to the path that was set.
+          # After cleanup_storage removes job_dir, TMPDIR still points to the path that was set.
           expect(ENV["TMPDIR"]).to eq(expected_tmp)
         ensure
           ENV["TMPDIR"] = saved_tmpdir
@@ -750,13 +750,16 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
   end
 
-  describe "NVMe setup edge cases" do
-    it "returns nil when /mnt/nvme does not exist" do
+  describe "storage setup edge cases" do
+    it "returns nil when /mnt/nvme does not exist and not on Fargate" do
       wrapper = described_class.new(step_class)
       allow(File).to receive(:directory?).and_call_original
       allow(File).to receive(:directory?).with("/mnt/nvme").and_return(false)
+      saved_ecs = ENV.delete("ECS_CONTAINER_METADATA_URI_V4")
 
-      expect(wrapper.send(:setup_nvme)).to be_nil
+      expect(wrapper.send(:setup_storage)).to be_nil
+    ensure
+      ENV["ECS_CONTAINER_METADATA_URI_V4"] = saved_ecs if saved_ecs
     end
 
     it "uses AWS_BATCH_JOB_ID and attempt number for subdirectory name" do
@@ -769,7 +772,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       allow(File).to receive(:directory?).with("/mnt/nvme").and_return(true)
       allow(FileUtils).to receive(:mkdir_p)
 
-      result = wrapper.send(:setup_nvme)
+      result = wrapper.send(:setup_storage)
       expect(result).to eq("/mnt/nvme/batch-job-42-attempt2")
     ensure
       ENV["AWS_BATCH_JOB_ID"] = saved_id
@@ -785,7 +788,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       allow(File).to receive(:directory?).with(expected_path).and_return(true)
       allow(FileUtils).to receive(:mkdir_p)
 
-      result = wrapper.send(:setup_nvme)
+      result = wrapper.send(:setup_storage)
       expect(result).to eq(expected_path)
     ensure
       ENV["AWS_BATCH_JOB_ID"] = saved if saved
@@ -915,14 +918,14 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       context = Turbofan::Runtime::Context.new(
         execution_id: "test-exec", attempt_number: 1, step_name: "LogErrorStep",
         stage: "development", pipeline_name: "test-pipeline", array_index: nil,
-        nvme_path: nil, uses: [], writes_to: []
+        storage_path: nil, uses: [], writes_to: []
       )
       metrics = Turbofan::Runtime::Metrics.new(
         cloudwatch_client: cloudwatch_client, pipeline_name: "test-pipeline",
         stage: "development", step_name: "LogErrorStep"
       )
       allow(context).to receive_messages(s3: s3_client, metrics: metrics, logger: logger_spy)
-      allow(wrapper).to receive_messages(setup_nvme: nil, build_context: context)
+      allow(wrapper).to receive_messages(setup_storage: nil, build_context: context)
 
       original_stdout = $stdout
       $stdout = StringIO.new

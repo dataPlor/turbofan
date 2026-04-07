@@ -12,7 +12,7 @@ RSpec.describe Turbofan::Runtime::Lineage do
       stage: "production",
       pipeline_name: "test-pipeline",
       array_index: nil,
-      nvme_path: nil,
+      storage_path: nil,
       uses: [],
       writes_to: []
     )
@@ -94,7 +94,7 @@ RSpec.describe Turbofan::Runtime::Lineage do
         stage: "production",
         pipeline_name: "test-pipeline",
         array_index: nil,
-        nvme_path: nil,
+        storage_path: nil,
         uses: [{type: :s3, uri: "s3://input-bucket/data/*"}, {type: :resource, key: :places_read}],
         writes_to: []
       )
@@ -131,7 +131,7 @@ RSpec.describe Turbofan::Runtime::Lineage do
         stage: "production",
         pipeline_name: "test-pipeline",
         array_index: nil,
-        nvme_path: nil,
+        storage_path: nil,
         uses: [],
         writes_to: [{type: :s3, uri: "s3://output-bucket/results/"}, {type: :resource, key: :places_write}]
       )

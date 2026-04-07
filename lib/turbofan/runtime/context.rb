@@ -6,17 +6,17 @@ module Turbofan
   module Runtime
     class Context
       attr_reader :execution_id, :attempt_number, :step_name, :stage,
-        :pipeline_name, :array_index, :nvme_path, :uses, :writes_to, :size, :envelope,
+        :pipeline_name, :array_index, :storage_path, :uses, :writes_to, :size, :envelope,
         :duckdb_extensions
 
-      def initialize(execution_id:, attempt_number:, step_name:, stage:, pipeline_name:, array_index:, nvme_path:, uses:, writes_to: [], size: nil, envelope: {}, duckdb_extensions: [])
+      def initialize(execution_id:, attempt_number:, step_name:, stage:, pipeline_name:, array_index:, storage_path:, uses:, writes_to: [], size: nil, envelope: {}, duckdb_extensions: [])
         @execution_id = execution_id
         @attempt_number = attempt_number
         @step_name = step_name
         @stage = stage
         @pipeline_name = pipeline_name
         @array_index = array_index
-        @nvme_path = nvme_path
+        @storage_path = storage_path
         @uses = uses
         @writes_to = writes_to
         @size = size
@@ -68,9 +68,9 @@ module Turbofan
           needs = uses_resources.any? || writes_to_resources.any? || @duckdb_extensions.any?
           return @duckdb = nil unless needs
 
-          if @nvme_path
-            db_path = File.join(@nvme_path, "duckdb.db")
-            tmp_dir = File.join(@nvme_path, "tmp")
+          if @storage_path
+            db_path = File.join(@storage_path, "duckdb.db")
+            tmp_dir = File.join(@storage_path, "tmp")
             FileUtils.mkdir_p(tmp_dir)
             raise "Invalid temp directory path" if tmp_dir.include?("'") && tmp_dir.include?("\\")
             @duckdb = ::DuckDB::Database.open(db_path).connect
