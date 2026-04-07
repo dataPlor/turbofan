@@ -385,34 +385,12 @@ end
       def lambda_step_function(prefix:, step_name:, step_class:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
         resource_name = "LambdaStep#{Naming.pascal_case(step_name)}"
         role_name = "LambdaStepRole#{Naming.pascal_case(step_name)}"
+        pipeline_name = @pipeline.turbofan_name
 
-        # S3 policies: pipeline bucket (read-write) + uses (read-only) + writes_to (read-write)
-        s3_statements = [
-          {
-            "Effect" => "Allow",
-            "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
-            "Resource" => [
-              "arn:aws:s3:::#{Turbofan.config.bucket}",
-              "arn:aws:s3:::#{Turbofan.config.bucket}/*"
-            ]
-          }
-        ]
-        read_arns = step_class.uses_s3.flat_map { |dep| Turbofan::S3Uri.new(dep[:uri]).to_arns }
-        if read_arns.any?
-          s3_statements << {
-            "Effect" => "Allow",
-            "Action" => ["s3:GetObject", "s3:ListBucket"],
-            "Resource" => read_arns
-          }
-        end
-        write_arns = step_class.writes_to_s3.flat_map { |dep| Turbofan::S3Uri.new(dep[:uri]).to_arns }
-        if write_arns.any?
-          s3_statements << {
-            "Effect" => "Allow",
-            "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
-            "Resource" => write_arns
-          }
-        end
+        lambda_policies = Iam.task_policies(
+          prefix: prefix, step_name: step_name, step_class: step_class,
+          pipeline_name: pipeline_name, resources: @resources
+        )
 
         {
           role_name => {
@@ -433,15 +411,7 @@ end
               "ManagedPolicyArns" => [
                 "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
               ],
-              "Policies" => [
-                {
-                  "PolicyName" => "S3Access",
-                  "PolicyDocument" => {
-                    "Version" => "2012-10-17",
-                    "Statement" => s3_statements
-                  }
-                }
-              ]
+              "Policies" => lambda_policies
             }
           },
           resource_name => {
