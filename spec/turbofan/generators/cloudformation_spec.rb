@@ -897,5 +897,19 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         expect(props["EphemeralStorage"]).to eq({"SizeInGiB" => 100})
       end
     end
+
+    it "uses array-of-objects tag format on IAM roles (not flat hash)" do
+      template = fargate_generator.generate
+      exec_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateExecRole") }
+      task_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskRole") }
+
+      exec_tags = template["Resources"][exec_role_key]["Properties"]["Tags"]
+      task_tags = template["Resources"][task_role_key]["Properties"]["Tags"]
+
+      expect(exec_tags).to be_an(Array), "FargateExecRole Tags must be array of {Key,Value} objects, got #{exec_tags.class}"
+      expect(exec_tags.first).to have_key("Key")
+      expect(task_tags).to be_an(Array), "FargateTaskRole Tags must be array of {Key,Value} objects, got #{task_tags.class}"
+      expect(task_tags.first).to have_key("Key")
+    end
   end
 end

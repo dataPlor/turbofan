@@ -289,7 +289,7 @@ end
           "Type" => "AWS::IAM::Role",
           "Properties" => {
             "RoleName" => Naming.iam_role_name("#{prefix}-fargate-exec-#{step_name}"),
-            "Tags" => CloudFormation.tags_hash(tags),
+            "Tags" => tags,
             "AssumeRolePolicyDocument" => {
               "Version" => "2012-10-17",
               "Statement" => [
@@ -311,7 +311,7 @@ end
           "Type" => "AWS::IAM::Role",
           "Properties" => {
             "RoleName" => Naming.iam_role_name("#{prefix}-fargate-task-#{step_name}"),
-            "Tags" => CloudFormation.tags_hash(tags),
+            "Tags" => tags,
             "AssumeRolePolicyDocument" => {
               "Version" => "2012-10-17",
               "Statement" => [
