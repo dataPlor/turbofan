@@ -898,6 +898,15 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       end
     end
 
+    it "resolves awslogs-region via Ref (not literal ${AWS::Region})" do
+      template = fargate_generator.generate
+      task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }
+      container = template["Resources"][task_def_key]["Properties"]["ContainerDefinitions"].first
+      region_val = container["LogConfiguration"]["Options"]["awslogs-region"]
+      expect(region_val).to eq({"Ref" => "AWS::Region"}),
+        "awslogs-region must use {Ref: AWS::Region}, not literal '${AWS::Region}'"
+    end
+
     it "sets RuntimePlatform to ARM64/LINUX on task definition" do
       template = fargate_generator.generate
       task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }

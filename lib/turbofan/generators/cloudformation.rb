@@ -362,7 +362,7 @@ end
                 "LogDriver" => "awslogs",
                 "Options" => {
                   "awslogs-group" => log_group_ref,
-                  "awslogs-region" => "${AWS::Region}",
+                  "awslogs-region" => {"Ref" => "AWS::Region"},
                   "awslogs-stream-prefix" => "fargate"
                 }
               }
