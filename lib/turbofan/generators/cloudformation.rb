@@ -84,8 +84,7 @@ module Turbofan
             timeout_val = sclass.turbofan_timeout || 900
             resources.merge!(lambda_step_function(
               prefix: prefix, step_name: sname, step_class: sclass, image_uri: image_uri,
-              memory_mb: memory_mb, timeout: timeout_val,
-              tags: step_tags, log_group_ref: {"Ref" => log_group_key}
+              memory_mb: memory_mb, timeout: timeout_val, tags: step_tags
             ))
           else
             # Batch: resolve CE (required for job queue)
@@ -244,7 +243,7 @@ module Turbofan
             step_class&.turbofan_batch_size
           end
         end
-end
+      end
 
       def routed_fan_out_steps
         @pipeline.turbofan_dag.steps.filter_map do |dag_step|
@@ -281,7 +280,7 @@ end
           "Properties" => {
             "ClusterName" => "#{prefix}-fargate-cluster",
             "CapacityProviders" => ["FARGATE", "FARGATE_SPOT"],
-            "Tags" => CloudFormation.tags_hash(tags).map { |k, v| {"Key" => k, "Value" => v} }
+            "Tags" => tags
           }
         }
 
@@ -382,7 +381,7 @@ end
         "#{account_id}.dkr.ecr.#{region}.amazonaws.com/#{prefix}-ecr-#{step_name}:#{tag}"
       end
 
-      def lambda_step_function(prefix:, step_name:, step_class:, image_uri:, memory_mb:, timeout:, tags:, log_group_ref:)
+      def lambda_step_function(prefix:, step_name:, step_class:, image_uri:, memory_mb:, timeout:, tags:)
         resource_name = "LambdaStep#{Naming.pascal_case(step_name)}"
         role_name = "LambdaStepRole#{Naming.pascal_case(step_name)}"
         pipeline_name = @pipeline.turbofan_name

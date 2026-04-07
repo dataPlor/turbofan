@@ -385,7 +385,7 @@ At runtime, a **routing Lambda** runs before the chunking Lambda. It loads the r
 - **Cost tracking** — Full AWS resource tagging, queryable via CUR 2.0 through DuckDB
 - **Least-privilege dependencies** — `uses` grants read-only access by default; `writes_to` escalates to read+write. Applies to both Postgres (DuckDB ATTACH) and S3 (IAM policies)
 - **DuckDB + Postgres** — Steps query Postgres tables through DuckDB with automatic `ATTACH` (read-only or read-write). On NVMe-backed instances, DuckDB uses file-based storage for better performance on large datasets.
-- **NVMe scratch space** — Steps on NVMe-equipped instances get `/mnt/nvme/{job_id}` with DuckDB file storage and TMPDIR redirection. Automatically cleaned up after execution.
+- **Local storage** — Steps get fast local scratch space automatically: NVMe on Batch `*gd` instances, ephemeral disk on Fargate. Accessed via `context.storage_path`. DuckDB uses file-based storage when available; TMPDIR is redirected. Cleaned up after execution.
 - **Instance selection** — Automatic EC2 instance type selection based on CPU/RAM requirements with bin-packing waste analysis
 - **SNS notifications** — Success/failure notifications per pipeline execution
 - **Large template support** — CloudFormation templates exceeding 51,200 bytes are automatically uploaded to S3
@@ -429,7 +429,7 @@ The test exercises:
 3. **Step Functions execution** — starts execution with `{"key": "starbucks"}` and polls until completion (10 min timeout)
 4. **S3 output verification** — reads each step's output from S3 and asserts correctness:
    - `retry_demo`: `retried == true`, `attempts == 2` — proves Batch retry strategy works (step exits 143 on first attempt, succeeds on second)
-   - `fetch_brand`: `brand_name == "Starbucks"`, `source == "postgres"`, `nvme_used == true` — proves DuckDB-over-Postgres resource attachment works on NVMe-backed compute environment
+   - `fetch_brand`: `brand_name == "Starbucks"`, `source == "postgres"`, `storage_available == true` — proves DuckDB-over-Postgres resource attachment works with local storage
    - `read_visits`: `row_count > 0`, `source == "s3"` — proves S3 read-only IAM policy and S3 client injection work
    - `classify`: `classification == "food_and_beverage"`, `language == "python"` — proves external Python container S3 protocol and parallel branch execution work
    - `build_items`: `item_count == 9` — proves parallel join collects outputs from both branches
@@ -671,7 +671,7 @@ Inside the `pipeline` block, the following methods are available:
 
 - **`trigger_input`** — Returns a `DagProxy` representing the execution's trigger input. This is the implicit input to the first step.
 - **Step methods** — Automatically generated from discovered step classes. `ValidatePlaces` becomes `validate_places(input_proxy)`. Each returns a `DagProxy` for chaining.
-- **`fan_out(proxy)`** — Marks a step for fan-out execution. The step class must declare `batch_size N` (items per array job child). Returns the same `DagProxy` for chaining. If the step has `size` definitions, this creates a routed fan-out. Optional kwargs: `tolerated_failure_rate:` (0.0 to <1.0), `timeout:` (seconds for the entire fan-out Map state).
+- **`fan_out(proxy)`** — Marks a step for fan-out execution. The step class must declare `batch_size N` (items per array job child). Returns the same `DagProxy` for chaining. If the step has `size` definitions, this creates a routed fan-out. Optional kwargs: `tolerated_failure_rate:` (0.0 to <1.0), `timeout:` (seconds for the entire fan-out Map state), `fan_in: false` (the next step waits for the fan-out to complete but receives the trigger input instead of collected outputs — skips S3 output collection).
 
 Steps are wired by passing return values:
 
@@ -1128,7 +1128,7 @@ Provided as the second argument to `call(inputs, context)`. Gives steps access t
 | `pipeline_name` | Pipeline name. |
 | `array_index` | For fan-out: 0..N-1. `nil` for non-array jobs. |
 | `size` | For routed fan-out: the size name (e.g., `"s"`, `"m"`, `"l"`). Read from `TURBOFAN_SIZE` env var. `nil` for non-routed steps. |
-| `nvme_path` | Path to NVMe scratch space (`/mnt/nvme/{job_id}`), or `nil`. When present, DuckDB uses a file-based database at `{nvme_path}/duckdb.db` with temp directory at `{nvme_path}/tmp/`. |
+| `storage_path` | Path to local scratch space, or `nil`. On Batch with NVMe instances: `/mnt/nvme/{job_id}`. On Fargate: `/tmp/turbofan-{job_id}`. When present, DuckDB uses a file-based database at `{storage_path}/duckdb.db` with temp directory at `{storage_path}/tmp/`. |
 | `envelope` | Hash of extra metadata from the interchange envelope (all keys except `"inputs"`). Empty hash by default. Useful for cross-language containers that pass metadata alongside inputs. |
 | `uses` | Array of dependency declarations from `uses`/`reads_from`. |
 | `writes_to` | Array of dependency declarations from `writes_to`. |
@@ -1136,7 +1136,7 @@ Provided as the second argument to `call(inputs, context)`. Gives steps access t
 | `metrics` | `Turbofan::Runtime::Metrics` — CloudWatch metric emitter. Values must be Numeric. |
 | `s3` | `Aws::S3::Client` instance. |
 | `secrets_client` | `Aws::SecretsManager::Client` instance. |
-| `duckdb` | DuckDB connection (lazy-initialized). Auto-provisioned if any Postgres resource is declared via `uses`/`writes_to`, if `uses :duckdb` is explicit, or if DuckDB extensions are declared. When `nvme_path` is available, uses a file-based database (`{nvme_path}/duckdb.db`) with `temp_directory` set to `{nvme_path}/tmp/`; otherwise uses in-memory mode. After connection init, any extensions declared via `uses :duckdb, extensions: [...]` are loaded automatically via `LOAD`. |
+| `duckdb` | DuckDB connection (lazy-initialized). Auto-provisioned if any Postgres resource is declared via `uses`/`writes_to`, if `uses :duckdb` is explicit, or if DuckDB extensions are declared. When `storage_path` is available, uses a file-based database (`{storage_path}/duckdb.db`) with `temp_directory` set to `{storage_path}/tmp/`; otherwise uses in-memory mode. After connection init, any extensions declared via `uses :duckdb, extensions: [...]` are loaded automatically via `LOAD`. |
 | `duckdb_extensions` | Array of DuckDB extension names (symbols) declared via `uses :duckdb, extensions: [...]`. Empty by default. |
 | `interrupted?` | Returns `true` if SIGTERM has been received. |
 | `interrupt!` | Sets the interrupted flag. Called by the SIGTERM handler. |
@@ -1214,8 +1214,8 @@ The `$LOAD_PATH.unshift(__dir__)` line makes the step's working directory a load
 
 `Wrapper.run(step_class)` performs the following sequence:
 
-1. Sets up NVMe scratch space (if available) at `/mnt/nvme/{job_id}`
-2. Sets `TMPDIR` to `{nvme_path}/tmp/` (if NVMe is available)
+1. Sets up local storage: NVMe at `/mnt/nvme/{job_id}` (Batch), ephemeral at `/tmp/turbofan-{job_id}` (Fargate), or `nil`
+2. Sets `TMPDIR` to `{storage_path}/tmp/` (if local storage is available)
 3. Builds a `Context` from environment variables (including `TURBOFAN_SIZE`)
 4. Installs a SIGTERM handler (sets interrupted flag + exits 143)
 5. Attaches resources via `ResourceAttacher` (Postgres → DuckDB)
