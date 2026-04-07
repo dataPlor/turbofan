@@ -307,62 +307,11 @@ end
           }
         }
 
-        # Task role — same permissions as Batch JobRole: S3, metrics, logs, secrets
-        secret_arns = Iam.send(:collect_secret_arns, {step_name.to_sym => step_class}, resources)
-        log_group_arn = "arn:aws:logs:*:*:log-group:#{prefix}-logs-#{step_name}:*"
-
-        task_policies = [
-          {
-            "PolicyName" => "S3Access",
-            "PolicyDocument" => {
-              "Version" => "2012-10-17",
-              "Statement" => Iam.send(:collect_s3_statements, prefix, {step_name.to_sym => step_class})
-            }
-          },
-          {
-            "PolicyName" => "CloudWatchMetrics",
-            "PolicyDocument" => {
-              "Version" => "2012-10-17",
-              "Statement" => [
-                {
-                  "Effect" => "Allow",
-                  "Action" => ["cloudwatch:PutMetricData"],
-                  "Resource" => "*",
-                  "Condition" => {"StringEquals" => {"cloudwatch:namespace" => "Turbofan/#{pipeline_name}"}}
-                }
-              ]
-            }
-          },
-          {
-            "PolicyName" => "CloudWatchLogs",
-            "PolicyDocument" => {
-              "Version" => "2012-10-17",
-              "Statement" => [
-                {
-                  "Effect" => "Allow",
-                  "Action" => ["logs:CreateLogStream", "logs:PutLogEvents"],
-                  "Resource" => log_group_arn
-                }
-              ]
-            }
-          }
-        ]
-
-        if secret_arns.any?
-          task_policies << {
-            "PolicyName" => "SecretsAccess",
-            "PolicyDocument" => {
-              "Version" => "2012-10-17",
-              "Statement" => [
-                {
-                  "Effect" => "Allow",
-                  "Action" => ["secretsmanager:GetSecretValue"],
-                  "Resource" => secret_arns
-                }
-              ]
-            }
-          }
-        end
+        # Task role — per-step policies via shared Iam.task_policies
+        task_policies = Iam.task_policies(
+          prefix: prefix, step_name: step_name, step_class: step_class,
+          pipeline_name: pipeline_name, resources: resources
+        )
 
         result[task_role_name] = {
           "Type" => "AWS::IAM::Role",
