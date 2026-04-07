@@ -11,6 +11,64 @@ module Turbofan
           iam_resources
         end
 
+        # Per-step IAM policies: S3, CloudWatch metrics, CloudWatch logs, secrets.
+        # Used by Fargate task roles and Lambda roles (per-step).
+        # Batch JobRole builds pipeline-wide policies separately.
+        def self.task_policies(prefix:, step_name:, step_class:, pipeline_name:, resources: {})
+          step_hash = {step_name.to_sym => step_class}
+          secret_arns = collect_secret_arns(step_hash, resources)
+          log_group_arn = "arn:aws:logs:*:*:log-group:#{prefix}-logs-#{step_name}:*"
+
+          policies = [
+            {
+              "PolicyName" => "S3Access",
+              "PolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => collect_s3_statements(prefix, step_hash)
+              }
+            },
+            {
+              "PolicyName" => "CloudWatchMetrics",
+              "PolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => [{
+                  "Effect" => "Allow",
+                  "Action" => ["cloudwatch:PutMetricData"],
+                  "Resource" => "*",
+                  "Condition" => {"StringEquals" => {"cloudwatch:namespace" => "Turbofan/#{pipeline_name}"}}
+                }]
+              }
+            },
+            {
+              "PolicyName" => "CloudWatchLogs",
+              "PolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => [{
+                  "Effect" => "Allow",
+                  "Action" => ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource" => log_group_arn
+                }]
+              }
+            }
+          ]
+
+          if secret_arns.any?
+            policies << {
+              "PolicyName" => "SecretsAccess",
+              "PolicyDocument" => {
+                "Version" => "2012-10-17",
+                "Statement" => [{
+                  "Effect" => "Allow",
+                  "Action" => ["secretsmanager:GetSecretValue"],
+                  "Resource" => secret_arns
+                }]
+              }
+            }
+          end
+
+          policies
+        end
+
         def self.job_role(prefix, steps, tags, pipeline_name, secret_arns)
           s3_statements = collect_s3_statements(prefix, steps)
           log_group_arns = steps.map { |sname, _| "arn:aws:logs:*:*:log-group:#{prefix}-logs-#{sname}:*" }
