@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    turbofan (0.4.3)
+    turbofan (0.4.4)
       aws-sdk-batch (~> 1)
       aws-sdk-cloudformation (~> 1)
       aws-sdk-cloudwatch (~> 1)

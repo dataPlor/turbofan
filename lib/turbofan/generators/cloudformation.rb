@@ -71,10 +71,11 @@ module Turbofan
             cpu_units = (sclass.turbofan_default_cpu * 1024).to_i.to_s
             memory_mb = (sclass.turbofan_default_ram * 1024).to_i.to_s
             resources.merge!(fargate_step_resources(
-              prefix: prefix, step_name: sname, image_uri: image_uri,
-              cpu_units: cpu_units, memory_mb: memory_mb,
+              prefix: prefix, step_name: sname, step_class: sclass,
+              image_uri: image_uri, cpu_units: cpu_units, memory_mb: memory_mb,
               storage_gib: sclass.turbofan_storage,
-              tags: step_tags, log_group_ref: {"Ref" => log_group_key}
+              tags: step_tags, log_group_ref: {"Ref" => log_group_key},
+              pipeline_name: pipeline_name, resources: @resources
             ))
           elsif sclass.turbofan_lambda?
             # Lambda function with container image from ECR
@@ -267,15 +268,15 @@ end
         @steps.filter_map { |sname, sclass| sname if sclass.turbofan_fargate? }
       end
 
-      def fargate_step_resources(prefix:, step_name:, image_uri:, cpu_units:, memory_mb:, storage_gib: nil, tags:, log_group_ref:)
+      def fargate_step_resources(prefix:, step_name:, step_class:, image_uri:, cpu_units:, memory_mb:, storage_gib: nil, tags:, log_group_ref:, pipeline_name:, resources: {})
         task_def_name = "FargateTaskDef#{Naming.pascal_case(step_name)}"
         exec_role_name = "FargateExecRole#{Naming.pascal_case(step_name)}"
         task_role_name = "FargateTaskRole#{Naming.pascal_case(step_name)}"
 
-        resources = {}
+        result = {}
 
         # Shared Fargate cluster (only created once)
-        resources["FargateCluster"] ||= {
+        result["FargateCluster"] ||= {
           "Type" => "AWS::ECS::Cluster",
           "Properties" => {
             "ClusterName" => "#{prefix}-fargate-cluster",
@@ -285,7 +286,7 @@ end
         }
 
         # Execution role (pull images, send logs)
-        resources[exec_role_name] = {
+        result[exec_role_name] = {
           "Type" => "AWS::IAM::Role",
           "Properties" => {
             "RoleName" => Naming.iam_role_name("#{prefix}-fargate-exec-#{step_name}"),
@@ -306,8 +307,64 @@ end
           }
         }
 
-        # Task role (app permissions — S3 access)
-        resources[task_role_name] = {
+        # Task role — same permissions as Batch JobRole: S3, metrics, logs, secrets
+        secret_arns = Iam.send(:collect_secret_arns, {step_name.to_sym => step_class}, resources)
+        log_group_arn = "arn:aws:logs:*:*:log-group:#{prefix}-logs-#{step_name}:*"
+
+        task_policies = [
+          {
+            "PolicyName" => "S3Access",
+            "PolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => Iam.send(:collect_s3_statements, prefix, {step_name.to_sym => step_class})
+            }
+          },
+          {
+            "PolicyName" => "CloudWatchMetrics",
+            "PolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => [
+                {
+                  "Effect" => "Allow",
+                  "Action" => ["cloudwatch:PutMetricData"],
+                  "Resource" => "*",
+                  "Condition" => {"StringEquals" => {"cloudwatch:namespace" => "Turbofan/#{pipeline_name}"}}
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName" => "CloudWatchLogs",
+            "PolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => [
+                {
+                  "Effect" => "Allow",
+                  "Action" => ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  "Resource" => log_group_arn
+                }
+              ]
+            }
+          }
+        ]
+
+        if secret_arns.any?
+          task_policies << {
+            "PolicyName" => "SecretsAccess",
+            "PolicyDocument" => {
+              "Version" => "2012-10-17",
+              "Statement" => [
+                {
+                  "Effect" => "Allow",
+                  "Action" => ["secretsmanager:GetSecretValue"],
+                  "Resource" => secret_arns
+                }
+              ]
+            }
+          }
+        end
+
+        result[task_role_name] = {
           "Type" => "AWS::IAM::Role",
           "Properties" => {
             "RoleName" => Naming.iam_role_name("#{prefix}-fargate-task-#{step_name}"),
@@ -322,21 +379,7 @@ end
                 }
               ]
             },
-            "Policies" => [
-              {
-                "PolicyName" => "S3Access",
-                "PolicyDocument" => {
-                  "Version" => "2012-10-17",
-                  "Statement" => [
-                    {
-                      "Effect" => "Allow",
-                      "Action" => ["s3:GetObject", "s3:PutObject"],
-                      "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
-                    }
-                  ]
-                }
-              }
-            ]
+            "Policies" => task_policies
           }
         }
 
@@ -371,12 +414,12 @@ end
         }
         task_def_props["EphemeralStorage"] = {"SizeInGiB" => storage_gib} if storage_gib
 
-        resources[task_def_name] = {
+        result[task_def_name] = {
           "Type" => "AWS::ECS::TaskDefinition",
           "Properties" => task_def_props
         }
 
-        resources
+        result
       end
 
       def lambda_step_names

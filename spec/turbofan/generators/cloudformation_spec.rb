@@ -898,6 +898,44 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       end
     end
 
+    it "includes SecretsAccess policy on task role when step has secrets" do
+      step_with_secret = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        cpu 2
+        ram 4
+        subnets ["subnet-fg1"]
+        security_groups ["sg-fg1"]
+        secret :db_url, from: "arn:aws:secretsmanager:us-east-1:123:secret:my-secret"
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("SecretTask", step_with_secret)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-secrets-test"
+        pipeline do
+          secret_task(trigger_input)
+        end
+      end
+      gen = described_class.new(pipeline: pipeline, steps: {secret_task: step_with_secret}, stage: "production", config: {})
+      template = gen.generate
+      task_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskRole") }
+      policies = template["Resources"][task_role_key]["Properties"]["Policies"]
+      secrets_policy = policies.find { |p| p["PolicyName"] == "SecretsAccess" }
+      expect(secrets_policy).not_to be_nil, "FargateTaskRole must include SecretsAccess when step has inject_secret"
+      statement = secrets_policy["PolicyDocument"]["Statement"].first
+      expect(statement["Action"]).to include("secretsmanager:GetSecretValue")
+    end
+
+    it "includes CloudWatchMetrics and CloudWatchLogs policies on task role" do
+      template = fargate_generator.generate
+      task_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskRole") }
+      policies = template["Resources"][task_role_key]["Properties"]["Policies"]
+      policy_names = policies.map { |p| p["PolicyName"] }
+      expect(policy_names).to include("S3Access", "CloudWatchMetrics", "CloudWatchLogs")
+    end
+
     it "resolves awslogs-region via Ref (not literal ${AWS::Region})" do
       template = fargate_generator.generate
       task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }
