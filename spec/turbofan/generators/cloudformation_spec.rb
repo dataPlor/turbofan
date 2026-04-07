@@ -928,6 +928,39 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(statement["Action"]).to include("secretsmanager:GetSecretValue")
     end
 
+    it "includes uses/writes_to S3 ARNs in task role S3Access policy" do
+      step_with_s3 = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        cpu 2
+        ram 4
+        subnets ["subnet-fg1"]
+        security_groups ["sg-fg1"]
+        uses "s3://dataplor-data-east/gkey_map/"
+        writes_to "s3://dataplor-visitation/exports/"
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("S3Task", step_with_s3)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-s3-test"
+        pipeline do
+          s3_task(trigger_input)
+        end
+      end
+      gen = described_class.new(pipeline: pipeline, steps: {s3_task: step_with_s3}, stage: "production", config: {})
+      template = gen.generate
+      task_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskRole") }
+      policies = template["Resources"][task_role_key]["Properties"]["Policies"]
+      s3_policy = policies.find { |p| p["PolicyName"] == "S3Access" }
+      all_resources = s3_policy["PolicyDocument"]["Statement"].flat_map { |s| Array(s["Resource"]) }
+      expect(all_resources.any? { |r| r.include?("dataplor-data-east") }).to be(true),
+        "FargateTaskRole S3Access must include uses S3 URI (dataplor-data-east)"
+      expect(all_resources.any? { |r| r.include?("dataplor-visitation") }).to be(true),
+        "FargateTaskRole S3Access must include writes_to S3 URI (dataplor-visitation)"
+    end
+
     it "includes CloudWatchMetrics and CloudWatchLogs policies on task role" do
       template = fargate_generator.generate
       task_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskRole") }
