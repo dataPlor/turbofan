@@ -345,6 +345,10 @@ end
           "Family" => "#{prefix}-taskdef-#{step_name}",
           "NetworkMode" => "awsvpc",
           "RequiresCompatibilities" => ["FARGATE"],
+          "RuntimePlatform" => {
+            "CpuArchitecture" => "ARM64",
+            "OperatingSystemFamily" => "LINUX"
+          },
           "Cpu" => cpu_units,
           "Memory" => memory_mb,
           "ExecutionRoleArn" => {"Fn::GetAtt" => [exec_role_name, "Arn"]},

@@ -898,6 +898,16 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       end
     end
 
+    it "sets RuntimePlatform to ARM64/LINUX on task definition" do
+      template = fargate_generator.generate
+      task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }
+      props = template["Resources"][task_def_key]["Properties"]
+      expect(props["RuntimePlatform"]).to eq({
+        "CpuArchitecture" => "ARM64",
+        "OperatingSystemFamily" => "LINUX"
+      })
+    end
+
     it "uses array-of-objects tag format on IAM roles (not flat hash)" do
       template = fargate_generator.generate
       exec_role_key = template["Resources"].keys.find { |k| k.start_with?("FargateExecRole") }
