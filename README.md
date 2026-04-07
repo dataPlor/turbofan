@@ -741,79 +741,117 @@ class ValidatePlaces
 end
 ```
 
-#### DSL Methods
+#### Common DSL Methods
+
+These methods work on all execution models:
 
 | Method | Required | Default | Description |
 |--------|----------|---------|-------------|
-| `execution(model)` | Yes | — | Execution model: `:batch`, `:lambda`, or `:fargate`. Determines how the step runs — as a Batch job, Lambda function, or Fargate task. See [Execution Models](#execution-models) below. |
-| `compute_environment(symbol)` | Yes | — | Symbol referencing a compute environment (e.g., `:compute_bound_with_nvme`). Resolved to a class via `ComputeEnvironment.resolve(sym)` at check/deploy time. |
-| `cpu(value)` | Yes* | — | vCPU count. Required for `:batch` and `:fargate` (unless `size` is used). Ignored for `:lambda`. |
-| `ram(value)` | Yes* | — | Memory in GB. Required for all execution models (unless `size` is used). For `:lambda`, max 10 GB. Framework converts to MB for Lambda/Fargate configs. |
+| `execution(model)` | Yes | — | `:batch`, `:lambda`, or `:fargate`. Determines how the step runs. See execution model sections below. |
 | `input_schema(filename)` | Yes | — | JSON Schema filename relative to `turbofans/schemas/`. |
 | `output_schema(filename)` | Yes | — | JSON Schema filename for output validation. |
-| `size(name, cpu:, ram:)` | No | `{}` | Named size profile. Can be called multiple times. Each generates a separate Batch job definition and queue. Mutually exclusive with top-level `cpu`/`ram` (use one or the other). |
-| `timeout(seconds)` | No | `3600` | Batch job timeout in seconds. |
-| `retries(count, on: nil)` | No | `3` | Number of retry attempts on failure. When `on:` is nil (default), retries are handled at the Batch level for all failures. When `on:` is an array of Step Functions error names (e.g., `["States.TaskFailed", "States.Timeout"]`), a Step Functions `Retry` field is generated with the specified error types. Retries are always automatic for host EC2 termination, exit code 143 (SIGTERM), and task startup failures. |
-| `uses(target, extensions: nil)` | No | `[]` | Declares a dependency with **read-only / minimum** permissions. Accepts a Symbol (resource key) or an S3 URI string. For Postgres resources, sets up a readonly DuckDB `ATTACH`. For S3 URIs, generates read-only IAM policies. `:duckdb` is a reserved built-in key (DuckDB is automatically available when other resources are declared). When `target` is `:duckdb`, accepts an optional `extensions:` array (e.g., `extensions: [:spatial, :h3]`) — these are pre-downloaded into the Docker image at build time and auto-loaded into the DuckDB connection at runtime (no internet required). Can be called multiple times; extensions accumulate across calls. |
-| `reads_from(target)` | No | — | Alias for `uses`. Use when you want to be explicit about read intent. |
-| `writes_to(target)` | No | `[]` | Declares a dependency with **read+write** permissions. Same argument types as `uses`. For Postgres resources, sets up a read-write DuckDB `ATTACH`. For S3 URIs, generates read+write IAM policies. |
-| `inject_secret(name, from:)` | No | `[]` | Inline secret injected as an environment variable. `name` is the env var name, `from:` is a Secrets Manager ARN. (Alias: `secret` is accepted for backward compatibility.) |
+| `timeout(seconds)` | No | `3600` | Step timeout in seconds. |
+| `retries(count, on: nil)` | No | `3` | Retry attempts. When `on:` is nil, retries at the Batch level. When `on:` is an array of Step Functions error names (e.g., `["States.TaskFailed"]`), generates a Step Functions `Retry`. |
+| `uses(target, extensions: nil)` | No | `[]` | Read-only dependency. Symbol (resource key) or S3 URI string. `:duckdb` accepts `extensions:` array. |
+| `reads_from(target)` | No | — | Alias for `uses`. |
+| `writes_to(target)` | No | `[]` | Read-write dependency. Same argument types as `uses`. |
+| `inject_secret(name, from:)` | No | `[]` | Secrets Manager env var. `name` is the env var, `from:` is the ARN. |
 | `tags(hash)` | No | `{}` | Custom tags merged with pipeline tags. |
-| `docker_image(uri)` | No | `nil` | ECR URI for a pre-built external container. When set, Turbofan skips the Docker build for this step. |
+| `docker_image(uri)` | No | `nil` | External ECR image. Turbofan skips the Docker build for this step. |
 
 #### Execution Models
 
-Every step declares how it runs via `execution`:
+Every step declares how it runs via `execution`. All three models use the same Docker image, same `call(inputs, context)` contract, and same S3 interchange. The framework handles infrastructure differences at deploy time.
 
 | Model | Infrastructure | Startup | Max Duration | Max Memory | Use When |
 |-------|---------------|---------|-------------|-----------|----------|
 | `:batch` | EC2 Spot via Batch | 2-3 min | Unlimited | Instance-limited | Fan-out, long-running jobs, NVMe needed |
 | `:lambda` | Lambda (container image) | <5 sec | 15 min | 10 GB | Short preprocessing, filters, enrichment |
-| `:fargate` | Fargate | 30-60 sec | Unlimited | 30 GB | Medium jobs, predictable startup, no spot interruptions |
+| `:fargate` | ECS Fargate | 30-60 sec | Unlimited | 120 GB | Medium jobs, predictable startup, VPC access |
 
-All three use the same Docker image (ECR), same `call(inputs, context)` contract, and same S3 interchange. The framework handles infrastructure differences at deploy time.
+#### `execution :batch`
+
+Runs as an AWS Batch job on EC2 Spot instances. The only execution model that supports `fan_out`.
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `compute_environment(sym)` | **Yes** | Provides the Batch compute environment, job queue, and EC2 networking. |
+| `cpu(value)` | **Yes*** | vCPU count for the Batch job definition. |
+| `ram(value)` | **Yes*** | Memory in GB for the Batch job definition. |
+| `size(name, cpu:, ram:, batch_size:)` | No | Named size profile. Each generates a separate job definition. Mutually exclusive with top-level `cpu`/`ram`. |
+| `batch_size(value)` | No | Items per Batch array job for fan-out. Default: `1`. |
+
+\* Either `cpu`+`ram` or `size` must be declared.
+
+`subnets`, `security_groups`, and `storage` are **not allowed** on Batch steps — networking comes from the compute environment.
 
 ```ruby
-# Batch: fan-out, long-running
 class ProcessPartitions
   include Turbofan::Step
   execution :batch
   compute_environment :compute_bound
   cpu 4
   ram 8
-  # ...
+  batch_size 500
+  input_schema "process_input.json"
+  output_schema "process_output.json"
 end
+```
 
-# Lambda: fast preprocessing
+#### `execution :lambda`
+
+Runs as an AWS Lambda function using a container image. Lambda CPU scales implicitly with memory — you only declare `ram`.
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `compute_environment(sym)` | **Yes** | Required for deployment. |
+| `ram(value)` | **Yes** | Memory in GB (max 10). Sets Lambda `MemorySize`. CPU scales proportionally. |
+
+`cpu`, `subnets`, `security_groups`, `storage`, `size`, and `batch_size` are **not allowed** on Lambda steps. Lambda has 10 GB ephemeral storage (hardcoded). Max duration is 15 minutes. Does not support `fan_out`.
+
+Turbofan automatically wraps your Docker image with `aws_lambda_ric` at build time — no Dockerfile changes needed. The same Dockerfile works for all execution models.
+
+```ruby
 class FilterGkeys
   include Turbofan::Step
   execution :lambda
   compute_environment :compute_bound
   ram 4
-  # cpu is ignored for Lambda (scales with ram)
-  # ...
-end
-
-# Fargate: predictable execution
-class ExportResults
-  include Turbofan::Step
-  execution :fargate
-  compute_environment :compute_bound
-  cpu 2
-  ram 4
-  # ...
+  input_schema "filter_input.json"
+  output_schema "filter_output.json"
 end
 ```
 
-**Constraints:**
-- `fan_out` only works with `execution :batch` (Batch array jobs)
-- `:lambda` requires `ram`, ignores `cpu` (Lambda scales CPU with memory)
-- `:lambda` max `ram` is 10 GB
-- `:fargate` requires both `cpu` and `ram`
-- `:lambda` steps are automatically wrapped with `aws_lambda_ric` at build time — no Dockerfile changes needed
-- `:fargate` creates a shared ECS cluster per pipeline with FARGATE + FARGATE_SPOT capacity providers
+#### `execution :fargate`
 
-**Lambda image wrapping:** When you declare `execution :lambda`, `turbofan deploy` builds your Docker image normally from your Dockerfile, then automatically applies a second build stage that installs `aws_lambda_ric` and sets the Lambda entrypoint. Your Dockerfile stays execution-model-agnostic — the same Dockerfile works for `:batch`, `:lambda`, and `:fargate`. No manual RIC installation needed.
+Runs as an ECS Fargate task. Resources are provisioned directly — no Batch compute environment needed.
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `compute_environment(sym)` | No | Optional. Only used as networking fallback if `subnets`/`security_groups` are not set. |
+| `cpu(value)` | **Yes** | vCPU count. Converted to Fargate CPU units (`cpu * 1024`). |
+| `ram(value)` | **Yes** | Memory in GB. Converted to MB (`ram * 1024`). Must be a [valid Fargate CPU/memory combination](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html). |
+| `subnets(value)` | No | VPC subnet IDs. Falls back to CE, then `Turbofan.config.subnets`. |
+| `security_groups(value)` | No | Security group IDs. Falls back to CE, then `Turbofan.config.security_groups`. |
+| `storage(value)` | No | ECS ephemeral storage in GiB (21-200). Default is 20 GiB (ECS default). Maps to `EphemeralStorage.SizeInGiB` on the TaskDefinition. |
+
+`size`, `batch_size` are **not allowed**. Does not support `fan_out`. Creates a shared ECS cluster per pipeline with FARGATE + FARGATE_SPOT capacity providers.
+
+**Networking priority:** step-level `subnets`/`security_groups` > compute environment > `Turbofan.config.subnets`/`Turbofan.config.security_groups`.
+
+```ruby
+class LoadObservations
+  include Turbofan::Step
+  execution :fargate
+  cpu 2
+  ram 8
+  storage 100
+  subnets ["subnet-abc123", "subnet-def456"]
+  security_groups ["sg-xxx"]
+  input_schema "load_input.json"
+  output_schema "load_output.json"
+end
+```
 
 #### The `call` Method
 
@@ -851,7 +889,7 @@ External containers must implement the S3 data protocol directly:
 
 #### Reader Attributes
 
-`turbofan_uses`, `turbofan_writes_to`, `turbofan_resource_keys`, `turbofan_needs_duckdb?`, `turbofan_duckdb_extensions`, `turbofan_secrets`, `turbofan_sizes`, `turbofan_timeout`, `turbofan_retries`, `turbofan_retry_on`, `turbofan_default_cpu`, `turbofan_default_ram`, `turbofan_compute_environment`, `turbofan_input_schema_file`, `turbofan_output_schema_file`, `turbofan_input_schema`, `turbofan_output_schema`, `turbofan_tags`, `turbofan_docker_image`
+`turbofan_uses`, `turbofan_writes_to`, `turbofan_resource_keys`, `turbofan_needs_duckdb?`, `turbofan_duckdb_extensions`, `turbofan_secrets`, `turbofan_sizes`, `turbofan_timeout`, `turbofan_retries`, `turbofan_retry_on`, `turbofan_default_cpu`, `turbofan_default_ram`, `turbofan_compute_environment`, `turbofan_subnets`, `turbofan_security_groups`, `turbofan_storage`, `resolved_subnets`, `resolved_security_groups`, `turbofan_input_schema_file`, `turbofan_output_schema_file`, `turbofan_input_schema`, `turbofan_output_schema`, `turbofan_tags`, `turbofan_docker_image`
 
 #### `turbofan_external?`
 

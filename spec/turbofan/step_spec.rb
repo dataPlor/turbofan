@@ -1017,4 +1017,205 @@ RSpec.describe Turbofan::Step do
       expect(klass.turbofan_fargate?).to be false
     end
   end
+
+  describe "subnets" do
+    it "stores subnets as array on Fargate step" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        subnets ["subnet-abc", "subnet-def"]
+      end
+      expect(klass.turbofan_subnets).to eq(["subnet-abc", "subnet-def"])
+    end
+
+    it "wraps a single value in an array" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        subnets "subnet-abc"
+      end
+      expect(klass.turbofan_subnets).to eq(["subnet-abc"])
+    end
+
+    it "defaults to nil" do
+      klass = Class.new { include Turbofan::Step }
+      expect(klass.turbofan_subnets).to be_nil
+    end
+
+    it "raises on Batch step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :batch
+          subnets ["subnet-abc"]
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "raises on Lambda step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :lambda
+          subnets ["subnet-abc"]
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "resolved_subnets returns step-level when set" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        subnets ["subnet-step"]
+      end
+      expect(klass.resolved_subnets).to eq(["subnet-step"])
+    end
+
+    it "resolved_subnets falls back to Turbofan.config" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+      end
+      allow(Turbofan.config).to receive(:subnets).and_return(["subnet-config"])
+      expect(klass.resolved_subnets).to eq(["subnet-config"])
+    end
+  end
+
+  describe "security_groups" do
+    it "stores security_groups as array on Fargate step" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        security_groups ["sg-abc"]
+      end
+      expect(klass.turbofan_security_groups).to eq(["sg-abc"])
+    end
+
+    it "defaults to nil" do
+      klass = Class.new { include Turbofan::Step }
+      expect(klass.turbofan_security_groups).to be_nil
+    end
+
+    it "raises on Batch step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :batch
+          security_groups ["sg-abc"]
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "raises on Lambda step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :lambda
+          security_groups ["sg-abc"]
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "resolved_security_groups returns step-level when set" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        security_groups ["sg-step"]
+      end
+      expect(klass.resolved_security_groups).to eq(["sg-step"])
+    end
+
+    it "resolved_security_groups falls back to Turbofan.config" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+      end
+      allow(Turbofan.config).to receive(:security_groups).and_return(["sg-config"])
+      expect(klass.resolved_security_groups).to eq(["sg-config"])
+    end
+  end
+
+  describe "storage" do
+    it "stores storage value on Fargate step" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        storage 100
+      end
+      expect(klass.turbofan_storage).to eq(100)
+    end
+
+    it "defaults to nil" do
+      klass = Class.new { include Turbofan::Step }
+      expect(klass.turbofan_storage).to be_nil
+    end
+
+    it "raises on Batch step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :batch
+          storage 50
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "raises on Lambda step" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :lambda
+          storage 50
+        end
+      }.to raise_error(ArgumentError, /only valid for execution :fargate/)
+    end
+
+    it "raises for value below 21" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :fargate
+          storage 20
+        end
+      }.to raise_error(ArgumentError, /between 21 and 200/)
+    end
+
+    it "raises for value above 200" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :fargate
+          storage 201
+        end
+      }.to raise_error(ArgumentError, /between 21 and 200/)
+    end
+
+    it "raises for non-integer" do
+      expect {
+        Class.new do
+          include Turbofan::Step
+          execution :fargate
+          storage 50.5
+        end
+      }.to raise_error(ArgumentError, /between 21 and 200/)
+    end
+
+    it "accepts boundary value 21" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        storage 21
+      end
+      expect(klass.turbofan_storage).to eq(21)
+    end
+
+    it "accepts boundary value 200" do
+      klass = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        storage 200
+      end
+      expect(klass.turbofan_storage).to eq(200)
+    end
+  end
 end

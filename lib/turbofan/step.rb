@@ -19,6 +19,9 @@ module Turbofan
       base.instance_variable_set(:@turbofan_execution, nil)
       base.instance_variable_set(:@turbofan_docker_image, nil)
       base.instance_variable_set(:@turbofan_duckdb_extensions, [])
+      base.instance_variable_set(:@turbofan_subnets, nil)
+      base.instance_variable_set(:@turbofan_security_groups, nil)
+      base.instance_variable_set(:@turbofan_storage, nil)
     end
 
     module ClassMethods
@@ -30,7 +33,8 @@ module Turbofan
         :turbofan_compute_environment,
         :turbofan_input_schema_file, :turbofan_output_schema_file,
         :turbofan_tags, :turbofan_docker_image,
-        :turbofan_duckdb_extensions
+        :turbofan_duckdb_extensions,
+        :turbofan_subnets, :turbofan_security_groups, :turbofan_storage
 
       def input_schema(filename)
         @turbofan_input_schema_file = filename
@@ -155,6 +159,38 @@ module Turbofan
       def compute_environment(sym)
         raise ArgumentError, "compute_environment must be a Symbol, got #{sym.class}" unless sym.is_a?(Symbol)
         @turbofan_compute_environment = sym
+      end
+
+      def subnets(value)
+        if @turbofan_execution && @turbofan_execution != :fargate
+          raise ArgumentError, "subnets is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+        end
+        @turbofan_subnets = Array(value)
+      end
+
+      def security_groups(value)
+        if @turbofan_execution && @turbofan_execution != :fargate
+          raise ArgumentError, "security_groups is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+        end
+        @turbofan_security_groups = Array(value)
+      end
+
+      def storage(value)
+        if @turbofan_execution && @turbofan_execution != :fargate
+          raise ArgumentError, "storage is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+        end
+        unless value.is_a?(Integer) && value >= 21 && value <= 200
+          raise ArgumentError, "storage must be an integer between 21 and 200 (GiB), got #{value.inspect}"
+        end
+        @turbofan_storage = value
+      end
+
+      def resolved_subnets
+        @turbofan_subnets || Turbofan.config.subnets
+      end
+
+      def resolved_security_groups
+        @turbofan_security_groups || Turbofan.config.security_groups
       end
 
       # Resource keys from both uses and writes_to (symbols only, no S3)

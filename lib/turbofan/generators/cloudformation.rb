@@ -62,12 +62,6 @@ module Turbofan
 
           log_group_key = "LogGroup#{Naming.pascal_case(sname)}"
 
-          # Resolve CE for this step
-          ce_sym = sclass.turbofan_compute_environment || @pipeline.turbofan_compute_environment
-          raise "No compute_environment resolved for step :#{sname}. Declare compute_environment on the step or pipeline." unless ce_sym
-          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
-          ce_ref = {"Fn::ImportValue" => ce_class.export_name(@stage)}
-
           # Check if this step uses consumable resources
           consumable_resource_refs = find_consumable_resource_refs(sclass, prefix)
 
@@ -79,6 +73,7 @@ module Turbofan
             resources.merge!(fargate_step_resources(
               prefix: prefix, step_name: sname, image_uri: image_uri,
               cpu_units: cpu_units, memory_mb: memory_mb,
+              storage_gib: sclass.turbofan_storage,
               tags: step_tags, log_group_ref: {"Ref" => log_group_key}
             ))
           elsif sclass.turbofan_lambda?
@@ -92,6 +87,11 @@ module Turbofan
               tags: step_tags, log_group_ref: {"Ref" => log_group_key}
             ))
           else
+            # Batch: resolve CE (required for job queue)
+            ce_sym = sclass.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+            raise "No compute_environment resolved for step :#{sname}. Declare compute_environment on the step or pipeline." unless ce_sym
+            Turbofan::ComputeEnvironment.resolve(ce_sym)
+
             # Batch job definitions (one per size, or one if unsized)
             sizes = sclass.turbofan_sizes.any? ? sclass.turbofan_sizes : {nil => nil}
             sizes.each do |size_name, size_config|
@@ -267,7 +267,7 @@ end
         @steps.filter_map { |sname, sclass| sname if sclass.turbofan_fargate? }
       end
 
-      def fargate_step_resources(prefix:, step_name:, image_uri:, cpu_units:, memory_mb:, tags:, log_group_ref:)
+      def fargate_step_resources(prefix:, step_name:, image_uri:, cpu_units:, memory_mb:, storage_gib: nil, tags:, log_group_ref:)
         task_def_name = "FargateTaskDef#{Naming.pascal_case(step_name)}"
         exec_role_name = "FargateExecRole#{Naming.pascal_case(step_name)}"
         task_role_name = "FargateTaskRole#{Naming.pascal_case(step_name)}"
@@ -341,32 +341,35 @@ end
         }
 
         # Task definition
-        resources[task_def_name] = {
-          "Type" => "AWS::ECS::TaskDefinition",
-          "Properties" => {
-            "Family" => "#{prefix}-taskdef-#{step_name}",
-            "NetworkMode" => "awsvpc",
-            "RequiresCompatibilities" => ["FARGATE"],
-            "Cpu" => cpu_units,
-            "Memory" => memory_mb,
-            "ExecutionRoleArn" => {"Fn::GetAtt" => [exec_role_name, "Arn"]},
-            "TaskRoleArn" => {"Fn::GetAtt" => [task_role_name, "Arn"]},
-            "ContainerDefinitions" => [
-              {
-                "Name" => "worker",
-                "Image" => image_uri,
-                "Essential" => true,
-                "LogConfiguration" => {
-                  "LogDriver" => "awslogs",
-                  "Options" => {
-                    "awslogs-group" => log_group_ref,
-                    "awslogs-region" => "${AWS::Region}",
-                    "awslogs-stream-prefix" => "fargate"
-                  }
+        task_def_props = {
+          "Family" => "#{prefix}-taskdef-#{step_name}",
+          "NetworkMode" => "awsvpc",
+          "RequiresCompatibilities" => ["FARGATE"],
+          "Cpu" => cpu_units,
+          "Memory" => memory_mb,
+          "ExecutionRoleArn" => {"Fn::GetAtt" => [exec_role_name, "Arn"]},
+          "TaskRoleArn" => {"Fn::GetAtt" => [task_role_name, "Arn"]},
+          "ContainerDefinitions" => [
+            {
+              "Name" => "worker",
+              "Image" => image_uri,
+              "Essential" => true,
+              "LogConfiguration" => {
+                "LogDriver" => "awslogs",
+                "Options" => {
+                  "awslogs-group" => log_group_ref,
+                  "awslogs-region" => "${AWS::Region}",
+                  "awslogs-stream-prefix" => "fargate"
                 }
               }
-            ]
-          }
+            }
+          ]
+        }
+        task_def_props["EphemeralStorage"] = {"SizeInGiB" => storage_gib} if storage_gib
+
+        resources[task_def_name] = {
+          "Type" => "AWS::ECS::TaskDefinition",
+          "Properties" => task_def_props
         }
 
         resources

@@ -53,6 +53,16 @@ module Turbofan
           end
 
           case step_class.turbofan_execution
+          when :batch
+            if step_class.turbofan_subnets
+              errors << "Step :#{step_name} (execution :batch) declares subnets but Batch networking comes from the compute environment"
+            end
+            if step_class.turbofan_security_groups
+              errors << "Step :#{step_name} (execution :batch) declares security_groups but Batch networking comes from the compute environment"
+            end
+            if step_class.turbofan_storage
+              errors << "Step :#{step_name} (execution :batch) declares storage but storage is only valid for :fargate steps"
+            end
           when :lambda
             unless step_class.turbofan_default_ram
               errors << "Step :#{step_name} (execution :lambda) requires `ram` declaration"
@@ -65,6 +75,15 @@ module Turbofan
             end
             if step_class.turbofan_sizes.any?
               warnings << "Step :#{step_name} (execution :lambda) declares sizes but sizes are only used with execution :batch fan-out"
+            end
+            if step_class.turbofan_subnets
+              errors << "Step :#{step_name} (execution :lambda) declares subnets but Lambda steps do not support VPC networking via the Step DSL"
+            end
+            if step_class.turbofan_security_groups
+              errors << "Step :#{step_name} (execution :lambda) declares security_groups but Lambda steps do not support VPC networking via the Step DSL"
+            end
+            if step_class.turbofan_storage
+              errors << "Step :#{step_name} (execution :lambda) declares storage but storage is only valid for :fargate steps"
             end
           when :fargate
             unless step_class.turbofan_default_cpu
@@ -146,15 +165,26 @@ module Turbofan
 
       def self.validate_steps(steps, errors)
         steps.each do |step_name, step_class|
-          unless step_class.turbofan_compute_environment
-            errors << "Step :#{step_name} has no compute_environment (must be set on each step)"
-          end
+          if step_class.turbofan_fargate?
+            # Fargate: CE is optional (networking comes from step-level or Turbofan.config)
+            if step_class.turbofan_compute_environment
+              begin
+                Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
+              rescue ArgumentError => e
+                errors << "Step :#{step_name}: #{e.message}"
+              end
+            end
+          else
+            unless step_class.turbofan_compute_environment
+              errors << "Step :#{step_name} has no compute_environment (must be set on each step)"
+            end
 
-          if step_class.turbofan_compute_environment
-            begin
-              Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
-            rescue ArgumentError => e
-              errors << "Step :#{step_name}: #{e.message}"
+            if step_class.turbofan_compute_environment
+              begin
+                Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
+              rescue ArgumentError => e
+                errors << "Step :#{step_name}: #{e.message}"
+              end
             end
           end
 

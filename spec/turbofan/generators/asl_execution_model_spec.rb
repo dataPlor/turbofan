@@ -213,4 +213,113 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(asl["States"]["export"]["Next"]).to eq("NotifySuccess")
     end
   end
+
+  describe "fargate networking resolution" do
+    it "uses step-level subnets/security_groups when set" do
+      ce_class
+      step = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        cpu 1
+        ram 2
+        subnets ["subnet-step"]
+        security_groups ["sg-step"]
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("RunTask", step)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-step-net"
+        pipeline do
+          run_task(trigger_input)
+        end
+      end
+      asl = described_class.new(pipeline: pipeline, stage: "production", steps: {run_task: step}).generate
+      network = asl["States"]["run_task"].dig("Parameters", "NetworkConfiguration", "AwsvpcConfiguration")
+      expect(network["Subnets"]).to eq(["subnet-step"])
+      expect(network["SecurityGroups"]).to eq(["sg-step"])
+    end
+
+    it "falls back to CE networking when step has no subnets/security_groups" do
+      ce = ce_class
+      allow(ce).to receive(:resolved_subnets).and_return(["subnet-ce"])
+      allow(ce).to receive(:resolved_security_groups).and_return(["sg-ce"])
+      step = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        compute_environment :test_ce
+        cpu 1
+        ram 2
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("RunTask", step)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-ce-net"
+        pipeline do
+          run_task(trigger_input)
+        end
+      end
+      asl = described_class.new(pipeline: pipeline, stage: "production", steps: {run_task: step}).generate
+      network = asl["States"]["run_task"].dig("Parameters", "NetworkConfiguration", "AwsvpcConfiguration")
+      expect(network["Subnets"]).to eq(["subnet-ce"])
+      expect(network["SecurityGroups"]).to eq(["sg-ce"])
+    end
+
+    it "falls back to Turbofan.config when no step subnets and no CE" do
+      allow(Turbofan.config).to receive(:subnets).and_return(["subnet-config"])
+      allow(Turbofan.config).to receive(:security_groups).and_return(["sg-config"])
+      step = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        cpu 1
+        ram 2
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("RunTask", step)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-config-net"
+        pipeline do
+          run_task(trigger_input)
+        end
+      end
+      asl = described_class.new(pipeline: pipeline, stage: "production", steps: {run_task: step}).generate
+      network = asl["States"]["run_task"].dig("Parameters", "NetworkConfiguration", "AwsvpcConfiguration")
+      expect(network["Subnets"]).to eq(["subnet-config"])
+      expect(network["SecurityGroups"]).to eq(["sg-config"])
+    end
+
+    it "step-level subnets override CE subnets" do
+      ce = ce_class
+      allow(ce).to receive(:resolved_subnets).and_return(["subnet-ce"])
+      allow(ce).to receive(:resolved_security_groups).and_return(["sg-ce"])
+      step = Class.new do
+        include Turbofan::Step
+        execution :fargate
+        compute_environment :test_ce
+        cpu 1
+        ram 2
+        subnets ["subnet-override"]
+        security_groups ["sg-override"]
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+      stub_const("RunTask", step)
+      pipeline = Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-override"
+        pipeline do
+          run_task(trigger_input)
+        end
+      end
+      asl = described_class.new(pipeline: pipeline, stage: "production", steps: {run_task: step}).generate
+      network = asl["States"]["run_task"].dig("Parameters", "NetworkConfiguration", "AwsvpcConfiguration")
+      expect(network["Subnets"]).to eq(["subnet-override"])
+      expect(network["SecurityGroups"]).to eq(["sg-override"])
+    end
+  end
 end

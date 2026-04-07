@@ -254,11 +254,22 @@ module Turbofan
             first: first, prev_step_name: prev_step_name,
             prev_step: prev_step, prev_step_names: prev_step_names)
 
-          # Resolve CE for networking
-          ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment
-          ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
-          subnets = ce_class.resolved_subnets
-          security_groups = ce_class.resolved_security_groups
+          # Networking priority: step-level > CE (backward compat) > Turbofan.config
+          subnets = if step_class.turbofan_subnets
+            step_class.turbofan_subnets
+          elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
+            Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_subnets
+          else
+            Turbofan.config.subnets
+          end
+
+          security_groups = if step_class.turbofan_security_groups
+            step_class.turbofan_security_groups
+          elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
+            Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_security_groups
+          else
+            Turbofan.config.security_groups
+          end
 
           state = {
             "Type" => "Task",

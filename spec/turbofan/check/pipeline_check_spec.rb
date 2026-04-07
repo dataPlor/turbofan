@@ -1346,6 +1346,191 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           expect(result.warnings.any? { |w| w.include?(":process") && w.include?("sizes") }).to be true
         end
       end
+
+      context "when :fargate step has no compute_environment" do
+        let(:step_class) do
+          Class.new do
+            include Turbofan::Step
+            execution :fargate
+            cpu 2
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "fargate-no-ce"
+          end
+        end
+
+        it "passes validation (CE is optional for Fargate)" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          ce_errors = result.errors.select { |e| e.include?("compute_environment") }
+          expect(ce_errors).to be_empty
+        end
+      end
+
+      context "when :batch step declares subnets" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :batch
+            compute_environment :check_ce
+            cpu 2
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_subnets, ["subnet-abc"]) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "batch-with-subnets"
+          end
+        end
+
+        it "errors that subnets are not valid for Batch" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("subnets") }).to be true
+        end
+      end
+
+      context "when :lambda step declares security_groups" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :lambda
+            compute_environment :check_ce
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_security_groups, ["sg-abc"]) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "lambda-with-sgs"
+          end
+        end
+
+        it "errors that security_groups are not valid for Lambda" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("security_groups") }).to be true
+        end
+      end
+
+      context "when :lambda step declares subnets" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :lambda
+            compute_environment :check_ce
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_subnets, ["subnet-abc"]) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "lambda-with-subnets"
+          end
+        end
+
+        it "errors that subnets are not valid for Lambda" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("subnets") }).to be true
+        end
+      end
+
+      context "when :batch step declares security_groups" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :batch
+            compute_environment :check_ce
+            cpu 2
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_security_groups, ["sg-abc"]) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "batch-with-sgs"
+          end
+        end
+
+        it "errors that security_groups are not valid for Batch" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("security_groups") }).to be true
+        end
+      end
+
+      context "when :lambda step declares storage" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :lambda
+            compute_environment :check_ce
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_storage, 50) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "lambda-with-storage"
+          end
+        end
+
+        it "errors that storage is not valid for Lambda" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("storage") }).to be true
+        end
+      end
+
+      context "when :batch step declares storage" do
+        let(:step_class) do
+          ce = ce_class
+          Class.new do
+            include Turbofan::Step
+            execution :batch
+            compute_environment :check_ce
+            cpu 2
+            ram 4
+            input_schema "passthrough.json"
+            output_schema "passthrough.json"
+          end.tap { |k| k.instance_variable_set(:@turbofan_storage, 50) }
+        end
+
+        let(:pipeline_class) do
+          Class.new do
+            include Turbofan::Pipeline
+            pipeline_name "batch-with-storage"
+          end
+        end
+
+        it "errors that storage is not valid for Batch" do
+          result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
+          expect(result.errors.any? { |e| e.include?(":process") && e.include?("storage") }).to be true
+        end
+      end
     end
   end
 end

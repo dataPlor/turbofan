@@ -806,4 +806,96 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(result).to eq({"stack" => "turbofan", "env" => "production"})
     end
   end
+
+  describe "Fargate step CloudFormation generation" do
+    let(:fargate_step) do
+      Class.new do
+        include Turbofan::Step
+        execution :fargate
+        cpu 2
+        ram 4
+        subnets ["subnet-fg1"]
+        security_groups ["sg-fg1"]
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+    end
+
+    let(:fargate_pipeline) do
+      stub_const("RunTask", fargate_step)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "fargate-cfn-test"
+        pipeline do
+          run_task(trigger_input)
+        end
+      end
+    end
+
+    let(:fargate_generator) do
+      described_class.new(
+        pipeline: fargate_pipeline,
+        steps: {run_task: fargate_step},
+        stage: "production",
+        config: {}
+      )
+    end
+
+    it "generates a valid template without compute_environment" do
+      template = fargate_generator.generate
+      expect(template).to have_key("Resources")
+      task_def = template["Resources"].find { |k, _| k.start_with?("FargateTaskDef") }
+      expect(task_def).not_to be_nil
+    end
+
+    it "does not include EphemeralStorage when storage is not set" do
+      template = fargate_generator.generate
+      task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }
+      props = template["Resources"][task_def_key]["Properties"]
+      expect(props).not_to have_key("EphemeralStorage")
+    end
+
+    context "with storage set" do
+      let(:fargate_step_with_storage) do
+        Class.new do
+          include Turbofan::Step
+          execution :fargate
+          cpu 2
+          ram 4
+          storage 100
+          subnets ["subnet-fg1"]
+          security_groups ["sg-fg1"]
+          input_schema "passthrough.json"
+          output_schema "passthrough.json"
+        end
+      end
+
+      let(:fargate_storage_pipeline) do
+        stub_const("RunTask", fargate_step_with_storage)
+        Class.new do
+          include Turbofan::Pipeline
+          pipeline_name "fargate-storage-test"
+          pipeline do
+            run_task(trigger_input)
+          end
+        end
+      end
+
+      let(:fargate_storage_generator) do
+        described_class.new(
+          pipeline: fargate_storage_pipeline,
+          steps: {run_task: fargate_step_with_storage},
+          stage: "production",
+          config: {}
+        )
+      end
+
+      it "includes EphemeralStorage in TaskDefinition" do
+        template = fargate_storage_generator.generate
+        task_def_key = template["Resources"].keys.find { |k| k.start_with?("FargateTaskDef") }
+        props = template["Resources"][task_def_key]["Properties"]
+        expect(props["EphemeralStorage"]).to eq({"SizeInGiB" => 100})
+      end
+    end
+  end
 end
