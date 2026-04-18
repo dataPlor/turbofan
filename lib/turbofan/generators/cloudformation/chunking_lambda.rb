@@ -14,8 +14,6 @@ module Turbofan
         # Lambda-bundled copy.
         ROUTER_MODULE = File.read(File.expand_path("../../router.rb", __dir__))
 
-        LAMBDA_RUNTIME = "ruby3.3"
-
         SUBDIR = "chunking-lambda"
         LOGICAL_ID = "ChunkingLambda"
         ROLE_LOGICAL_ID = "ChunkingLambdaRole"
