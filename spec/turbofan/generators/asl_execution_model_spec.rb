@@ -138,6 +138,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       state = asl["States"]["export_results"]
       expect(state["Catch"].first["Next"]).to eq("NotifyFailure")
     end
+
+    it "includes turbofan:execution tag referencing the execution ID" do
+      state = asl["States"]["export_results"]
+      tags = state.dig("Parameters", "Tags")
+      expect(tags).to eq([{"Key" => "turbofan:execution", "Value.$" => "$$.Execution.Id"}])
+    end
   end
 
   describe "mixed pipeline with :batch, :lambda, and :fargate steps" do

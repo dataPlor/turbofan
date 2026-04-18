@@ -13,13 +13,20 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     ).generate
   end
 
+  let(:step_dirs) do
+    {
+      score_items: File.expand_path("../../../fixtures/integration/steps/score_items", __dir__)
+    }
+  end
+
   let(:cfn) do
     Turbofan::Generators::CloudFormation.new(
       pipeline: pipeline_class,
       steps: steps_hash,
       stage: stage,
       config: {},
-      resources: {places_read: places_read_resource}
+      resources: {places_read: places_read_resource},
+      step_dirs: step_dirs
     ).generate
   end
 
@@ -125,7 +132,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(sizes).to contain_exactly("s", "m", "l")
     end
 
-    it "has correct state chain: ... -> build_items -> score_items_route -> score_items_chunk -> score_items_routed -> aggregate -> NotifySuccess" do
+    it "has correct state chain: ... -> build_items -> score_items_chunk -> score_items_routed -> aggregate -> NotifySuccess" do
       states = asl["States"]
 
       # retry_demo points to controlled_step
@@ -141,12 +148,12 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       # parallel state points to build_items
       expect(states[parallel_key]["Next"]).to eq("build_items")
 
-      # linear chain after parallel: routing -> chunking -> routed parallel -> aggregate
-      expect(states["build_items"]["Next"]).to eq("score_items_route")
-      expect(states["score_items_route"]["Next"]).to eq("score_items_chunk")
+      # linear chain after parallel: combined routing+chunking -> routed parallel -> aggregate
+      expect(states["build_items"]["Next"]).to eq("score_items_chunk")
       expect(states["score_items_chunk"]["Next"]).to eq("score_items_routed")
       expect(states["score_items_routed"]["Next"]).to eq("aggregate")
       expect(states["aggregate"]["Next"]).to eq("NotifySuccess")
+      expect(states).not_to have_key("score_items_route")
     end
 
     it "controlled_step ASL state has SFN Retry block for States.TaskFailed" do
@@ -187,9 +194,9 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
   # ── ASL + CFN coherence tests ────────────────────────────────────────
 
   describe "ASL and CloudFormation coherence" do
-    it "ASL chunk state FunctionName matches CFN ChunkingLambda FunctionName" do
+    it "ASL routed chunk state FunctionName matches per-step CFN ChunkingLambda FunctionName" do
       asl_function_name = asl.dig("States", "score_items_chunk", "Parameters", "FunctionName")
-      cfn_function_name = cfn.dig("Resources", "ChunkingLambda", "Properties", "FunctionName")
+      cfn_function_name = cfn.dig("Resources", "ChunkingLambdaScoreItems", "Properties", "FunctionName")
 
       expect(asl_function_name).to eq(cfn_function_name)
     end

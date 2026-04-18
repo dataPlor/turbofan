@@ -14,11 +14,7 @@ module Turbofan
 
         def state_name_for(step)
           if step.fan_out?
-            if routed_fan_out?(step)
-              "#{step.name}_route"
-            else
-              "#{step.name}_chunk"
-            end
+            "#{step.name}_chunk"
           else
             step.name.to_s
           end
@@ -107,6 +103,10 @@ module Turbofan
           step_class&.turbofan_sizes&.any?
         end
 
+        def execution_tags
+          {"turbofan:execution.$" => "$$.Execution.Id"}
+        end
+
         def notification_states(topic_arn)
           {
             "NotifySuccess" => {
@@ -161,7 +161,8 @@ module Turbofan
             "JobQueue" => refs[:job_queue],
             "ContainerOverrides" => {
               "Environment" => env
-            }
+            },
+            "Tags" => execution_tags
           }
 
           state = {
@@ -291,7 +292,8 @@ module Turbofan
                     "Environment" => env
                   }
                 ]
-              }
+              },
+              "Tags" => [{"Key" => "turbofan:execution", "Value.$" => "$$.Execution.Id"}]
             },
             "Catch" => CATCH_ALL_FAILURE
           }
@@ -328,7 +330,8 @@ module Turbofan
               "JobName.$" => "States.Format('#{@prefix}-#{step_name}-parent{}', $.index)",
               "JobQueue" => refs[:job_queue],
               "ContainerOverrides" => {"Environment" => env},
-              "ArrayProperties" => {"Size.$" => "$.size"}
+              "ArrayProperties" => {"Size.$" => "$.size"},
+              "Tags" => execution_tags
             },
             "ResultSelector" => {
               "JobId.$" => "$.JobId",
@@ -426,7 +429,8 @@ module Turbofan
             "JobQueue" => refs[:job_queue],
             "ContainerOverrides" => {
               "Environment" => env
-            }
+            },
+            "Tags" => execution_tags
           }
 
           state = {
@@ -468,39 +472,7 @@ module Turbofan
           }
         end
 
-        def build_routing_state(step, prev_step_name, first:)
-          step_class = resolve_step_class(step.name)
-          router_class = "#{Naming.pascal_case(step.name)}Router"
-
-          payload = {
-            "step_name" => step.name.to_s,
-            "router_class" => router_class,
-            "execution_id.$" => "$$.Execution.Id"
-          }
-          if first
-            payload["trigger.$"] = "$"
-          else
-            payload["prev_step"] = prev_step_name.to_s
-          end
-
-          {
-            "Type" => "Task",
-            "Resource" => "arn:aws:states:::lambda:invoke",
-            "Parameters" => {
-              "FunctionName" => "#{@prefix}-routing-#{step.name}",
-              "Payload" => payload
-            },
-            "ResultSelector" => {
-              "items_s3_uri.$" => "$.Payload.items_s3_uri"
-            },
-            "ResultPath" => "$.routing.#{step.name}",
-            "Next" => "#{step.name}_chunk",
-            "Retry" => LAMBDA_RETRY,
-            "Catch" => CATCH_ALL_FAILURE
-          }
-        end
-
-        def build_chunk_state(step, prev_step_name, first:, routed: false)
+        def build_chunk_state(step, prev_step_name, first:, routed: false, router_class: nil)
           step_class = resolve_step_class(step.name)
           payload = {
             "step_name" => step.name.to_s,
@@ -515,18 +487,16 @@ module Turbofan
               batch_sizes[size_name.to_s] = bs if bs
             end
             payload["batch_sizes"] = batch_sizes
+            payload["router_class"] = router_class if router_class
+          end
 
-            # Routed: chunking reads from routing Lambda output (items_s3_uri)
-            payload["trigger"] = {}
-            payload["trigger"]["items_s3_uri.$"] = "$.routing.#{step.name}.items_s3_uri"
-          elsif first
+          if first
             payload["trigger.$"] = "$"
           else
             payload["prev_step"] = prev_step_name.to_s
             prev_step_obj = @pipeline.turbofan_dag.sorted_steps.find { |s| s.name.to_s == prev_step_name.to_s }
             if prev_step_obj&.fan_out?
               if routed_fan_out?(prev_step_obj)
-                sizes = resolve_step_class(prev_step_obj.name).turbofan_sizes
                 payload["prev_fan_out_sizes.$"] = "States.JsonToString($.chunking.#{prev_step_name}.sizes)"
               else
                 payload["prev_fan_out_parents.$"] = "States.JsonToString($.chunking.#{prev_step_name}.parents)"
@@ -544,11 +514,13 @@ module Turbofan
 
           next_state = routed ? "#{step.name}_routed" : step.name.to_s
 
+          function_name = router_class ? "#{@prefix}-chunking-#{step.name}" : "#{@prefix}-chunking"
+
           {
             "Type" => "Task",
             "Resource" => "arn:aws:states:::lambda:invoke",
             "Parameters" => {
-              "FunctionName" => "#{@prefix}-chunking",
+              "FunctionName" => function_name,
               "Payload" => payload
             },
             "ResultSelector" => result_selector,
@@ -584,7 +556,8 @@ module Turbofan
                 "JobName.$" => "States.Format('#{@prefix}-#{step_name}-#{size_name}-parent{}', $.index)",
                 "JobQueue" => queue_name,
                 "ContainerOverrides" => {"Environment" => env},
-                "ArrayProperties" => {"Size.$" => "$.size"}
+                "ArrayProperties" => {"Size.$" => "$.size"},
+                "Tags" => execution_tags
               },
               "ResultSelector" => {
                 "JobId.$" => "$.JobId",

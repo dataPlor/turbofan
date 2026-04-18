@@ -363,16 +363,16 @@ end
 
 Generate a scaffold with `turbofan add router {step_name}`.
 
-At runtime, a **routing Lambda** runs before the chunking Lambda. It loads the router, calls `route(item)` per item, and tags each item with `__turbofan_size`. The chunking Lambda then groups tagged items by size and creates per-size Batch array jobs. Each size gets its own job definition with the appropriate CPU/RAM allocation.
+At runtime, a **per-step chunking Lambda** — generated for each routed fan-out step with the user's router bundled into the zip — loads the router, calls `route(item)` per item to tag each with `__turbofan_size`, then groups tagged items by size and creates per-size Batch array jobs in a single invocation. Each size gets its own job definition with the appropriate CPU/RAM allocation.
 
 ```
-{step}_route → {step}_chunk → {step}_routed (Parallel → Map per size → Batch)
+{step}_chunk → {step}_routed (Parallel → Map per size → Batch)
 ```
 
 ## Features
 
 - **Fan-out at scale** — Batch array jobs with up to 10,000 children, automatic chunking Lambda for larger datasets
-- **Routed fan-out** — Steps with multiple `size` profiles use a Router class to classify items. A routing Lambda tags items with `__turbofan_size`, then the chunking Lambda groups and creates per-size Batch array jobs with different CPU/RAM allocations.
+- **Routed fan-out** — Steps with multiple `size` profiles use a Router class to classify items. A per-step chunking Lambda (with the router code bundled in) tags items with `__turbofan_size` and creates per-size Batch array jobs with different CPU/RAM allocations — routing and chunking happen in one invocation.
 - **Concurrency control** — Consumable resources enforce database connection limits at the Batch scheduler level
 - **Content-addressed deploys** — Docker images tagged by SHA256 of source files; unchanged steps aren't rebuilt
 - **Schema validation** — Build-time edge compatibility checks and runtime input/output validation
@@ -1070,8 +1070,8 @@ end
 
 When a step has `size` definitions and is wrapped in `fan_out()`, Turbofan generates a **routed fan-out** instead of a standard fan-out. The flow is:
 
-1. The **preceding step** annotates each output item with a `__turbofan_size` field indicating which size it should be routed to.
-2. The **chunking Lambda** reads items, groups them by `__turbofan_size`, writes per-size input files to S3 (`{pipeline}-{stage}/{step}/input/{size}/{index}.json`), and returns `{"sizes": {"s": {"count": 2}, "m": {"count": 1}}}`.
+1. Each item gets a `__turbofan_size` tag — either written by the preceding step, or assigned by a **Router** class (`steps/{step}/router/router.rb`, bundled into the per-step chunking Lambda and invoked per item).
+2. A **per-step chunking Lambda** (generated for each routed fan-out step, with the router code bundled into its zip) reads items, tags them by calling `router.route(item)` when a router is configured, groups them by `__turbofan_size`, writes per-size input files to S3 (`{pipeline}-{stage}/{step}/input/{size}/{index}.json`), and returns `{"sizes": {"s": {"parents": [...]}, "m": {"parents": [...]}}}`.
 3. The **ASL state machine** generates a Parallel state (`{step}_routed`) with one branch per size. Each branch:
    - References the correctly-sized Batch job definition and queue (e.g., `jobdef-{step}-s`)
    - Sets `TURBOFAN_SIZE` env var so the step knows which size it's running as
@@ -1547,7 +1547,7 @@ Generated resources:
 - Step Functions state machine
 - CloudWatch dashboard (optional — skipped when `dashboard: false`)
 - SNS notification topic
-- Chunking Lambda with routing support, deployed via S3 zip (if any step uses fan-out)
+- Chunking Lambda deployed via S3 zip (shared variant when any step uses fan-out; a per-step `ChunkingLambda{Step}` variant with the router bundled when a step has `size` definitions)
 - EventBridge rule + guard Lambda (if `schedule` is set)
 
 ---

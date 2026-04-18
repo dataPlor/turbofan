@@ -76,6 +76,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       params = state["Parameters"]
       expect(params["JobName"]).to include("process")
     end
+
+    it "includes turbofan:execution tag referencing the execution ID" do
+      state = asl["States"]["process"]
+      tags = state.dig("Parameters", "Tags")
+      expect(tags).to eq({"turbofan:execution.$" => "$$.Execution.Id"})
+    end
   end
 
   describe "two-step linear pipeline" do
@@ -671,6 +677,16 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     it "step_d is present as a regular task state" do
       expect(asl["States"]).to have_key("step_d")
       expect(asl["States"]["step_d"]["Type"]).to eq("Task")
+    end
+
+    it "includes turbofan:execution tag on branch Batch tasks" do
+      parallel = asl["States"]["step_a_parallel"]
+      parallel["Branches"].each do |branch|
+        branch["States"].each_value do |state|
+          tags = state.dig("Parameters", "Tags")
+          expect(tags).to eq({"turbofan:execution.$" => "$$.Execution.Id"})
+        end
+      end
     end
   end
 end

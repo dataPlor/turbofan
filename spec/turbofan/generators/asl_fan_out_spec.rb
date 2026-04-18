@@ -138,6 +138,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         job_queue = inner_task.dig("Parameters", "JobQueue")
         expect(job_queue).to eq("turbofan-ce-test-ce-production-queue")
       end
+
+      it "includes turbofan:execution tag on the inner Batch task" do
+        inner_task = asl["States"]["process"].dig("ItemProcessor", "States", "process_batch")
+        tags = inner_task.dig("Parameters", "Tags")
+        expect(tags).to eq({"turbofan:execution.$" => "$$.Execution.Id"})
+      end
     end
 
     describe "chunk state retry configuration" do

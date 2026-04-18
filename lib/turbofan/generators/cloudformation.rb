@@ -7,7 +7,6 @@ require_relative "cloudformation/dashboard"
 require_relative "cloudformation/sns"
 require_relative "cloudformation/chunking_lambda"
 require_relative "cloudformation/tolerance_lambda"
-require_relative "cloudformation/routing_lambda"
 
 module Turbofan
   module Generators
@@ -145,13 +144,16 @@ module Turbofan
           resources.merge!(ToleranceLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
         end
 
-        # Routing Lambdas (one per routed fan-out step)
-        routed_fan_out_steps.each do |dag_step, step_class|
+        # Per-step ChunkingLambda for routed fan-out steps — bundles the user's
+        # router.rb so one Lambda invocation routes and chunks in a single pass.
+        routed_fan_out_steps.each do |dag_step, _step_class|
           router_source = load_router_source(dag_step.name)
           next unless router_source
 
-          code_hash = Digest::SHA256.hexdigest(RoutingLambda::HANDLER + router_source)[0, 12]
-          resources.merge!(RoutingLambda.generate(
+          code_hash = Digest::SHA256.hexdigest(
+            ChunkingLambda::HANDLER + ChunkingLambda::ROUTER_MODULE + router_source
+          )[0, 12]
+          resources.merge!(ChunkingLambda.generate_per_step(
             prefix: prefix, step_name: dag_step.name,
             bucket_prefix: bucket_prefix, tags: all_resource_tags,
             code_hash: code_hash
@@ -190,7 +192,7 @@ module Turbofan
           router_source = load_router_source(dag_step.name)
           next unless router_source
 
-          artifacts.concat(RoutingLambda.lambda_artifacts(
+          artifacts.concat(ChunkingLambda.lambda_artifacts_per_step(
             bucket_prefix: bucket_prefix,
             step_name: dag_step.name,
             router_source: router_source

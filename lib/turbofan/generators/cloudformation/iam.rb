@@ -218,7 +218,7 @@ module Turbofan
                 "Statement" => [
                   {
                     "Effect" => "Allow",
-                    "Action" => ["batch:SubmitJob", "batch:DescribeJobs", "batch:TerminateJob"],
+                    "Action" => ["batch:SubmitJob", "batch:DescribeJobs", "batch:TerminateJob", "batch:TagResource"],
                     "Resource" => "*"
                   },
                   {
@@ -266,7 +266,7 @@ module Turbofan
             lambda_resources << {"Fn::GetAtt" => ["ChunkingLambda", "Arn"]} if has_fan_out
             lambda_resources << {"Fn::GetAtt" => ["ToleranceLambda", "Arn"]} if has_tolerated_fan_out
             routed_step_names.each do |sname|
-              lambda_resources << {"Fn::GetAtt" => ["RoutingLambda#{Naming.pascal_case(sname)}", "Arn"]}
+              lambda_resources << {"Fn::GetAtt" => ["ChunkingLambda#{Naming.pascal_case(sname)}", "Arn"]}
             end
             lambda_step_names.each do |sname|
               lambda_resources << {"Fn::GetAtt" => ["LambdaStep#{Naming.pascal_case(sname)}", "Arn"]}
@@ -301,7 +301,7 @@ module Turbofan
                 "Statement" => [
                   {
                     "Effect" => "Allow",
-                    "Action" => ["ecs:RunTask", "ecs:StopTask", "ecs:DescribeTasks"],
+                    "Action" => ["ecs:RunTask", "ecs:StopTask", "ecs:DescribeTasks", "ecs:TagResource"],
                     "Resource" => "*"
                   },
                   {

@@ -85,6 +85,20 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       expect(chunk_state["Next"]).to eq("process_routed")
     end
 
+    it "does not emit a separate routing state (routing merged into chunk Lambda)" do
+      expect(asl["States"]).not_to have_key("process_route")
+    end
+
+    it "chunk state payload includes router_class for the bundled router" do
+      chunk_state = asl["States"]["process_chunk"]
+      expect(chunk_state.dig("Parameters", "Payload", "router_class")).to eq("ProcessRouter")
+    end
+
+    it "chunk state invokes the per-step ChunkingLambda when routed" do
+      chunk_state = asl["States"]["process_chunk"]
+      expect(chunk_state.dig("Parameters", "FunctionName")).to eq("#{prefix}-chunking-process")
+    end
+
     it "generates a Parallel state for process_routed" do
       routed_state = asl["States"]["process_routed"]
       expect(routed_state).not_to be_nil
@@ -134,6 +148,15 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         "$.size",
         "$.size"
       )
+    end
+
+    it "includes turbofan:execution tag on routed parallel inner Batch tasks" do
+      routed_state = asl["States"]["process_routed"]
+      routed_state["Branches"].each do |branch|
+        inner_task = branch["States"].values.first.dig("ItemProcessor", "States").values.first
+        tags = inner_task.dig("Parameters", "Tags")
+        expect(tags).to eq({"turbofan:execution.$" => "$$.Execution.Id"})
+      end
     end
 
     it "aggregate step has TURBOFAN_PREV_FAN_OUT_SIZES env var" do

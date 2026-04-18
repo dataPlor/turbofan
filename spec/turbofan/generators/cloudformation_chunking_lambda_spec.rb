@@ -875,4 +875,112 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(env_vars["TURBOFAN_BUCKET_PREFIX"]).to eq("bucket-env-pipeline-production")
     end
   end
+
+  describe "pipeline with routed fan_out" do
+    let(:router_dir) { File.expand_path("../../fixtures/chunking_lambda/process", __dir__) }
+    let(:router_source) { File.read(File.join(router_dir, "router", "router.rb")) }
+
+    let(:routed_step_class) do
+      Class.new do
+        include Turbofan::Step
+        execution :batch
+        compute_environment :test_ce
+        size :s, cpu: 1, ram: 2
+        size :m, cpu: 2, ram: 4
+        batch_size 10
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+      end
+    end
+
+    let(:routed_pipeline_class) do
+      step_klass = routed_step_class
+      stub_const("Process", step_klass)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "routed-chunked-pipeline"
+        pipeline do
+          fan_out(process(trigger_input))
+        end
+      end
+    end
+
+    let(:routed_generator) do
+      described_class.new(
+        pipeline: routed_pipeline_class,
+        steps: {process: routed_step_class},
+        stage: "production",
+        config: config,
+        step_dirs: {process: router_dir}
+      )
+    end
+
+    let(:routed_template) { routed_generator.generate }
+
+    it "emits a per-step ChunkingLambda{Step} Lambda function" do
+      expect(routed_template["Resources"]).to have_key("ChunkingLambdaProcess")
+      expect(routed_template["Resources"]["ChunkingLambdaProcess"]["Type"]).to eq("AWS::Lambda::Function")
+    end
+
+    it "per-step Lambda FunctionName is prefix-chunking-{step}" do
+      fn_name = routed_template["Resources"]["ChunkingLambdaProcess"].dig("Properties", "FunctionName")
+      expect(fn_name).to eq("turbofan-routed-chunked-pipeline-production-chunking-process")
+    end
+
+    it "emits a per-step IAM role ChunkingLambdaRole{Step}" do
+      expect(routed_template["Resources"]).to have_key("ChunkingLambdaRoleProcess")
+      expect(routed_template["Resources"]["ChunkingLambdaRoleProcess"]["Type"]).to eq("AWS::IAM::Role")
+    end
+
+    it "per-step Lambda references its per-step role" do
+      role_ref = routed_template["Resources"]["ChunkingLambdaProcess"].dig("Properties", "Role", "Fn::GetAtt")
+      expect(role_ref).to eq(["ChunkingLambdaRoleProcess", "Arn"])
+    end
+
+    it "per-step role grants S3 GetObject and PutObject on the pipeline bucket" do
+      role = routed_template["Resources"]["ChunkingLambdaRoleProcess"]
+      s3_policy = role.dig("Properties", "Policies").find { |p| p["PolicyName"] == "S3Access" }
+      actions = s3_policy.dig("PolicyDocument", "Statement", 0, "Action")
+      expect(actions).to include("s3:GetObject", "s3:PutObject")
+    end
+
+    it "per-step Lambda S3Key includes a code hash covering HANDLER + ROUTER_MODULE + router_source" do
+      s3_key = routed_template["Resources"]["ChunkingLambdaProcess"].dig("Properties", "Code", "S3Key")
+      expected_hash = Digest::SHA256.hexdigest(
+        Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER +
+        Turbofan::Generators::CloudFormation::ChunkingLambda::ROUTER_MODULE +
+        router_source
+      )[0, 12]
+      expect(s3_key).to include("process-#{expected_hash}.zip")
+    end
+
+    it "lambda_artifacts_per_step bundles index.rb, turbofan_router.rb, and router.rb" do
+      artifacts = routed_generator.lambda_artifacts
+      routed_artifact = artifacts.find { |a| a[:key].include?("process-") }
+      expect(routed_artifact).not_to be_nil
+      zip_bytes = routed_artifact[:body]
+      # Zip central directory contains filenames as ASCII; check for presence
+      expect(zip_bytes).to include("index.rb")
+      expect(zip_bytes).to include("turbofan_router.rb")
+      expect(zip_bytes).to include("router.rb")
+    end
+  end
+
+  describe "HANDLER content (combined routing+chunking)" do
+    let(:handler) { Turbofan::Generators::CloudFormation::ChunkingLambda::HANDLER }
+
+    it "guards router require with begin/rescue LoadError for shared-variant reuse" do
+      expect(handler).to include("rescue LoadError")
+      expect(handler).to include("require_relative 'router'")
+    end
+
+    it "raises when router_class is requested but router module not bundled" do
+      expect(handler).to include("router.rb not bundled in this Lambda zip")
+    end
+
+    it "tags items with __turbofan_size from router.route(item)" do
+      expect(handler).to include("router.route(item)")
+      expect(handler).to include("__turbofan_size")
+    end
+  end
 end

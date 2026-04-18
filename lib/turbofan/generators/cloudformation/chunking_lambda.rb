@@ -6,176 +6,15 @@ module Turbofan
   module Generators
     class CloudFormation
       module ChunkingLambda
-        HANDLER = <<~'RUBY'
-          require 'json'
-          require 'aws-sdk-s3'
+        # Handler code bundled into the Lambda zip as `index.rb`. Kept as a real
+        # Ruby file so syntax/lint tools can check it; read at gem-load time.
+        HANDLER = File.read(File.expand_path("chunking_handler.rb", __dir__))
 
-          S3 = Aws::S3::Client.new
-
-          def chunk(items, group_size)
-            items.each_slice(group_size).to_a
-          end
-
-          def s3_key(*parts)
-            prefix = ENV['TURBOFAN_BUCKET_PREFIX']
-            key = parts.join('/')
-            prefix && !prefix.empty? ? "#{prefix}/#{key}" : key
-          end
-
-          def read_items(event, bucket, execution_id)
-            if event.key?('prev_step')
-              prev_step = event['prev_step']
-              if event.key?('prev_fan_out_parents')
-                parents = event['prev_fan_out_parents']
-                all_items = []
-                parents.each do |parent|
-                  parent['size'].times do |idx|
-                    begin
-                      key = s3_key(execution_id, prev_step, 'output', "parent#{parent['index']}", "#{idx}.json")
-                      response = S3.get_object(bucket: bucket, key: key)
-                      all_items << JSON.parse(response.body.read)
-                    rescue Aws::S3::Errors::NoSuchKey
-                      nil # sentinel chunk — no output written, skip
-                    end
-                  end
-                end
-                all_items
-              elsif event.key?('prev_fan_out_sizes')
-                sizes = event['prev_fan_out_sizes']
-                all_items = []
-                sizes.each do |size_name, size_info|
-                  parents = size_info['parents'] || []
-                  parents.each do |parent|
-                    parent['size'].times do |idx|
-                      begin
-                        key = s3_key(execution_id, prev_step, 'output', size_name, "parent#{parent['index']}", "#{idx}.json")
-                        response = S3.get_object(bucket: bucket, key: key)
-                        all_items << JSON.parse(response.body.read)
-                      rescue Aws::S3::Errors::NoSuchKey
-                        nil # sentinel — skip
-                      end
-                    end
-                  end
-                end
-                all_items
-              else
-                key = s3_key(execution_id, prev_step, 'output.json')
-                response = S3.get_object(bucket: bucket, key: key)
-                data = JSON.parse(response.body.read)
-                unless data.is_a?(Hash) && data.key?('items') && data['items'].is_a?(Array)
-                  raise "Invalid input from step '#{prev_step}': expected {\"items\": [...]} in output.json. " \
-                        "Got: #{data.is_a?(Hash) ? data.keys.inspect : data.class}"
-                end
-                data['items']
-              end
-            elsif event.key?('trigger')
-              read_trigger_input(event['trigger'], bucket)
-            else
-              raise "No input source: expected 'prev_step' or 'trigger' in event"
-            end
-          end
-
-          def read_trigger_input(input, bucket)
-            unless input.is_a?(Hash) && input.key?('items_s3_uri')
-              raise "Invalid trigger input for fan-out: expected {\"items_s3_uri\": \"s3://...\"}. " \
-                    "Fan-out items must be stored on S3 in {\"items\": [...]} format. " \
-                    "Got: #{input.class}"
-            end
-
-            uri = input['items_s3_uri']
-            unless uri.is_a?(String) && uri.start_with?('s3://')
-              raise "Invalid items_s3_uri: expected s3:// URI, got: #{uri.inspect}"
-            end
-
-            key = uri.sub("s3://#{bucket}/", '')
-            if key == uri
-              raise "items_s3_uri must reference the pipeline bucket (s3://#{bucket}/...). " \
-                    "Got: #{uri}"
-            end
-
-            response = S3.get_object(bucket: bucket, key: key)
-            data = JSON.parse(response.body.read)
-
-            unless data.is_a?(Hash) && data.key?('items') && data['items'].is_a?(Array)
-              raise "Invalid S3 input format: expected {\"items\": [...]} in #{uri}. " \
-                    "Got: #{data.is_a?(Hash) ? data.keys.inspect : data.class}"
-            end
-
-            data['items']
-          end
-
-          MAX_ARRAY_SIZE = 10_000
-          MIN_ARRAY_SIZE = 2
-
-          def split_into_parents(chunks, execution_id, step_name, bucket, size_name: nil)
-            parent_count = [(chunks.size.to_f / MAX_ARRAY_SIZE).ceil, 1].max
-            base = chunks.size / parent_count
-            remainder = chunks.size % parent_count
-
-            parents = []
-            offset = 0
-            parent_count.times do |i|
-              real_size = base + (i < remainder ? 1 : 0)
-              parent_chunks = chunks[offset, real_size]
-
-              # Batch requires ArrayProperties.Size >= 2. Pad with null sentinel.
-              if parent_chunks.size < MIN_ARRAY_SIZE
-                parent_chunks += [nil] * (MIN_ARRAY_SIZE - parent_chunks.size)
-              end
-
-              key = if size_name
-                s3_key(execution_id, step_name, 'input', size_name, "parent#{i}", 'items.json')
-              else
-                s3_key(execution_id, step_name, 'input', "parent#{i}", 'items.json')
-              end
-              S3.put_object(bucket: bucket, key: key, body: JSON.generate(parent_chunks))
-              parents << { 'index' => i, 'size' => [real_size, MIN_ARRAY_SIZE].max, 'real_size' => real_size }
-              offset += real_size
-            end
-
-            parents
-          end
-
-          def handler(event:, context:)
-            bucket = ENV['TURBOFAN_BUCKET']
-            execution_id = event['execution_id'] || context.aws_request_id
-            step_name = event['step_name']
-            group_size = event['group_size']
-            routed = event.fetch('routed', false)
-
-            items = read_items(event, bucket, execution_id)
-
-            if routed
-              batch_sizes = event.fetch('batch_sizes', {})
-              groups = {}
-              items.each do |item|
-                size = item.fetch('__turbofan_size', 'default')
-                (groups[size] ||= []) << item
-              end
-
-              sizes = {}
-              groups.each do |size_name, size_items|
-                size_batch_size = batch_sizes.fetch(size_name, group_size)
-                chunks = chunk(size_items, size_batch_size)
-                parents = split_into_parents(
-                  chunks, execution_id, step_name, bucket, size_name: size_name
-                )
-                sizes[size_name] = { 'parents' => parents }
-              end
-
-              # Ensure all declared sizes are present (empty parents for sizes with no items)
-              batch_sizes.each_key do |size_name|
-                sizes[size_name] ||= { 'parents' => [] }
-              end
-
-              { 'sizes' => sizes }
-            else
-              chunks = chunk(items, group_size)
-              parents = split_into_parents(chunks, execution_id, step_name, bucket)
-              { 'parents' => parents }
-            end
-          end
-        RUBY
+        # Turbofan::Router source bundled into the zip as `turbofan_router.rb`
+        # for the per-step routed variant. Read from the gem's canonical Router
+        # module so there's no drift between the user-facing module and the
+        # Lambda-bundled copy.
+        ROUTER_MODULE = File.read(File.expand_path("../../router.rb", __dir__))
 
         LAMBDA_RUNTIME = "ruby3.3"
 
@@ -293,6 +132,146 @@ module Turbofan
           }
         end
         private_class_method :lambda_role
+
+        # Per-step routed variant — bundles the user's router.rb into the zip
+        # so one Lambda invocation both routes items and chunks them.
+
+        def self.handler_s3_key_per_step(bucket_prefix, step_name, code_hash)
+          "#{bucket_prefix}/chunking-lambda/#{step_name}-#{code_hash}.zip"
+        end
+
+        def self.generate_per_step(prefix:, step_name:, bucket_prefix:, tags:, code_hash:)
+          lambda_role_per_step(prefix, step_name, tags)
+            .merge(lambda_function_per_step(prefix, step_name, bucket_prefix, tags, code_hash))
+        end
+
+        def self.lambda_artifacts_per_step(bucket_prefix:, step_name:, router_source:)
+          code_hash = Digest::SHA256.hexdigest(HANDLER + ROUTER_MODULE + router_source)[0, 12]
+          [{
+            bucket: Turbofan.config.bucket,
+            key: handler_s3_key_per_step(bucket_prefix, step_name, code_hash),
+            body: build_zip_with_router(router_source: router_source)
+          }]
+        end
+
+        def self.lambda_function_per_step(prefix, step_name, bucket_prefix, tags, code_hash)
+          resource_name = "ChunkingLambda#{Naming.pascal_case(step_name)}"
+          {
+            resource_name => {
+              "Type" => "AWS::Lambda::Function",
+              "Properties" => {
+                "FunctionName" => "#{prefix}-chunking-#{step_name}",
+                "Runtime" => LAMBDA_RUNTIME,
+                "Handler" => "index.handler",
+                "Timeout" => 300,
+                "MemorySize" => 1024,
+                "Role" => {"Fn::GetAtt" => ["ChunkingLambdaRole#{Naming.pascal_case(step_name)}", "Arn"]},
+                "Code" => {
+                  "S3Bucket" => Turbofan.config.bucket,
+                  "S3Key" => handler_s3_key_per_step(bucket_prefix, step_name, code_hash)
+                },
+                "Environment" => {
+                  "Variables" => {
+                    "TURBOFAN_BUCKET" => Turbofan.config.bucket,
+                    "TURBOFAN_BUCKET_PREFIX" => bucket_prefix,
+                    "TURBOFAN_CODE_HASH" => code_hash
+                  }
+                },
+                "Tags" => tags
+              }
+            }
+          }
+        end
+        private_class_method :lambda_function_per_step
+
+        def self.lambda_role_per_step(prefix, step_name, tags)
+          resource_name = "ChunkingLambdaRole#{Naming.pascal_case(step_name)}"
+          {
+            resource_name => {
+              "Type" => "AWS::IAM::Role",
+              "Properties" => {
+                "RoleName" => Naming.iam_role_name("#{prefix}-chunking-#{step_name}-role"),
+                "Tags" => tags,
+                "AssumeRolePolicyDocument" => {
+                  "Version" => "2012-10-17",
+                  "Statement" => [
+                    {
+                      "Effect" => "Allow",
+                      "Principal" => {"Service" => "lambda.amazonaws.com"},
+                      "Action" => "sts:AssumeRole"
+                    }
+                  ]
+                },
+                "ManagedPolicyArns" => [
+                  "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies" => [
+                  {
+                    "PolicyName" => "S3Access",
+                    "PolicyDocument" => {
+                      "Version" => "2012-10-17",
+                      "Statement" => [
+                        {
+                          "Effect" => "Allow",
+                          "Action" => ["s3:GetObject", "s3:PutObject"],
+                          "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        end
+        private_class_method :lambda_role_per_step
+
+        def self.build_zip_with_router(router_source:)
+          build_zip_from_files(
+            "index.rb" => HANDLER,
+            "turbofan_router.rb" => ROUTER_MODULE,
+            "router.rb" => router_source
+          )
+        end
+        private_class_method :build_zip_with_router
+
+        def self.build_zip_from_files(files)
+          buf = StringIO.new
+          buf.set_encoding(Encoding::BINARY)
+
+          entries = []
+          files.each do |name, content|
+            content = content.b
+            name_b = name.b
+            crc = Zlib.crc32(content)
+            size = content.bytesize
+            offset = buf.pos
+
+            # Local file header
+            buf.write([0x04034b50, 20, 0, 0, 0, 0].pack("Vvvvvv"))
+            buf.write([crc, size, size, name_b.bytesize, 0].pack("VVVvv"))
+            buf.write(name_b)
+            buf.write(content)
+
+            entries << {name: name_b, crc: crc, size: size, offset: offset}
+          end
+
+          # Central directory
+          cd_offset = buf.pos
+          entries.each do |e|
+            buf.write([0x02014b50, 20, 20, 0, 0, 0, 0].pack("Vvvvvvv"))
+            buf.write([e[:crc], e[:size], e[:size], e[:name].bytesize, 0, 0, 0, 0, 0, e[:offset]].pack("VVVvvvvvVV"))
+            buf.write(e[:name])
+          end
+          cd_size = buf.pos - cd_offset
+
+          # End of central directory
+          buf.write([0x06054b50, 0, 0, entries.size, entries.size].pack("Vvvvv"))
+          buf.write([cd_size, cd_offset, 0].pack("VVv"))
+
+          buf.string
+        end
+        private_class_method :build_zip_from_files
       end
     end
   end

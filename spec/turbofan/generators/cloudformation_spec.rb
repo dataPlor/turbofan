@@ -667,6 +667,17 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     end
   end
 
+  describe "SfnRole batch:TagResource permission" do
+    let(:sfn_role) { template["Resources"]["SfnRole"] }
+    let(:sfn_policies) { sfn_role["Properties"]["Policies"] }
+
+    it "includes batch:TagResource in BatchAccess policy" do
+      batch_policy = sfn_policies.find { |p| p["PolicyName"] == "BatchAccess" }
+      actions = batch_policy["PolicyDocument"]["Statement"].first["Action"]
+      expect(actions).to include("batch:TagResource")
+    end
+  end
+
   describe "no ImageTag parameter (M5: per-step image_tags)" do
     it "does not have a Parameters section with ImageTag" do
       params = template["Parameters"] || {}
@@ -986,6 +997,14 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         "CpuArchitecture" => "ARM64",
         "OperatingSystemFamily" => "LINUX"
       })
+    end
+
+    it "includes ecs:TagResource in SfnRole ECSAccess policy" do
+      template = fargate_generator.generate
+      sfn_policies = template["Resources"]["SfnRole"]["Properties"]["Policies"]
+      ecs_policy = sfn_policies.find { |p| p["PolicyName"] == "ECSAccess" }
+      actions = ecs_policy["PolicyDocument"]["Statement"].first["Action"]
+      expect(actions).to include("ecs:TagResource")
     end
 
     it "uses array-of-objects tag format on IAM roles (not flat hash)" do
