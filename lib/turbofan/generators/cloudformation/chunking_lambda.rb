@@ -1,6 +1,7 @@
 require "digest"
 require "zlib"
 require "stringio"
+require_relative "lambdas/packager"
 
 module Turbofan
   module Generators
@@ -18,120 +19,49 @@ module Turbofan
 
         LAMBDA_RUNTIME = "ruby3.3"
 
-        # Returns the S3 key where the handler zip should be uploaded.
-        # Includes the code hash so CloudFormation detects code changes
-        # (S3Key change forces Lambda to re-download the zip).
-        def self.handler_s3_key(bucket_prefix)
-          code_hash = Digest::SHA256.hexdigest(HANDLER)[0, 12]
-          "#{bucket_prefix}/chunking-lambda/handler-#{code_hash}.zip"
-        end
+        SUBDIR = "chunking-lambda"
+        LOGICAL_ID = "ChunkingLambda"
+        ROLE_LOGICAL_ID = "ChunkingLambdaRole"
+        MEMORY_SIZE = 1024
+        TIMEOUT = 300
 
-        # Builds a minimal zip file containing index.rb with the handler code
-        def self.handler_zip
-          content = HANDLER.b
-          name = "index.rb".b
-          crc = Zlib.crc32(content)
-          size = content.bytesize
-
-          buf = StringIO.new
-          buf.set_encoding(Encoding::BINARY)
-
-          # Local file header
-          buf.write([0x04034b50, 20, 0, 0, 0, 0].pack("Vvvvvv"))
-          buf.write([crc, size, size, name.bytesize, 0].pack("VVVvv"))
-          buf.write(name)
-          buf.write(content)
-
-          # Central directory entry
-          cd_offset = buf.pos
-          buf.write([0x02014b50, 20, 20, 0, 0, 0, 0].pack("Vvvvvvv"))
-          buf.write([crc, size, size, name.bytesize, 0, 0, 0, 0, 0, 0].pack("VVVvvvvvVV"))
-          buf.write(name)
-          cd_size = buf.pos - cd_offset
-
-          # End of central directory
-          buf.write([0x06054b50, 0, 0, 1, 1].pack("Vvvvv"))
-          buf.write([cd_size, cd_offset, 0].pack("VVv"))
-
-          buf.string
-        end
+        # ── Shared variant (non-routed fan-outs) ────────────────────────
+        #
+        # Invoked by Step Functions as `{prefix}-chunking` for pipelines
+        # with non-routed fan-outs. One shared Lambda per stack.
 
         def self.generate(prefix:, bucket_prefix:, tags:)
-          resources = {}
-          resources.merge!(lambda_role(prefix, tags))
-          resources.merge!(lambda_function(prefix, bucket_prefix, tags))
-          resources
+          config = build_shared_config(prefix: prefix, bucket_prefix: bucket_prefix, tags: tags)
+          Lambdas::Packager.lambda_role(config).merge(Lambdas::Packager.lambda_function(config))
         end
 
-        def self.lambda_function(prefix, bucket_prefix, tags)
-          {
-            "ChunkingLambda" => {
-              "Type" => "AWS::Lambda::Function",
-              "Properties" => {
-                "FunctionName" => "#{prefix}-chunking",
-                "Runtime" => LAMBDA_RUNTIME,
-                "Handler" => "index.handler",
-                "Timeout" => 300,
-                "MemorySize" => 1024,
-                "Role" => {"Fn::GetAtt" => ["ChunkingLambdaRole", "Arn"]},
-                "Code" => {
-                  "S3Bucket" => Turbofan.config.bucket,
-                  "S3Key" => handler_s3_key(bucket_prefix)
-                },
-                "Environment" => {
-                  "Variables" => {
-                    "TURBOFAN_BUCKET" => Turbofan.config.bucket,
-                    "TURBOFAN_BUCKET_PREFIX" => bucket_prefix,
-                    "TURBOFAN_CODE_HASH" => Digest::SHA256.hexdigest(HANDLER)[0, 12]
-                  }
-                },
-                "Tags" => tags
-              }
-            }
-          }
+        def self.handler_s3_key(bucket_prefix)
+          Lambdas::Packager.handler_s3_key(
+            bucket_prefix: bucket_prefix,
+            subdir: SUBDIR,
+            code_hash: Lambdas::Packager.code_hash(HANDLER)
+          )
         end
-        private_class_method :lambda_function
 
-        def self.lambda_role(prefix, tags)
-          {
-            "ChunkingLambdaRole" => {
-              "Type" => "AWS::IAM::Role",
-              "Properties" => {
-                "RoleName" => Naming.iam_role_name("#{prefix}-chunking-lambda-role"),
-                "Tags" => tags,
-                "AssumeRolePolicyDocument" => {
-                  "Version" => "2012-10-17",
-                  "Statement" => [
-                    {
-                      "Effect" => "Allow",
-                      "Principal" => {"Service" => "lambda.amazonaws.com"},
-                      "Action" => "sts:AssumeRole"
-                    }
-                  ]
-                },
-                "ManagedPolicyArns" => [
-                  "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-                ],
-                "Policies" => [
-                  {
-                    "PolicyName" => "S3Access",
-                    "PolicyDocument" => {
-                      "Version" => "2012-10-17",
-                      "Statement" => [
-                        {
-                          "Effect" => "Allow",
-                          "Action" => ["s3:GetObject", "s3:PutObject"],
-                          "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }
+        def self.handler_zip
+          Lambdas::Packager.build_handler_zip(HANDLER)
         end
-        private_class_method :lambda_role
+
+        def self.build_shared_config(prefix:, bucket_prefix:, tags:)
+          Lambdas::Packager::LambdaConfig.new(
+            logical_id: LOGICAL_ID,
+            role_logical_id: ROLE_LOGICAL_ID,
+            function_name: "#{prefix}-chunking",
+            role_name: Naming.iam_role_name("#{prefix}-chunking-lambda-role"),
+            s3_key: handler_s3_key(bucket_prefix),
+            memory_size: MEMORY_SIZE,
+            timeout: TIMEOUT,
+            code_hash: Lambdas::Packager.code_hash(HANDLER),
+            bucket_prefix: bucket_prefix,
+            tags: tags
+          )
+        end
+        private_class_method :build_shared_config
 
         # Per-step routed variant — bundles the user's router.rb into the zip
         # so one Lambda invocation both routes items and chunks them.
