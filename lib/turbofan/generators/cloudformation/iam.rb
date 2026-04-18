@@ -261,7 +261,8 @@ module Turbofan
           ]
 
           has_lambda_steps = lambda_step_names.any?
-          if has_fan_out || has_tolerated_fan_out || has_lambda_steps
+          has_routed_steps = routed_step_names.any?
+          if has_fan_out || has_tolerated_fan_out || has_lambda_steps || has_routed_steps
             lambda_resources = []
             lambda_resources << {"Fn::GetAtt" => ["ChunkingLambda", "Arn"]} if has_fan_out
             lambda_resources << {"Fn::GetAtt" => ["ToleranceLambda", "Arn"]} if has_tolerated_fan_out

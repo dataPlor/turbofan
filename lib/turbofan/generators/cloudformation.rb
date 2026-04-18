@@ -39,7 +39,7 @@ module Turbofan
         # IAM roles
         resources.merge!(Iam.generate(
           prefix: prefix, steps: @steps, tags: all_resource_tags, pipeline_name: pipeline_name,
-          resources: @resources, has_fan_out: any_grouped_fan_out?,
+          resources: @resources, has_fan_out: any_non_routed_fan_out?,
           has_tolerated_fan_out: any_tolerated_fan_out?,
           routed_step_names: routed_fan_out_steps.map { |ds, _| ds.name },
           lambda_step_names: lambda_step_names,
@@ -134,8 +134,9 @@ module Turbofan
 
         bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
 
-        # Chunking Lambda (only when pipeline has fan-out steps)
-        if any_grouped_fan_out?
+        # Shared ChunkingLambda — only needed for non-routed fan-outs.
+        # Routed fan-outs use per-step ChunkingLambda{Step} (see loop below).
+        if any_non_routed_fan_out?
           resources.merge!(ChunkingLambda.generate(prefix: prefix, bucket_prefix: bucket_prefix, tags: all_resource_tags))
         end
 
@@ -178,7 +179,7 @@ module Turbofan
         pipeline_name = @pipeline.turbofan_name
         bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
         artifacts = []
-        if any_grouped_fan_out?
+        if any_non_routed_fan_out?
           artifacts << {
             bucket: Turbofan.config.bucket,
             key: ChunkingLambda.handler_s3_key(bucket_prefix),
@@ -244,6 +245,18 @@ module Turbofan
             step_class = @steps[dag_step.name]
             step_class&.turbofan_batch_size
           end
+        end
+      end
+
+      # A fan-out needs the shared ChunkingLambda only when it has no `size`
+      # profiles. Routed fan-outs use a per-step ChunkingLambda{Step} that
+      # bundles the user's router — the shared Lambda is never invoked.
+      def any_non_routed_fan_out?
+        @pipeline.turbofan_dag.steps.any? do |dag_step|
+          next unless dag_step.fan_out?
+          step_class = @steps[dag_step.name]
+          next unless step_class&.turbofan_batch_size
+          !step_class.turbofan_sizes&.any?
         end
       end
 

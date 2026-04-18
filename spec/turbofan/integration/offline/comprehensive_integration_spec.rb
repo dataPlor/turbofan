@@ -289,12 +289,20 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(secret_arns.any? { |a| a.include?(INTEGRATION_SECRET_ARN) }).to be true
     end
 
-    it "includes a chunking lambda (fan-out with group)" do
-      expect(cfn["Resources"]).to have_key("ChunkingLambda")
+    it "does not emit a shared ChunkingLambda for a routed-only pipeline" do
+      # score_items is the only fan-out and it's routed, so the per-step
+      # ChunkingLambdaScoreItems replaces the shared Lambda.
+      expect(cfn["Resources"]).not_to have_key("ChunkingLambda")
+      expect(cfn["Resources"]).not_to have_key("ChunkingLambdaRole")
     end
 
-    it "chunking lambda uses ruby3.3 runtime" do
-      runtime = cfn.dig("Resources", "ChunkingLambda", "Properties", "Runtime")
+    it "emits a per-step ChunkingLambda for the routed score_items step" do
+      expect(cfn["Resources"]).to have_key("ChunkingLambdaScoreItems")
+      expect(cfn["Resources"]).to have_key("ChunkingLambdaRoleScoreItems")
+    end
+
+    it "per-step ChunkingLambda uses ruby3.3 runtime" do
+      runtime = cfn.dig("Resources", "ChunkingLambdaScoreItems", "Properties", "Runtime")
       expect(runtime).to eq("ruby3.3")
     end
 
@@ -304,11 +312,11 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       expect(handler).to include("__turbofan_size")
     end
 
-    it "chunking lambda references S3 for code deployment" do
-      code = cfn.dig("Resources", "ChunkingLambda", "Properties", "Code")
+    it "per-step ChunkingLambda references S3 for code deployment" do
+      code = cfn.dig("Resources", "ChunkingLambdaScoreItems", "Properties", "Code")
       expect(code).to have_key("S3Bucket")
       expect(code).to have_key("S3Key")
-      expect(code["S3Key"]).to match(%r{chunking-lambda/handler-[0-9a-f]+\.zip})
+      expect(code["S3Key"]).to match(%r{chunking-lambda/score_items-[0-9a-f]+\.zip})
     end
 
     it "includes SNS notification topic" do

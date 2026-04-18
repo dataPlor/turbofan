@@ -964,6 +964,25 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       expect(zip_bytes).to include("turbofan_router.rb")
       expect(zip_bytes).to include("router.rb")
     end
+
+    it "does not emit the shared ChunkingLambda in a routed-only pipeline" do
+      expect(routed_template["Resources"]).not_to have_key("ChunkingLambda")
+      expect(routed_template["Resources"]).not_to have_key("ChunkingLambdaRole")
+    end
+
+    it "does not include the shared ChunkingLambda zip in lambda_artifacts" do
+      shared_keys = routed_generator.lambda_artifacts.map { |a| a[:key] }
+      expect(shared_keys).not_to(include(a_string_matching(%r{chunking-lambda/handler-[0-9a-f]+\.zip\z})))
+    end
+
+    it "state machine role's LambdaInvoke does not include the shared ChunkingLambda ARN" do
+      policies = routed_template.dig("Resources", "SfnRole", "Properties", "Policies") || []
+      invoke_policy = policies.find { |p| p["PolicyName"] == "LambdaInvoke" }
+      expect(invoke_policy).not_to be_nil
+      raw_resources = invoke_policy.dig("PolicyDocument", "Statement", 0, "Resource")
+      resources = raw_resources.is_a?(Array) ? raw_resources : [raw_resources]
+      expect(resources).not_to include({"Fn::GetAtt" => ["ChunkingLambda", "Arn"]})
+    end
   end
 
   describe "HANDLER content (combined routing+chunking)" do
