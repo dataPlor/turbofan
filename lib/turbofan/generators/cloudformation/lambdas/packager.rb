@@ -60,11 +60,10 @@ module Turbofan
 
           # Build the S3 object key for a Lambda zip.
           # Subdir convention: "chunking-lambda", "tolerance-lambda", etc.
-          # Leaf convention: "handler-{hash}.zip" for shared; callers building
-          # per-step zips construct their own leaf via this method's output
-          # plus a string replacement or their own path builder.
-          def self.handler_s3_key(bucket_prefix:, subdir:, code_hash:)
-            "#{bucket_prefix}/#{subdir}/handler-#{code_hash}.zip"
+          # Basename defaults to "handler" (shared Lambdas). Per-step variants
+          # pass the step name as basename so each step's zip gets its own key.
+          def self.handler_s3_key(bucket_prefix:, subdir:, code_hash:, basename: "handler")
+            "#{bucket_prefix}/#{subdir}/#{basename}-#{code_hash}.zip"
           end
 
           # Build a zip containing a single index.rb file with the given source.

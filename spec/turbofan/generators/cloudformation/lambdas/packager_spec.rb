@@ -52,9 +52,14 @@ RSpec.describe Turbofan::Generators::CloudFormation::Lambdas::Packager do
   end
 
   describe ".handler_s3_key" do
-    it "builds the deterministic path" do
+    it "builds the deterministic path with the default 'handler' basename" do
       key = described_class.handler_s3_key(bucket_prefix: "bp", subdir: "chunking-lambda", code_hash: "abc")
       expect(key).to eq("bp/chunking-lambda/handler-abc.zip")
+    end
+
+    it "accepts a custom basename for per-step variants" do
+      key = described_class.handler_s3_key(bucket_prefix: "bp", subdir: "chunking-lambda", code_hash: "abc", basename: "process")
+      expect(key).to eq("bp/chunking-lambda/process-abc.zip")
     end
   end
 
