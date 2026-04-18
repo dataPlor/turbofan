@@ -1,11 +1,13 @@
-require "digest"
-require "zlib"
-require "stringio"
+require_relative "lambdas/packager"
 
 module Turbofan
   module Generators
     class CloudFormation
       module ToleranceLambda
+        # Handler executed by Step Functions when a fan-out branch fails —
+        # checks the Batch job status summary against the tolerated failure
+        # rate, writes a manifest of failed items to S3, and either returns
+        # a "tolerated" result or re-raises to fail the execution.
         HANDLER = <<~'RUBY'
           require 'json'
           require 'aws-sdk-batch'
@@ -132,129 +134,42 @@ module Turbofan
           end
         RUBY
 
-        LAMBDA_RUNTIME = "ruby3.3"
+        SUBDIR = "tolerance-lambda"
+        LOGICAL_ID = "ToleranceLambda"
+        ROLE_LOGICAL_ID = "ToleranceLambdaRole"
+        MEMORY_SIZE = 512
+        TIMEOUT = 300
+
+        BATCH_ACCESS_POLICY = {
+          "PolicyName" => "BatchAccess",
+          "PolicyDocument" => {
+            "Version" => "2012-10-17",
+            "Statement" => [
+              {
+                "Effect" => "Allow",
+                "Action" => ["batch:DescribeJobs", "batch:ListJobs"],
+                "Resource" => "*"
+              }
+            ]
+          }
+        }.freeze
+
+        def self.generate(prefix:, bucket_prefix:, tags:)
+          config = build_config(prefix: prefix, bucket_prefix: bucket_prefix, tags: tags)
+          Lambdas::Packager.lambda_role(config).merge(Lambdas::Packager.lambda_function(config))
+        end
 
         def self.handler_s3_key(bucket_prefix)
-          code_hash = Digest::SHA256.hexdigest(HANDLER)[0, 12]
-          "#{bucket_prefix}/tolerance-lambda/handler-#{code_hash}.zip"
+          Lambdas::Packager.handler_s3_key(
+            bucket_prefix: bucket_prefix,
+            subdir: SUBDIR,
+            code_hash: Lambdas::Packager.code_hash(HANDLER)
+          )
         end
 
         def self.handler_zip
-          content = HANDLER.b
-          name = "index.rb".b
-          crc = Zlib.crc32(content)
-          size = content.bytesize
-
-          buf = StringIO.new
-          buf.set_encoding(Encoding::BINARY)
-
-          # Local file header
-          buf.write(["PK\x03\x04", 20, 0, 0, 0, 0, 0, 0, crc, size, size, name.bytesize, 0].pack("a4vvvvvvVVVvv"))
-          buf.write(name)
-          buf.write(content)
-          offset = 0
-
-          # Central directory
-          cd_start = buf.pos
-          buf.write(["PK\x01\x02", 20, 20, 0, 0, 0, 0, 0, 0, crc, size, size, name.bytesize, 0, 0, 0, 0, 0x20, offset].pack("a4vvvvvvVVVvvvvvVV"))
-          buf.write(name)
-          cd_size = buf.pos - cd_start
-
-          # End of central directory
-          buf.write(["PK\x05\x06", 0, 0, 1, 1, cd_size, cd_start, 0].pack("a4vvvvVVv"))
-
-          buf.string
+          Lambdas::Packager.build_handler_zip(HANDLER)
         end
-
-        def self.generate(prefix:, bucket_prefix:, tags:)
-          resources = {}
-          resources.merge!(lambda_role(prefix, tags))
-          resources.merge!(lambda_function(prefix, bucket_prefix, tags))
-          resources
-        end
-
-        def self.lambda_function(prefix, bucket_prefix, tags)
-          {
-            "ToleranceLambda" => {
-              "Type" => "AWS::Lambda::Function",
-              "Properties" => {
-                "FunctionName" => "#{prefix}-tolerance-check",
-                "Runtime" => LAMBDA_RUNTIME,
-                "Handler" => "index.handler",
-                "Timeout" => 300,
-                "MemorySize" => 512,
-                "Role" => {"Fn::GetAtt" => ["ToleranceLambdaRole", "Arn"]},
-                "Code" => {
-                  "S3Bucket" => Turbofan.config.bucket,
-                  "S3Key" => handler_s3_key(bucket_prefix)
-                },
-                "Environment" => {
-                  "Variables" => {
-                    "TURBOFAN_BUCKET" => Turbofan.config.bucket,
-                    "TURBOFAN_BUCKET_PREFIX" => bucket_prefix,
-                    "TURBOFAN_CODE_HASH" => Digest::SHA256.hexdigest(HANDLER)[0, 12]
-                  }
-                },
-                "Tags" => tags
-              }
-            }
-          }
-        end
-        private_class_method :lambda_function
-
-        def self.lambda_role(prefix, tags)
-          {
-            "ToleranceLambdaRole" => {
-              "Type" => "AWS::IAM::Role",
-              "Properties" => {
-                "RoleName" => Naming.iam_role_name("#{prefix}-tolerance-lambda-role"),
-                "Tags" => tags,
-                "AssumeRolePolicyDocument" => {
-                  "Version" => "2012-10-17",
-                  "Statement" => [
-                    {
-                      "Effect" => "Allow",
-                      "Principal" => {"Service" => "lambda.amazonaws.com"},
-                      "Action" => "sts:AssumeRole"
-                    }
-                  ]
-                },
-                "ManagedPolicyArns" => [
-                  "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-                ],
-                "Policies" => [
-                  {
-                    "PolicyName" => "S3Access",
-                    "PolicyDocument" => {
-                      "Version" => "2012-10-17",
-                      "Statement" => [
-                        {
-                          "Effect" => "Allow",
-                          "Action" => ["s3:GetObject", "s3:PutObject"],
-                          "Resource" => "arn:aws:s3:::#{Turbofan.config.bucket}/*"
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "PolicyName" => "BatchAccess",
-                    "PolicyDocument" => {
-                      "Version" => "2012-10-17",
-                      "Statement" => [
-                        {
-                          "Effect" => "Allow",
-                          "Action" => ["batch:DescribeJobs", "batch:ListJobs"],
-                          "Resource" => "*"
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        end
-        private_class_method :lambda_role
 
         def self.lambda_artifacts(bucket_prefix)
           [{
@@ -263,6 +178,23 @@ module Turbofan
             body: handler_zip
           }]
         end
+
+        def self.build_config(prefix:, bucket_prefix:, tags:)
+          Lambdas::Packager::LambdaConfig.new(
+            logical_id: LOGICAL_ID,
+            role_logical_id: ROLE_LOGICAL_ID,
+            function_name: "#{prefix}-tolerance-check",
+            role_name: Naming.iam_role_name("#{prefix}-tolerance-lambda-role"),
+            s3_key: handler_s3_key(bucket_prefix),
+            memory_size: MEMORY_SIZE,
+            timeout: TIMEOUT,
+            code_hash: Lambdas::Packager.code_hash(HANDLER),
+            bucket_prefix: bucket_prefix,
+            tags: tags,
+            extra_policies: [BATCH_ACCESS_POLICY]
+          )
+        end
+        private_class_method :build_config
       end
     end
   end
