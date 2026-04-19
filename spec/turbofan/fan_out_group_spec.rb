@@ -248,7 +248,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
 
       it "does not accept concurrency: as a DagStep keyword" do
         expect {
-          Turbofan::DagStep.new(:process, fan_out: true, concurrency: 50)
+          Turbofan::DagStep.build(:process, fan_out: true, concurrency: 50)
         }.to raise_error(ArgumentError, /concurrency.*use batch_size: instead/)
       end
 
@@ -283,7 +283,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
   describe "DagStep rejects batch_size:" do
     it "raises ArgumentError when batch_size: is passed" do
       expect {
-        Turbofan::DagStep.new(:process, fan_out: true, batch_size: 100)
+        Turbofan::DagStep.build(:process, fan_out: true, batch_size: 100)
       }.to raise_error(ArgumentError, /batch_size has moved to the Step class/)
     end
 

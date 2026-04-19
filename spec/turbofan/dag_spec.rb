@@ -277,61 +277,61 @@ end
 RSpec.describe Turbofan::DagStep do
   describe "#name" do
     it "returns the step name" do
-      step = described_class.new(:process)
+      step = described_class.build(:process)
       expect(step.name).to eq(:process)
     end
   end
 
   describe "#fan_out?" do
     it "is false by default" do
-      step = described_class.new(:process)
+      step = described_class.build(:process)
       expect(step.fan_out?).to be false
     end
 
     it "is true when created with fan_out: true" do
-      step = described_class.new(:process, fan_out: true)
+      step = described_class.build(:process, fan_out: true)
       expect(step.fan_out?).to be true
     end
   end
 
   describe "#batch_size (moved to Step class)" do
     it "raises when passing batch_size: to DagStep" do
-      expect { described_class.new(:process, batch_size: 100) }
+      expect { described_class.build(:process, batch_size: 100) }
         .to raise_error(ArgumentError, /batch_size has moved to the Step class/)
     end
 
     it "raises when using the old group: keyword" do
-      expect { described_class.new(:foo, group: 5) }
+      expect { described_class.build(:foo, group: 5) }
         .to raise_error(ArgumentError, /use batch_size: instead/)
     end
   end
 
   describe "#fan_in" do
     it "defaults to true" do
-      step = described_class.new(:process)
+      step = described_class.build(:process)
       expect(step.fan_in).to be true
     end
 
     it "can be set to false" do
-      step = described_class.new(:process, fan_in: false)
+      step = described_class.build(:process, fan_in: false)
       expect(step.fan_in).to be false
     end
   end
 
   describe "immutability (Data.define)" do
     it "is frozen on construction" do
-      step = described_class.new(:process)
+      step = described_class.build(:process)
       expect(step).to be_frozen
     end
 
     it "cannot be mutated via writers (no writers exist)" do
-      step = described_class.new(:process)
+      step = described_class.build(:process)
       expect(step).not_to respond_to(:fan_out=)
       expect(step).not_to respond_to(:name=)
     end
 
     it "supports .with to produce an updated copy" do
-      original = described_class.new(:process, fan_out: false)
+      original = described_class.build(:process, fan_out: false)
       updated = original.with(fan_out: true, fan_out_timeout: 600)
       expect(original.fan_out).to be false
       expect(updated.fan_out).to be true
@@ -346,7 +346,7 @@ RSpec.describe Turbofan::Dag do
     it "swaps a step with an updated immutable copy" do
       dag = described_class.new
       dag.add_step(:process)
-      updated = Turbofan::DagStep.new(:process, fan_out: true)
+      updated = Turbofan::DagStep.build(:process, fan_out: true)
 
       dag.replace_step(:process, updated)
 
@@ -355,7 +355,7 @@ RSpec.describe Turbofan::Dag do
 
     it "raises when the step name is not found" do
       dag = described_class.new
-      replacement = Turbofan::DagStep.new(:missing)
+      replacement = Turbofan::DagStep.build(:missing)
       expect { dag.replace_step(:missing, replacement) }
         .to raise_error(ArgumentError, /:missing not found/)
     end
@@ -364,7 +364,7 @@ RSpec.describe Turbofan::Dag do
       dag = described_class.new
       dag.add_step(:process)
       dag.freeze!
-      replacement = Turbofan::DagStep.new(:process, fan_out: true)
+      replacement = Turbofan::DagStep.build(:process, fan_out: true)
       expect { dag.replace_step(:process, replacement) }
         .to raise_error(/frozen/)
     end

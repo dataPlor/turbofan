@@ -12,32 +12,29 @@ module Turbofan
   # Step class. Look up the Step class separately via Turbofan.discover_components
   # or the pipeline's step registry.
   DagStep = Data.define(:name, :fan_out, :tolerated_failure_rate, :fan_out_timeout, :fan_in) do
-    def fan_out?
-      fan_out
-    end
-  end
-
-  # Override DagStep.new to preserve the old positional-name + kw-rest API
-  # (`DagStep.new(:process, fan_out: true)`). We alias Data's generated
-  # keyword-only constructor as `_data_new` and call it from the wrapper.
-  # `def self.new` inside the Data.define block doesn't work reliably
-  # because `super` resolution differs across Ruby patch versions.
-  class << DagStep
-    alias_method :_data_new, :new
-
-    def new(name, fan_out: false, tolerated_failure_rate: 0, fan_out_timeout: nil, fan_in: true, **rest)
+    # Factory preserving the old positional-name + kw-rest sugar
+    # (`DagStep.build(:process, fan_out: true)`). Validates unknown
+    # keywords, fills defaults, then delegates to Data's generated
+    # keyword-only constructor. Keeping this as a separate factory
+    # (rather than overriding .new) leaves Data's .new and .with
+    # contracts intact — which is the idiomatic Data.define pattern.
+    def self.build(name, fan_out: false, tolerated_failure_rate: 0, fan_out_timeout: nil, fan_in: true, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "batch_size has moved to the Step class. Use `batch_size N` in your Step definition." if rest.key?(:batch_size)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
 
-      _data_new(
+      new(
         name: name,
         fan_out: fan_out,
         tolerated_failure_rate: tolerated_failure_rate,
         fan_out_timeout: fan_out_timeout,
         fan_in: fan_in
       )
+    end
+
+    def fan_out?
+      fan_out
     end
   end
 
@@ -57,7 +54,7 @@ module Turbofan
     def add_step(name, **kwargs)
       raise "DAG is frozen; cannot add steps after construction" if @frozen
 
-      step = DagStep.new(name, **kwargs)
+      step = DagStep.build(name, **kwargs)
       @steps << step
       @nodes << name
       step
