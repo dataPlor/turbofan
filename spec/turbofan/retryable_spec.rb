@@ -292,4 +292,77 @@ RSpec.describe Turbofan::Retryable do
       expect(described_class.transient?(RuntimeError.new("x"))).to be(false)
     end
   end
+
+  describe "observability via logger: kwarg" do
+    let(:log_io) { StringIO.new }
+    let(:logger) do
+      Turbofan::Runtime::Logger.new(
+        execution_id: "test-exec", step_name: "step", stage: "dev",
+        pipeline_name: "pipe", array_index: nil, output: log_io
+      )
+    end
+
+    def log_entries
+      log_io.string.split("\n").reject(&:empty?).map { |l| JSON.parse(l) }
+    end
+
+    it "logs one info entry per retry attempt when logger is passed" do
+      attempts = 0
+      described_class.call(max: 3, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, logger: logger) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 3
+        :ok
+      end
+
+      entries = log_entries
+      expect(entries.size).to eq(2)  # 2 retries (after attempts 1 and 2)
+      entries.each do |entry|
+        expect(entry["message"]).to eq("Retryable: transient error, retrying")
+        expect(entry["max"]).to eq(3)
+        expect(entry["error_class"]).to eq("Aws::S3::Errors::ServiceError")
+        expect(entry["code"]).to eq("SlowDown")
+        expect(entry["delay_ms"]).to be_a(Integer)
+      end
+      expect(entries.map { |e| e["attempt"] }).to eq([1, 2])
+    end
+
+    it "logs nothing when logger is nil (default, backward-compat)" do
+      attempts = 0
+      begin
+        described_class.call(max: 1, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }) do
+          attempts += 1
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      rescue Aws::Errors::ServiceError
+        # expected after max exhausted
+      end
+      expect(log_io.string).to eq("")  # logger not touched
+    end
+
+    it "logs nothing for non-transient errors (no retry happens)" do
+      begin
+        described_class.call(sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, logger: logger) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "AccessDenied", status: 403)
+        end
+      rescue Aws::Errors::ServiceError
+        # expected
+      end
+      expect(log_entries).to be_empty
+    end
+
+    it "does NOT log after final attempt exhausts max (failure not a retry)" do
+      attempts = 0
+      begin
+        described_class.call(max: 2, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, logger: logger) do
+          attempts += 1
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      rescue Aws::Errors::ServiceError
+        # expected
+      end
+      # 3 total attempts (1 initial + 2 retries); logs should cover the 2 retries only
+      expect(log_entries.size).to eq(2)
+      expect(log_entries.map { |e| e["attempt"] }).to eq([1, 2])
+    end
+  end
 end

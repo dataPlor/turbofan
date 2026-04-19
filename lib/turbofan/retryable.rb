@@ -64,9 +64,15 @@ module Turbofan
     # Requests), 500-599 (server errors).
     MAX_ATTEMPTS_LIMIT = 20
 
+    # Optional `logger:` kwarg takes any object responding to `#info(msg, **kwargs)`
+    # (including Turbofan::Runtime::Logger). When present, emits one structured
+    # entry per retry attempt with: attempt, max, error_class, code, delay_ms.
+    # Default `nil` keeps Retryable silent — no behavior change for existing
+    # callers. Pass `logger: context.logger` at call sites that have a Context.
     def self.call(max: 5, base: 0.5, cap: 30,
                   sleeper: Kernel.method(:sleep),
-                  jitter_rand: Kernel.method(:rand))
+                  jitter_rand: Kernel.method(:rand),
+                  logger: nil)
       raise ArgumentError, "block required" unless block_given?
       raise ArgumentError, "max must be 1..#{MAX_ATTEMPTS_LIMIT}, got #{max}" unless max.is_a?(Integer) && max >= 1 && max <= MAX_ATTEMPTS_LIMIT
       raise ArgumentError, "base must be > 0, got #{base}" unless base.is_a?(Numeric) && base > 0
@@ -81,6 +87,12 @@ module Turbofan
         raise if attempt > max
         backoff = [cap, base * (2**(attempt - 1))].min.to_f
         delay = jitter_rand.call * backoff
+        logger&.info("Retryable: transient error, retrying",
+          attempt: attempt,
+          max: max,
+          error_class: e.class.name,
+          code: (e.respond_to?(:code) ? e.code : nil),
+          delay_ms: (delay * 1000).round)
         sleeper.call(delay)
         retry
       end
