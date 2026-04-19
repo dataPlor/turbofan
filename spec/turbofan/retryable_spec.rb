@@ -488,5 +488,27 @@ RSpec.describe Turbofan::Retryable do
       # before that sleep.
       expect(attempts).to eq(3)
     end
+
+    it "emits RetryBudgetExhausted metric distinct from RetriesExhausted on budget trip" do
+      Turbofan.config.max_retry_seconds = 1.0
+      recorder = Class.new do
+        attr_reader :emitted
+        def initialize = @emitted = []
+        def emit(name, value, unit: nil) = @emitted << {name: name, value: value}
+      end.new
+
+      begin
+        described_class.call(max: 10, base: 2.0, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }, metrics: recorder) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      rescue Turbofan::RetryBudgetExhausted
+        # expected
+      end
+
+      names = recorder.emitted.map { |e| e[:name] }
+      expect(names).to include("RetryBudgetExhausted")
+      expect(names).not_to include("RetriesExhausted"),
+        "budget-trip path must emit RetryBudgetExhausted only, not RetriesExhausted"
+    end
   end
 end

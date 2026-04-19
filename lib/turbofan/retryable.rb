@@ -122,7 +122,15 @@ module Turbofan
         # Turbofan.config.max_retry_seconds is nil (default), budget
         # is skipped.
         if budget && elapsed_sleep + delay > budget
-          metrics&.emit("RetriesExhausted", 1)
+          # Distinct metric from RetriesExhausted. Operators need to
+          # distinguish "gave up on attempt count" from "gave up on
+          # wall-clock budget" — they're different failure modes that
+          # warrant different alert thresholds. RetryBudgetExhausted
+          # usually implies the service is degraded for longer than
+          # we're willing to wait (Spot reclamation, SLO pressure);
+          # RetriesExhausted usually implies persistent failure.
+          # Mike Perham's final-review ask.
+          metrics&.emit("RetryBudgetExhausted", 1)
           raise Turbofan::RetryBudgetExhausted.new(
             elapsed_seconds: elapsed_sleep,
             budget_seconds: budget,
