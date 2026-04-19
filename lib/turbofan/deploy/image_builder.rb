@@ -222,10 +222,15 @@ module Turbofan
 
       def self.run_cmd(*cmd)
         Turbofan::Subprocess.capture(*cmd)
-      rescue Turbofan::Subprocess::Error => e
-        raise "Command failed: #{cmd.first(3).join(" ")}\n#{e.stderr}"
-      rescue Errno::ENOENT
-        raise "Command failed: #{cmd.first(3).join(" ")}\ncommand not found"
+      rescue Errno::ENOENT => e
+        # Normalize missing-binary failures into the same structured Error
+        # type that non-zero exits produce, so callers rescuing
+        # Subprocess::Error catch both. Exit code 127 is the shell
+        # convention for "command not found".
+        raise Turbofan::Subprocess::Error.new(
+          command: cmd, exit_code: 127, stdout: "",
+          stderr: "command not found (#{e.message})"
+        )
       end
       private_class_method :run_cmd
     end
