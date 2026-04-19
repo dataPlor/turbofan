@@ -1,0 +1,94 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bin/release — cut a Turbofan gem release.
+#
+# Verifies the CHANGELOG has been moved out of [Unreleased] into a
+# dated version section, runs the test suite, builds the gem, and
+# (unless --dry-run) pushes to rubygems + tags the commit.
+#
+# Usage:
+#
+#   bin/release              # full release
+#   bin/release --dry-run    # stop before gem push + tag
+#
+# Expected pre-state:
+#   * lib/turbofan/version.rb already bumped to the new version
+#   * CHANGELOG.md [Unreleased] already renamed to [X.Y.Z] — YYYY-MM-DD
+#   * New empty [Unreleased] header added back
+#   * All changes committed (clean working tree)
+
+require "open3"
+require_relative "../lib/turbofan/version"
+
+DRY_RUN = ARGV.include?("--dry-run")
+VERSION = Turbofan::VERSION
+TAG = "v#{VERSION}"
+
+def die(msg)
+  warn "\e[31m[release] ERROR: #{msg}\e[0m"
+  exit 1
+end
+
+def info(msg)
+  warn "\e[36m[release]\e[0m #{msg}"
+end
+
+def run(*cmd, allow_failure: false)
+  info "$ #{cmd.join(' ')}"
+  stdout, stderr, status = Open3.capture3(*cmd)
+  unless status.success? || allow_failure
+    die "command failed:\n  stdout: #{stdout}\n  stderr: #{stderr}"
+  end
+  [stdout, stderr, status]
+end
+
+info "Releasing turbofan #{VERSION} (#{DRY_RUN ? "DRY RUN" : "LIVE"})"
+
+# Pre-flight: clean working tree
+stdout, _, _ = run("git", "status", "--porcelain")
+die "working tree is not clean — commit or stash before release" unless stdout.strip.empty?
+
+# Pre-flight: on main
+stdout, _, _ = run("git", "branch", "--show-current")
+branch = stdout.strip
+die "must release from main (currently on #{branch})" unless branch == "main"
+
+# Pre-flight: tag doesn't already exist
+_, _, status = run("git", "rev-parse", TAG, allow_failure: true)
+die "tag #{TAG} already exists — bump version in lib/turbofan/version.rb" if status.success?
+
+# Pre-flight: CHANGELOG has the version section with a date
+changelog = File.read("CHANGELOG.md")
+section_header = "## [#{VERSION}]"
+die "CHANGELOG.md has no '#{section_header}' section — promote [Unreleased] to [#{VERSION}] — YYYY-MM-DD first" unless changelog.include?(section_header)
+die "CHANGELOG.md has '#{section_header}' but no date on that line — add ' — YYYY-MM-DD'" unless changelog.match?(/^#{Regexp.escape(section_header)}.*\d{4}-\d{2}-\d{2}/)
+
+# Tests + build
+run("bundle", "exec", "rspec")
+info "test suite passed"
+
+Dir["turbofan-*.gem"].each { |f| File.unlink(f) }
+run("gem", "build", "turbofan.gemspec")
+built = Dir["turbofan-#{VERSION}.gem"].first
+die "gem build didn't produce turbofan-#{VERSION}.gem" unless built
+info "built #{built}"
+
+run("gem", "install", "--local", "--user-install", built)
+run("ruby", "-rturbofan", "-e", %(raise unless Turbofan::VERSION == "#{VERSION}"))
+info "require turbofan → #{VERSION} (smoke test passed)"
+
+if DRY_RUN
+  info "dry run complete. Review turbofan-#{VERSION}.gem, then re-run without --dry-run to push + tag."
+  exit 0
+end
+
+run("gem", "push", built)
+info "pushed turbofan #{VERSION} to rubygems.org"
+
+run("git", "tag", "-a", TAG, "-m", "Release #{TAG}")
+run("git", "push", "origin", "main")
+run("git", "push", "origin", TAG)
+info "tagged and pushed #{TAG}"
+
+info "Done. https://rubygems.org/gems/turbofan/versions/#{VERSION}"
