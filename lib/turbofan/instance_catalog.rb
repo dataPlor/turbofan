@@ -101,6 +101,8 @@ module Turbofan
       Entry.new(type: "r7gd.16xlarge", family: :r, vcpus: 64, ram_gb: 512, nvme: true)
     ].freeze
 
+    private_constant :INSTANCES
+
     def self.for_family(family, nvme:)
       INSTANCES.select { |e| e.family == family && e.nvme? == nvme }
     end

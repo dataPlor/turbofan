@@ -187,7 +187,7 @@ module Turbofan
         raise SchemaIncompatibleError,
           "Step :#{source_proxy.step_name} has no output schema"
       end
-      target_label = Turbofan::GET_CLASS_NAME.bind_call(target_class) || target_class.inspect
+      target_label = Turbofan::Discovery.class_name_of(target_class) || target_class.inspect
       unless target_class.turbofan_input_schema
         raise SchemaIncompatibleError,
           "Step #{target_label} has no input schema"

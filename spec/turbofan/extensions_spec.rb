@@ -55,15 +55,24 @@ RSpec.describe Turbofan::Extensions do
     end
   end
 
-  describe "PLATFORM" do
-    it "is linux_arm64" do
-      expect(described_class::PLATFORM).to eq("linux_arm64")
+  describe ".install_path" do
+    it "targets the linux_arm64 platform directory" do
+      expect(described_class.install_path).to include("linux_arm64")
     end
   end
 
-  describe "COMMUNITY" do
-    it "includes h3 and delta" do
-      expect(described_class::COMMUNITY).to contain_exactly(:h3, :delta)
+  describe ".repo_url" do
+    it "routes h3 through the community DuckDB extension repository" do
+      expect(described_class.repo_url(:h3)).to include("community-extensions.duckdb.org")
+    end
+
+    it "routes delta through the community repository" do
+      expect(described_class.repo_url(:delta)).to include("community-extensions.duckdb.org")
+    end
+
+    it "routes core extensions through the main DuckDB extension repository" do
+      expect(described_class.repo_url(:spatial)).to include("extensions.duckdb.org")
+      expect(described_class.repo_url(:spatial)).not_to include("community-")
     end
   end
 end

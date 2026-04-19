@@ -70,17 +70,15 @@ module Turbofan
     config.schemas_path = path
   end
 
-  GET_CLASS_NAME = Module.instance_method(:name)
-
   def self.discover_components
     steps = {}
     Discovery.subclasses_of(Step).each do |c|
-      steps[snake_case(GET_CLASS_NAME.bind_call(c))] = c
+      steps[snake_case(Discovery.class_name_of(c))] = c
     end
 
     pipelines = {}
     Discovery.subclasses_of(Pipeline).each do |c|
-      pipelines[snake_case(GET_CLASS_NAME.bind_call(c))] = c
+      pipelines[snake_case(Discovery.class_name_of(c))] = c
     end
 
     resources = {}

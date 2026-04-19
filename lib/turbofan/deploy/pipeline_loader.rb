@@ -18,7 +18,7 @@ module Turbofan
         components = Turbofan.discover_components
         new_pipelines = components[:pipelines].values.reject { |c| before.include?(c) }
         raise "No pipeline class found after loading #{pipeline_file}" if new_pipelines.empty?
-        raise "Multiple pipeline classes found: #{new_pipelines.map { |c| Turbofan::GET_CLASS_NAME.bind_call(c) }}" if new_pipelines.size > 1
+        raise "Multiple pipeline classes found: #{new_pipelines.map { |c| Turbofan::Discovery.class_name_of(c) }}" if new_pipelines.size > 1
         pipeline_class = new_pipelines.first
 
         dag = pipeline_class.turbofan_dag

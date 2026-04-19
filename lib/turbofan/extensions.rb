@@ -6,6 +6,7 @@ module Turbofan
 
     CORE_REPO = "https://extensions.duckdb.org"
     COMMUNITY_REPO = "https://community-extensions.duckdb.org"
+    private_constant :PLATFORM, :COMMUNITY, :CORE_REPO, :COMMUNITY_REPO
 
     def self.version
       "v#{Turbofan.config.duckdb_version}"

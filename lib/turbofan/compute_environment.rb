@@ -2,8 +2,11 @@
 
 module Turbofan
   module ComputeEnvironment
+    # Public: consumed by runtime/wrapper.rb for NVMe mount detection.
     NVME_MOUNT_PATH = "/mnt/nvme"
 
+    # Internal: the cloud-init user data script is an implementation
+    # detail of generate_template; callers should not embed it directly.
     NVME_USERDATA = <<~'BASH'
       Content-Type: multipart/mixed; boundary="MIMEBOUNDARY"
       MIME-Version: 1.0
@@ -69,6 +72,7 @@ module Turbofan
 
       --MIMEBOUNDARY--
     BASH
+    private_constant :NVME_USERDATA
 
     def self.included(base)
       base.extend(ClassMethods)

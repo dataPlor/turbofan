@@ -69,7 +69,7 @@ module Turbofan
           Kernel.load(router_path)
         end
         Turbofan::Discovery.subclasses_of(Turbofan::Router).each do |c|
-          key = Turbofan.snake_case(Turbofan::GET_CLASS_NAME.bind_call(c)).to_s.delete_suffix("_router").to_sym
+          key = Turbofan.snake_case(Turbofan::Discovery.class_name_of(c)).to_s.delete_suffix("_router").to_sym
           routers[key] = c if steps.key?(key)
         end
         routers

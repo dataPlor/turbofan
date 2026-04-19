@@ -83,7 +83,7 @@ module Turbofan
         components[:steps].each do |method_name, klass|
           if RESERVED_DAG_METHODS.include?(method_name)
             raise ArgumentError,
-              "Step class #{Turbofan::GET_CLASS_NAME.bind_call(klass)} maps to :#{method_name}, which conflicts " \
+              "Step class #{Turbofan::Discovery.class_name_of(klass)} maps to :#{method_name}, which conflicts " \
               "with a reserved DagBuilder method. Rename the step class."
           end
           builder.define_singleton_method(method_name) do |input_proxy = nil|
@@ -99,7 +99,7 @@ module Turbofan
           next if klass == self  # skip self-reference
           if RESERVED_DAG_METHODS.include?(method_name)
             raise ArgumentError,
-              "Pipeline class #{Turbofan::GET_CLASS_NAME.bind_call(klass)} maps to :#{method_name}, which conflicts " \
+              "Pipeline class #{Turbofan::Discovery.class_name_of(klass)} maps to :#{method_name}, which conflicts " \
               "with a reserved DagBuilder method. Rename the pipeline class."
           end
 

@@ -177,7 +177,7 @@ RSpec.describe "Turbofan::Resource" do
 
       discovered = Turbofan::Resource.discover
       discovered.each do |klass|
-        expect(Turbofan::GET_CLASS_NAME.bind_call(klass)).not_to be_nil
+        expect(Turbofan::Discovery.class_name_of(klass)).not_to be_nil
       end
     end
 
