@@ -382,8 +382,8 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "read_visits has S3 dependency" do
-      expect(read_visits_class.uses_s3.size).to eq(1)
-      expect(read_visits_class.uses_s3.first[:uri]).to start_with("s3://#{INTEGRATION_EXT_BUCKET}")
+      expect(read_visits_class.turbofan.uses_s3.size).to eq(1)
+      expect(read_visits_class.turbofan.uses_s3.first[:uri]).to start_with("s3://#{INTEGRATION_EXT_BUCKET}")
     end
 
     it "classify is an external step" do
@@ -400,8 +400,8 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "aggregate has writes_to S3 dependency" do
-      expect(aggregate_class.writes_to_s3.size).to eq(1)
-      expect(aggregate_class.writes_to_s3.first[:uri]).to include("turbofan-test")
+      expect(aggregate_class.turbofan.writes_to_s3.size).to eq(1)
+      expect(aggregate_class.turbofan.writes_to_s3.first[:uri]).to include("turbofan-test")
     end
 
     it "controlled_step has SFN retry configuration" do

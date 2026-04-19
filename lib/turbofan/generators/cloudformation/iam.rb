@@ -354,7 +354,7 @@ module Turbofan
 
           # Read-only S3 URIs (from uses/reads_from)
           read_arns = steps.flat_map { |_, sclass|
-            sclass.uses_s3.flat_map { |dep| s3_uri_to_arns(dep[:uri]) }
+            sclass.turbofan.uses_s3.flat_map { |dep| s3_uri_to_arns(dep[:uri]) }
           }.uniq
           if read_arns.any?
             statements << {
@@ -366,7 +366,7 @@ module Turbofan
 
           # Read-write S3 URIs (from writes_to)
           write_arns = steps.flat_map { |_, sclass|
-            sclass.writes_to_s3.flat_map { |dep| s3_uri_to_arns(dep[:uri]) }
+            sclass.turbofan.writes_to_s3.flat_map { |dep| s3_uri_to_arns(dep[:uri]) }
           }.uniq
           if write_arns.any?
             statements << {

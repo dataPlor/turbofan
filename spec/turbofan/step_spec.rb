@@ -149,8 +149,8 @@ RSpec.describe Turbofan::Step do
       expect(step_class.turbofan_resource_keys).to be_empty
     end
 
-    it "returns S3 deps via uses_s3" do
-      expect(step_class.uses_s3).to eq([{type: :s3, uri: "s3://data-bucket/input/*"}])
+    it "returns S3 deps via the façade (uses_s3)" do
+      expect(step_class.turbofan.uses_s3).to eq([{type: :s3, uri: "s3://data-bucket/input/*"}])
     end
   end
 
@@ -179,8 +179,8 @@ RSpec.describe Turbofan::Step do
       expect(step_class.turbofan_resource_keys).to include(:places_write)
     end
 
-    it "returns write S3 deps via writes_to_s3" do
-      expect(step_class.writes_to_s3).to eq([{type: :s3, uri: "s3://output-bucket/results/"}])
+    it "returns write S3 deps via the façade (writes_to_s3)" do
+      expect(step_class.turbofan.writes_to_s3).to eq([{type: :s3, uri: "s3://output-bucket/results/"}])
     end
   end
 

@@ -66,6 +66,14 @@ module Turbofan
       def fargate? = @step_class.turbofan_fargate?
       def external? = @step_class.turbofan_external?
 
+      # S3 dependency filters — previously public-by-accident on
+      # Step::ClassMethods (Jeremy Evans's audit flag), now routed
+      # exclusively through the façade. The private-on-ClassMethods
+      # versions still exist and this delegates to them via send so
+      # privatization doesn't break internal behavior.
+      def uses_s3 = @step_class.send(:uses_s3)
+      def writes_to_s3 = @step_class.send(:writes_to_s3)
+
       def inspect
         attrs = FIELDS.map { |f| "#{f}=#{public_send(f).inspect}" }.join(" ")
         "#<Turbofan::Step::ConfigFacade #{Turbofan::Discovery.class_name_of(@step_class)} #{attrs}>"
@@ -352,17 +360,33 @@ module Turbofan
         @turbofan_security_groups || Turbofan.config.security_groups
       end
 
-      # Resource keys from both uses and writes_to (symbols only, no S3)
+      # Resource keys from both uses and writes_to (symbols only, no S3).
+      # Public: documented reader + exposed on the .turbofan façade as
+      # `resource_keys`. Multiple internal callers (generators,
+      # resource_check, instance_check) depend on this.
       def turbofan_resource_keys
         @turbofan_resource_keys ||= (uses_resources + writes_to_resources).map { |d| d[:key] }.uniq.freeze
       end
 
-      # Whether DuckDB is needed (explicit :duckdb OR any resource key OR extensions)
+      # Public: documented reader + .turbofan.needs_duckdb? façade entry.
       def turbofan_needs_duckdb?
         turbofan_resource_keys.any? || @turbofan_duckdb_extensions.any?
       end
 
-      # Filter helpers
+      # add_duckdb_extensions is defined above (public order-of-declaration)
+      # but is purely internal — called only by UsesDuckdbDSL and the uses
+      # macro's kwarg path. Retroactively privatize.
+      private :add_duckdb_extensions
+
+      private
+
+      # The four filter helpers are implementation details of the public
+      # DSL / façade. Previously public-by-accident (no external docs, no
+      # external lib/ callers except iam.rb's use of uses_s3/writes_to_s3
+      # which is now routed through the façade). Made private to tighten
+      # the public surface per Jeremy Evans's audit — "publishing an API
+      # means declaring it."
+
       def uses_resources
         @turbofan_uses_resources ||= @turbofan_uses.select { |d| d[:type] == :resource }.freeze
       end
@@ -378,8 +402,6 @@ module Turbofan
       def writes_to_s3
         @turbofan_writes_to_s3 ||= @turbofan_writes_to.select { |d| d[:type] == :s3 }.freeze
       end
-
-      private
 
       # :duckdb is a reserved/built-in resource key. DuckDB is automatically
       # available when any resource key is declared (see BUILT_IN_RESOURCES in
