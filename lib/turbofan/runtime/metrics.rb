@@ -19,20 +19,33 @@ module Turbofan
         @pending << entry
       end
 
+      # CloudWatch PutMetricData supports up to 1000 metrics per call (1 MB
+      # payload cap). Previously we used 20, causing 50× more API calls than
+      # needed and increased throttle exposure at high fan-out scale.
+      BATCH_SIZE = 100
+
       def flush
         return if @pending.empty?
 
-        @pending.each_slice(20) do |batch|
+        # Clear each batch only after its PUT succeeds. If a later batch fails
+        # after retry exhaustion, the unsent remainder stays in @pending so a
+        # subsequent flush call (if the container lives long enough) can retry.
+        until @pending.empty?
+          batch = @pending.first(BATCH_SIZE)
           metric_data = batch.map { |entry| build_metric_datum(entry) }
-          cloudwatch_client.put_metric_data(
-            namespace: "Turbofan/#{@pipeline_name}",
-            metric_data: metric_data
-          )
+          Turbofan::Retryable.call do
+            cloudwatch_client.put_metric_data(
+              namespace: "Turbofan/#{@pipeline_name}",
+              metric_data: metric_data
+            )
+          end
+          @pending.shift(batch.size)
         end
-        @pending.clear
       rescue Aws::Errors::ServiceError => e
-        warn("[Turbofan] WARNING: Failed to flush #{@pending.size} metrics: #{e.message}")
-        @pending.clear
+        warn("[Turbofan] WARNING: Failed to flush #{@pending.size} remaining metrics: #{e.message}")
+        # Intentionally do NOT clear @pending — if this Metrics instance is
+        # flushed again, we get another chance. Container teardown is the
+        # only path that truly drops them.
       end
 
       private

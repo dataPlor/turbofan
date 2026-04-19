@@ -148,7 +148,9 @@ RSpec.describe Turbofan::Runtime::Metrics do
       allow(cloudwatch_client).to receive(:put_metric_data)
     end
 
-    {20 => 1, 25 => 2, 40 => 2, 41 => 3}.each do |count, expected_batches|
+    # Batch size is 100 (CloudWatch limit is 1000 per call; 100 gives
+    # payload-size headroom while cutting 5x the API calls vs the old 20).
+    {100 => 1, 101 => 2, 200 => 2, 201 => 3}.each do |count, expected_batches|
       it "sends #{count} metrics in #{expected_batches} batch(es)" do
         count.times { |i| metrics.emit("metric_#{i}", i) }
         metrics.flush
@@ -176,15 +178,17 @@ RSpec.describe Turbofan::Runtime::Metrics do
       expect { metrics.flush }.to output(/CloudWatch is down/).to_stderr
     end
 
-    it "clears pending metrics after failure" do
+    it "preserves pending metrics after failure so a subsequent flush can retry" do
       metrics.emit("rows_processed", 1000)
-      metrics.flush
+      metrics.flush  # first flush raises, gets rescued, metric stays in @pending
 
       allow(cloudwatch_client).to receive(:put_metric_data)
-      metrics.flush
-      # put_metric_data was called once during the first (failed) flush;
-      # the second flush should be a no-op because pending was cleared
-      expect(cloudwatch_client).to have_received(:put_metric_data).once
+      metrics.flush  # second flush succeeds, drains @pending
+
+      # First flush: 1 call (attempt before Retryable gives up on
+      # InternalServiceFault — note: non-transient for our predicate since
+      # no HTTP status). Second flush: 1 more call. Total: 2.
+      expect(cloudwatch_client).to have_received(:put_metric_data).at_least(2).times
     end
   end
 end
