@@ -4,6 +4,20 @@ require "json"
 
 module Turbofan
   module Step
+    # Block-form receiver for `uses :duckdb do ... end`. Delegates the
+    # single meaningful verb (extensions) back to the owning step class
+    # so the public side of the DSL doesn't leak a private receiver type.
+    class UsesDuckdbDSL
+      def initialize(step_class)
+        @step_class = step_class
+      end
+
+      def extensions(*names)
+        @step_class.send(:add_duckdb_extensions, names)
+      end
+    end
+    private_constant :UsesDuckdbDSL
+
     # Per-class DSL state defaults. Frozen so the constant itself can't
     # be mutated; .dup'd per-class in initializers so each Step subclass
     # gets an independent mutable copy of the container values (Arrays,
@@ -151,22 +165,57 @@ module Turbofan
         @turbofan_sizes[name] = {cpu: cpu, ram: ram, batch_size: batch_size}
       end
 
-      def uses(target, extensions: nil)
+      # Declare a step-level dependency. Accepts a resource Symbol
+      # (`uses :postgres`) or an S3 URI String (`uses "s3://bucket/key"`).
+      #
+      # For DuckDB extensions, prefer the block form:
+      #
+      #   uses :duckdb do
+      #     extensions :json, :parquet, :spatial
+      #   end
+      #
+      # The old kwarg form still works but is deprecated and logs a
+      # one-time warning per class:
+      #
+      #   uses :duckdb, extensions: [:json, :parquet]  # deprecated
+      #
+      # The block form reads more like configuration of a named thing;
+      # the kwarg form has the oddity that `extensions:` is only valid
+      # when `target == :duckdb` (Matz's "the argument shape is lying"
+      # critique).
+      def uses(target, extensions: nil, &block)
         dep = parse_dependency(target)
         @turbofan_uses << dep unless @turbofan_uses.include?(dep)
-        if extensions
+
+        if block
+          raise ArgumentError, "uses block form is only supported for :duckdb" unless target == :duckdb
+          raise ArgumentError, "uses: cannot pass both `extensions:` kwarg and a block" if extensions
+          UsesDuckdbDSL.new(self).instance_eval(&block)
+        elsif extensions
           raise ArgumentError, "extensions: is only supported for :duckdb" unless target == :duckdb
-          Array(extensions).each do |ext|
-            ext = ext.to_sym
-            unless ext.to_s.match?(/\A[a-z][a-z0-9_]*\z/)
-              raise ArgumentError, "invalid extension name: #{ext.inspect}"
-            end
-            @turbofan_duckdb_extensions << ext unless @turbofan_duckdb_extensions.include?(ext)
-          end
+          Turbofan::Deprecations.warn_once(
+            self, :uses_extensions_kwarg,
+            "uses(:duckdb, extensions: [...]) is deprecated; use the block form: " \
+            "uses(:duckdb) { extensions :json, :parquet }. Will be removed in 0.7."
+          )
+          add_duckdb_extensions(extensions)
         end
       end
 
       alias_method :reads_from, :uses
+
+      # Internal: used by the block form of `uses :duckdb`. Adds each
+      # argument to @turbofan_duckdb_extensions with the same validation
+      # as the legacy kwarg path.
+      def add_duckdb_extensions(names)
+        Array(names).each do |ext|
+          ext = ext.to_sym
+          unless ext.to_s.match?(/\A[a-z][a-z0-9_]*\z/)
+            raise ArgumentError, "invalid extension name: #{ext.inspect}"
+          end
+          @turbofan_duckdb_extensions << ext unless @turbofan_duckdb_extensions.include?(ext)
+        end
+      end
 
       def writes_to(target)
         dep = parse_dependency(target)

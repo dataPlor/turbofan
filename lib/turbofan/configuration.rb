@@ -6,7 +6,7 @@ module Turbofan
       :log_retention_days, :notification_topic_arn, :docker_registry,
       :duckdb_version, :aws_account_id, :subnets, :security_groups,
       :cur_s3_uri, :fan_out_early_exit_threshold, :max_retry_seconds,
-      :worker_stall_seconds
+      :worker_stall_seconds, :deprecations
 
     def initialize
       @bucket = nil
@@ -52,6 +52,14 @@ module Turbofan
       # Sidekiq's equivalent feature exists for — a worker that's not
       # crashing but also not making progress should be loud.
       @worker_stall_seconds = nil
+
+      # Whether to emit deprecation warnings from Turbofan::Deprecations.
+      # Default nil = quiet, matching $VERBOSE-off runtime behavior.
+      # Turbofan::Deprecations also emits when $VERBOSE is true, so
+      # rspec/rake/test runs that set -W automatically see warnings.
+      # Set true to force emission in production for one release cycle
+      # during a migration.
+      @deprecations = nil
     end
   end
 
