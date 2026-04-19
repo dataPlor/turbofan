@@ -273,7 +273,7 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
         compute_environment :test_ce
         cpu 1
-        uses :duckdb, extensions: [:spatial]
+        uses(:duckdb) { extensions :spatial }
       end
       expect(step.turbofan_needs_duckdb?).to be true
     end
@@ -833,7 +833,7 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
         compute_environment :test_ce
         cpu 2
-        uses :duckdb, extensions: [:spatial, :h3]
+        uses(:duckdb) { extensions :spatial, :h3 }
       end
     end
 
@@ -848,7 +848,7 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
         compute_environment :test_ce
         cpu 1
-        uses :duckdb, extensions: [:spatial, :spatial, :h3]
+        uses(:duckdb) { extensions :spatial, :spatial, :h3 }
       end
       expect(step.turbofan_duckdb_extensions).to eq([:spatial, :h3])
     end
@@ -860,12 +860,12 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
         compute_environment :test_ce
         cpu 1
-        uses :duckdb, extensions: ["spatial"]
+        uses(:duckdb) { extensions "spatial" }
       end
       expect(step.turbofan_duckdb_extensions).to eq([:spatial])
     end
 
-    it "raises ArgumentError for non-duckdb target with extensions" do
+    it "raises ArgumentError for non-duckdb target with block" do
       ce = ce_class
       expect {
         Class.new do
@@ -873,9 +873,9 @@ RSpec.describe Turbofan::Step do
           runs_on :batch
           compute_environment :test_ce
           cpu 1
-          uses :gpu, extensions: [:spatial]
+          uses(:gpu) { extensions :spatial }
         end
-      }.to raise_error(ArgumentError, /only supported for :duckdb/)
+      }.to raise_error(ArgumentError, /block form is only supported for :duckdb/)
     end
 
     it "raises ArgumentError for invalid extension names" do
@@ -886,7 +886,7 @@ RSpec.describe Turbofan::Step do
           runs_on :batch
           compute_environment :test_ce
           cpu 1
-          uses :duckdb, extensions: [:"Invalid-Ext"]
+          uses(:duckdb) { extensions :"Invalid-Ext" }
         end
       }.to raise_error(ArgumentError, /invalid extension name/)
     end
@@ -909,8 +909,8 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
         compute_environment :test_ce
         cpu 1
-        uses :duckdb, extensions: [:spatial]
-        uses :duckdb, extensions: [:h3]
+        uses(:duckdb) { extensions :spatial }
+        uses(:duckdb) { extensions :h3 }
       end
       expect(step.turbofan_duckdb_extensions).to eq([:spatial, :h3])
     end

@@ -279,37 +279,21 @@ module Turbofan
       # Declare a step-level dependency. Accepts a resource Symbol
       # (`uses :postgres`) or an S3 URI String (`uses "s3://bucket/key"`).
       #
-      # For DuckDB extensions, prefer the block form:
+      # For DuckDB extensions, pass a block:
       #
       #   uses :duckdb do
       #     extensions :json, :parquet, :spatial
       #   end
       #
-      # The old kwarg form still works but is deprecated and logs a
-      # one-time warning per class:
-      #
-      #   uses :duckdb, extensions: [:json, :parquet]  # deprecated
-      #
-      # The block form reads more like configuration of a named thing;
-      # the kwarg form has the oddity that `extensions:` is only valid
-      # when `target == :duckdb` (Matz's "the argument shape is lying"
-      # critique).
-      def uses(target, extensions: nil, &block)
+      # Only :duckdb accepts a block. The block form replaced the old
+      # `extensions:` kwarg in 0.6.0; kwarg form was removed in 0.7.0.
+      def uses(target, &block)
         dep = parse_dependency(target)
         @turbofan_uses << dep unless @turbofan_uses.include?(dep)
 
         if block
           raise ArgumentError, "uses block form is only supported for :duckdb" unless target == :duckdb
-          raise ArgumentError, "uses: cannot pass both `extensions:` kwarg and a block" if extensions
           UsesDuckdbDSL.new(self).instance_eval(&block)
-        elsif extensions
-          raise ArgumentError, "extensions: is only supported for :duckdb" unless target == :duckdb
-          Turbofan::Deprecations.warn_once(
-            self, :uses_extensions_kwarg,
-            "uses(:duckdb, extensions: [...]) is deprecated; use the block form: " \
-            "uses(:duckdb) { extensions :json, :parquet }. Will be removed in 0.7."
-          )
-          add_duckdb_extensions(extensions)
         end
       end
 
