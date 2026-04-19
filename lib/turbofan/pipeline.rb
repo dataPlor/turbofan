@@ -2,18 +2,37 @@
 
 module Turbofan
   module Pipeline
+    DEFAULT_STATE = {
+      turbofan_name: nil,
+      turbofan_metrics: [],
+      turbofan_pipeline_block: nil,
+      turbofan_compute_environment: nil,
+      turbofan_tags: {},
+      turbofan_schedule: nil,
+      turbofan_timeout: nil
+    }.freeze
+    private_constant :DEFAULT_STATE
+
+    def self.init_state(klass)
+      DEFAULT_STATE.each do |key, value|
+        klass.instance_variable_set(:"@#{key}", value.dup)
+      end
+    end
+
     def self.included(base)
       base.extend(ClassMethods)
-      base.instance_variable_set(:@turbofan_name, nil)
-      base.instance_variable_set(:@turbofan_metrics, [])
-      base.instance_variable_set(:@turbofan_pipeline_block, nil)
-      base.instance_variable_set(:@turbofan_compute_environment, nil)
-      base.instance_variable_set(:@turbofan_tags, {})
-      base.instance_variable_set(:@turbofan_schedule, nil)
-      base.instance_variable_set(:@turbofan_timeout, nil)
+      init_state(base)
     end
 
     module ClassMethods
+      # Mirror of Step#inherited: re-initialize per-class DSL state so a
+      # subclass of a Pipeline-including class gets its own ivar slots.
+      # Call super to preserve downstream inheritance hooks.
+      def inherited(subclass)
+        super
+        Turbofan::Pipeline.init_state(subclass)
+      end
+
       attr_reader :turbofan_name, :turbofan_metrics,
         :turbofan_compute_environment, :turbofan_tags, :turbofan_schedule,
         :turbofan_timeout

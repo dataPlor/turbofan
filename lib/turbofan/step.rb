@@ -4,29 +4,58 @@ require "json"
 
 module Turbofan
   module Step
+    # Per-class DSL state defaults. Frozen so the constant itself can't
+    # be mutated; .dup'd per-class in initializers so each Step subclass
+    # gets an independent mutable copy of the container values (Arrays,
+    # Hashes). Shallow-dup is sufficient because the containers start
+    # empty — if a default ever contained a nested collection, it would
+    # need Marshal.load(Marshal.dump(DEFAULT)) to avoid aliasing.
+    DEFAULT_STATE = {
+      turbofan_uses: [],
+      turbofan_writes_to: [],
+      turbofan_secrets: [],
+      turbofan_sizes: {},
+      turbofan_batch_size: 1,
+      turbofan_timeout: nil,
+      turbofan_retries: 3,
+      turbofan_retry_on: nil,
+      turbofan_default_cpu: nil,
+      turbofan_default_ram: nil,
+      turbofan_compute_environment: nil,
+      turbofan_tags: {},
+      turbofan_execution: nil,
+      turbofan_docker_image: nil,
+      turbofan_duckdb_extensions: [],
+      turbofan_subnets: nil,
+      turbofan_security_groups: nil,
+      turbofan_storage: nil
+    }.freeze
+    private_constant :DEFAULT_STATE
+
+    def self.init_state(klass)
+      DEFAULT_STATE.each do |key, value|
+        # dup only containers (Arrays, Hashes); immutable defaults (nil,
+        # Integer, Symbol) return themselves on .dup on modern Ruby.
+        klass.instance_variable_set(:"@#{key}", value.dup)
+      end
+    end
+
     def self.included(base)
       base.extend(ClassMethods)
-      base.instance_variable_set(:@turbofan_uses, [])
-      base.instance_variable_set(:@turbofan_writes_to, [])
-      base.instance_variable_set(:@turbofan_secrets, [])
-      base.instance_variable_set(:@turbofan_sizes, {})
-      base.instance_variable_set(:@turbofan_batch_size, 1)
-      base.instance_variable_set(:@turbofan_timeout, nil)
-      base.instance_variable_set(:@turbofan_retries, 3)
-      base.instance_variable_set(:@turbofan_retry_on, nil)
-      base.instance_variable_set(:@turbofan_default_cpu, nil)
-      base.instance_variable_set(:@turbofan_default_ram, nil)
-      base.instance_variable_set(:@turbofan_compute_environment, nil)
-      base.instance_variable_set(:@turbofan_tags, {})
-      base.instance_variable_set(:@turbofan_execution, nil)
-      base.instance_variable_set(:@turbofan_docker_image, nil)
-      base.instance_variable_set(:@turbofan_duckdb_extensions, [])
-      base.instance_variable_set(:@turbofan_subnets, nil)
-      base.instance_variable_set(:@turbofan_security_groups, nil)
-      base.instance_variable_set(:@turbofan_storage, nil)
+      init_state(base)
     end
 
     module ClassMethods
+      # Re-initialize DSL state for each subclass. Without this, `class B < A`
+      # where A already includes Step inherits A's class-ivar lookups (nil for
+      # B) and the first DSL macro (e.g. B.uses :foo) would NoMethodError on
+      # `@turbofan_uses << dep`. Call super so we don't break inheritance
+      # hooks installed by downstream gems (ActiveSupport, dry-rb, etc.).
+      def inherited(subclass)
+        super
+        Turbofan::Step.init_state(subclass)
+      end
+
       attr_reader :turbofan_uses, :turbofan_writes_to,
         :turbofan_secrets, :turbofan_sizes, :turbofan_batch_size,
         :turbofan_execution, :turbofan_timeout,
