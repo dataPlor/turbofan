@@ -7,11 +7,10 @@ module Turbofan
   class CLI < Thor
     module Deploy
       def self.call(pipeline_name:, stage:, dry_run: false)
-        turbofans_root = "turbofans"
-        pipeline_file = File.join(turbofans_root, "pipelines", "#{pipeline_name}.rb")
+        turbofans_root = Turbofan::Deploy::PipelineContext::DEFAULT_ROOT
         schemas_dir = File.join(turbofans_root, "schemas")
 
-        load_result = Turbofan::Deploy::PipelineLoader.load(pipeline_file, turbofans_root: turbofans_root)
+        load_result = Turbofan::Deploy::PipelineContext.load(pipeline_name: pipeline_name)
         pipeline_class = load_result.pipeline
         steps = load_result.steps
         step_dirs = load_result.step_dirs

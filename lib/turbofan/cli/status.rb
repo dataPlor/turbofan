@@ -110,11 +110,13 @@ module Turbofan
       private_class_method :time_ago
 
       def self.load_pipeline_steps(pipeline_name)
-        turbofans_root = "turbofans"
-        pipeline_file = File.join(turbofans_root, "pipelines", "#{pipeline_name}.rb")
+        pipeline_file = File.join(
+          Turbofan::Deploy::PipelineContext::DEFAULT_ROOT,
+          "pipelines", "#{pipeline_name}.rb"
+        )
         return [] unless File.exist?(pipeline_file)
 
-        load_result = Turbofan::Deploy::PipelineLoader.load(pipeline_file, turbofans_root: turbofans_root)
+        load_result = Turbofan::Deploy::PipelineContext.load(pipeline_name: pipeline_name)
         load_result.steps
       rescue StandardError => e
         warn("[Turbofan] WARNING: Could not load pipeline steps: #{e.message}")

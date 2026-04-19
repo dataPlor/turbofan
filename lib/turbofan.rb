@@ -40,6 +40,7 @@ require_relative "turbofan/deploy/pipeline_loader"
 require_relative "turbofan/deploy/image_builder"
 require_relative "turbofan/deploy/stack_manager"
 require_relative "turbofan/deploy/execution"
+require_relative "turbofan/deploy/pipeline_context"
 require_relative "turbofan/status"
 
 module Turbofan

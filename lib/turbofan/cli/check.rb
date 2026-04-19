@@ -3,9 +3,7 @@ module Turbofan
     module Check
       def self.call(pipeline_name:, stage:, load_result: nil)
         Turbofan::CLI::Ce.load_all_definitions
-        turbofans_root = "turbofans"
-        pipeline_file = File.join(turbofans_root, "pipelines", "#{pipeline_name}.rb")
-        load_result ||= Turbofan::Deploy::PipelineLoader.load(pipeline_file, turbofans_root: turbofans_root)
+        load_result ||= Turbofan::Deploy::PipelineContext.load(pipeline_name: pipeline_name)
 
         pipeline = load_result.pipeline
         steps = load_result.steps
