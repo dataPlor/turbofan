@@ -238,3 +238,75 @@ RSpec.describe "Turbofan::Step DSL — .turbofan Façade (8c)" do
     expect(step.turbofan.uses.map { |d| d[:key] }).to eq([:postgres])
   end
 end
+
+RSpec.describe "Turbofan::Step DSL — polymorphic input_schema/output_schema (0.6.1)" do
+  it "accepts a Hash literal for input_schema" do
+    schema_hash = {"type" => "object", "properties" => {"id" => {"type" => "string"}}, "required" => ["id"]}
+    step = Class.new do
+      include Turbofan::Step
+      input_schema schema_hash
+    end
+    stub_const("HashInputStep", step)
+    expect(step.turbofan_input_schema).to eq(schema_hash)
+    expect(step.turbofan_input_schema_file).to be_nil
+  end
+
+  it "accepts a Hash literal for output_schema" do
+    schema_hash = {"type" => "object", "properties" => {"result" => {"type" => "boolean"}}}
+    step = Class.new do
+      include Turbofan::Step
+      output_schema schema_hash
+    end
+    stub_const("HashOutputStep", step)
+    expect(step.turbofan_output_schema).to eq(schema_hash)
+    expect(step.turbofan_output_schema_file).to be_nil
+  end
+
+  it "accepts a Class/Module responding to .schema" do
+    schema_hash = {"type" => "object", "properties" => {"n" => {"type" => "integer"}}}
+    schema_class = Class.new do
+      define_singleton_method(:schema) { schema_hash }
+    end
+    stub_const("MySchemaClass", schema_class)
+
+    step = Class.new do
+      include Turbofan::Step
+      input_schema MySchemaClass
+    end
+    stub_const("ClassSchemaStep", step)
+    expect(step.turbofan_input_schema).to eq(schema_hash)
+  end
+
+  it "still accepts a filename String (backward-compat)" do
+    step = Class.new do
+      include Turbofan::Step
+      input_schema "passthrough.json"
+    end
+    stub_const("FilenameInputStep", step)
+    expect(step.turbofan_input_schema_file).to eq("passthrough.json")
+  end
+
+  it "raises for a Class that doesn't respond to .schema" do
+    broken_class = Class.new
+    stub_const("BrokenSchemaClass", broken_class)
+    expect {
+      Class.new do
+        include Turbofan::Step
+        input_schema BrokenSchemaClass
+      end
+    }.to raise_error(ArgumentError, /expects a filename String, a Hash, or a Class.*responding to .schema/)
+  end
+
+  it "raises when .schema returns non-Hash" do
+    bad_schema = Class.new do
+      define_singleton_method(:schema) { "not a hash" }
+    end
+    stub_const("BadReturnSchema", bad_schema)
+    expect {
+      Class.new do
+        include Turbofan::Step
+        input_schema BadReturnSchema
+      end
+    }.to raise_error(ArgumentError, /must return a Hash/)
+  end
+end

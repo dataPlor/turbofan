@@ -150,22 +150,60 @@ module Turbofan
         :turbofan_duckdb_extensions,
         :turbofan_subnets, :turbofan_security_groups, :turbofan_storage
 
-      def input_schema(filename)
-        @turbofan_input_schema_file = filename
+      # Declare the step's input JSON schema. Accepts three shapes
+      # (Matz's "the name should agree with what it takes" critique —
+      # honest by broadening acceptance rather than renaming):
+      #
+      #   input_schema "hello_input.json"   # String: filename under
+      #                                     # Turbofan.config.schemas_path
+      #   input_schema({type: "object", ...}) # Hash: literal schema
+      #   input_schema HelloInputSchema       # Class/Module responding
+      #                                       # to .schema returning a Hash
+      #
+      # The filename path is the original behavior and remains
+      # unchanged. Hash and Class paths are additive in 0.6.1.
+      def input_schema(schema)
+        @turbofan_input_schema_file = nil
+        @turbofan_input_schema_parsed = nil
+        case schema
+        when String
+          @turbofan_input_schema_file = schema
+        when Hash
+          @turbofan_input_schema_parsed = schema
+        else
+          raise ArgumentError, "input_schema expects a filename String, a Hash, or a Class/Module responding to .schema; got #{schema.class}" unless schema.respond_to?(:schema)
+          resolved = schema.schema
+          raise ArgumentError, "#{schema}.schema must return a Hash, got #{resolved.class}" unless resolved.is_a?(Hash)
+          @turbofan_input_schema_parsed = resolved
+        end
       end
 
-      def output_schema(filename)
-        @turbofan_output_schema_file = filename
+      def output_schema(schema)
+        @turbofan_output_schema_file = nil
+        @turbofan_output_schema_parsed = nil
+        case schema
+        when String
+          @turbofan_output_schema_file = schema
+        when Hash
+          @turbofan_output_schema_parsed = schema
+        else
+          raise ArgumentError, "output_schema expects a filename String, a Hash, or a Class/Module responding to .schema; got #{schema.class}" unless schema.respond_to?(:schema)
+          resolved = schema.schema
+          raise ArgumentError, "#{schema}.schema must return a Hash, got #{resolved.class}" unless resolved.is_a?(Hash)
+          @turbofan_output_schema_parsed = resolved
+        end
       end
 
       def turbofan_input_schema
+        return @turbofan_input_schema_parsed if @turbofan_input_schema_parsed
         return nil unless @turbofan_input_schema_file
-        @turbofan_input_schema_parsed ||= load_schema(@turbofan_input_schema_file)
+        @turbofan_input_schema_parsed = load_schema(@turbofan_input_schema_file)
       end
 
       def turbofan_output_schema
+        return @turbofan_output_schema_parsed if @turbofan_output_schema_parsed
         return nil unless @turbofan_output_schema_file
-        @turbofan_output_schema_parsed ||= load_schema(@turbofan_output_schema_file)
+        @turbofan_output_schema_parsed = load_schema(@turbofan_output_schema_file)
       end
 
       def tags(hash)
