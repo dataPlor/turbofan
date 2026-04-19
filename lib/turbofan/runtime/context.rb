@@ -94,6 +94,13 @@ module Turbofan
         @duckdb = nil
       end
 
+      # `@interrupted` is written by the SIGTERM signal handler and read by
+      # step code / framework infrastructure on the main thread. Ruby forbids
+      # `Mutex#synchronize` in trap context (raises
+      # `ThreadError: can't be called from trap context`), so synchronization
+      # is impossible here. We rely on CRuby's GIL, which guarantees atomic
+      # read/write of boolean values — torn reads are impossible. Non-CRuby
+      # runtimes must provide equivalent guarantees for this to be safe.
       def interrupted?
         @interrupted
       end
