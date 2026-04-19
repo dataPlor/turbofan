@@ -5,26 +5,29 @@ require "aws-sdk-states"
 
 RSpec.describe Turbofan::CLI::Deploy::Preflight do # rubocop:disable RSpec/MultipleDescribes
   describe ".buildkit_available?" do
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
     it "returns true when docker buildx is present" do
-      allow(described_class).to receive(:system)
-        .with("docker", "buildx", "version", out: File::NULL, err: File::NULL)
-        .and_return(true)
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("docker", "buildx", "version", allow_failure: true)
+        .and_return(["", "", success_status])
 
       expect(described_class.buildkit_available?).to be true
     end
 
     it "returns false when docker buildx is absent" do
-      allow(described_class).to receive(:system)
-        .with("docker", "buildx", "version", out: File::NULL, err: File::NULL)
-        .and_return(false)
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("docker", "buildx", "version", allow_failure: true)
+        .and_return(["", "", failure_status])
 
       expect(described_class.buildkit_available?).to be false
     end
 
-    it "returns false when system returns nil (command not found)" do
-      allow(described_class).to receive(:system)
-        .with("docker", "buildx", "version", out: File::NULL, err: File::NULL)
-        .and_return(nil)
+    it "returns false when docker command is not found (ENOENT)" do
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("docker", "buildx", "version", allow_failure: true)
+        .and_raise(Errno::ENOENT)
 
       expect(described_class.buildkit_available?).to be false
     end
@@ -52,20 +55,28 @@ RSpec.describe Turbofan::CLI::Deploy::Preflight do # rubocop:disable RSpec/Multi
   end
 
   describe ".git_clean?" do
+    let(:status) { instance_double(Process::Status, success?: true) }
+
     it "returns true when git status --porcelain output is empty" do
-      allow(described_class).to receive(:`).with("git status --porcelain").and_return("")
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "status", "--porcelain", allow_failure: true)
+        .and_return(["", "", status])
 
       expect(described_class.git_clean?).to be true
     end
 
     it "returns false when git status --porcelain output is non-empty" do
-      allow(described_class).to receive(:`).with("git status --porcelain").and_return(" M some_file.rb\n")
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "status", "--porcelain", allow_failure: true)
+        .and_return([" M some_file.rb\n", "", status])
 
       expect(described_class.git_clean?).to be false
     end
 
     it "returns false when there are untracked files" do
-      allow(described_class).to receive(:`).with("git status --porcelain").and_return("?? new_file.rb\n")
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "status", "--porcelain", allow_failure: true)
+        .and_return(["?? new_file.rb\n", "", status])
 
       expect(described_class.git_clean?).to be false
     end

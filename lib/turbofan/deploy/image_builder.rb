@@ -1,6 +1,5 @@
 require "digest"
 require "base64"
-require "open3"
 require "pathname"
 require "aws-sdk-ecr"
 require_relative "dependency_resolver"
@@ -135,17 +134,17 @@ module Turbofan
         password = Base64.decode64(auth.authorization_token).split(":").last
         registry = auth.proxy_endpoint
 
-        _out, status = Open3.capture2(
+        Turbofan::Subprocess.capture(
           "docker", "login", "--username", "AWS", "--password-stdin", registry,
           stdin_data: password
         )
-        raise "ECR authentication failed" unless status.success?
 
         registry.sub(%r{\Ahttps?://}, "")
       end
 
       def self.git_sha
-        sha = `git rev-parse --short HEAD 2>/dev/null`.strip
+        stdout, _, _ = Turbofan::Subprocess.capture("git", "rev-parse", "--short", "HEAD", allow_failure: true)
+        sha = stdout.strip
         sha.empty? ? nil : "git-#{sha}"
       end
 
@@ -222,8 +221,9 @@ module Turbofan
       end
 
       def self.run_cmd(*cmd)
-        success = system(*cmd)
-        raise "Command failed: #{cmd.first(3).join(" ")}" unless success
+        Turbofan::Subprocess.capture(*cmd)
+      rescue Turbofan::Subprocess::Error => e
+        raise "Command failed: #{cmd.first(3).join(" ")}\n#{e.stderr}"
       end
       private_class_method :run_cmd
     end

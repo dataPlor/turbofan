@@ -106,18 +106,19 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     let(:step_dir) { File.join(tmpdir, "step") }
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
     let(:repository_uri) { "123456789.dkr.ecr.us-east-1.amazonaws.com/my-repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
 
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
     end
 
-    it "calls system with splatted docker build command" do
-      allow(described_class).to receive(:system).and_return(true)
+    it "calls Subprocess.capture with splatted docker build command" do
+      allow(Turbofan::Subprocess).to receive(:capture).and_return(["", "", success_status])
 
       described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
 
-      expect(described_class).to have_received(:system) do |*args|
+      expect(Turbofan::Subprocess).to have_received(:capture) do |*args|
         expect(args.first).to eq("docker")
         expect(args[1]).to eq("build")
         expect(args).to include("--build-context", "schemas=#{schemas_dir}")
@@ -127,7 +128,9 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     end
 
     it "raises when docker build fails" do
-      allow(described_class).to receive(:system).and_return(false)
+      allow(Turbofan::Subprocess).to receive(:capture).and_raise(
+        Turbofan::Subprocess::Error.new(command: ["docker", "build"], exit_code: 1, stdout: "", stderr: "boom")
+      )
 
       expect {
         described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
@@ -137,19 +140,22 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
 
   describe ".push" do
     let(:repository_uri) { "123456789.dkr.ecr.us-east-1.amazonaws.com/my-repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
 
-    it "calls system with splatted docker push command" do
-      allow(described_class).to receive(:system).and_return(true)
+    it "calls Subprocess.capture with splatted docker push command" do
+      allow(Turbofan::Subprocess).to receive(:capture).and_return(["", "", success_status])
 
       described_class.push(tag: "sha-abc123", repository_uri: repository_uri)
 
-      expect(described_class).to have_received(:system).with(
+      expect(Turbofan::Subprocess).to have_received(:capture).with(
         "docker", "push", "#{repository_uri}:sha-abc123"
       )
     end
 
     it "raises when docker push fails" do
-      allow(described_class).to receive(:system).and_return(false)
+      allow(Turbofan::Subprocess).to receive(:capture).and_raise(
+        Turbofan::Subprocess::Error.new(command: ["docker", "push"], exit_code: 1, stdout: "", stderr: "boom")
+      )
 
       expect {
         described_class.push(tag: "sha-abc123", repository_uri: repository_uri)
@@ -159,6 +165,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
 
   describe ".authenticate_ecr" do
     let(:ecr_client) { instance_double(Aws::ECR::Client) }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
 
     before do
       auth_data = double(
@@ -168,7 +175,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       allow(ecr_client).to receive(:get_authorization_token).and_return(
         double(authorization_data: [auth_data])
       )
-      allow(Open3).to receive(:capture2).and_return(["", double(success?: true)])
+      allow(Turbofan::Subprocess).to receive(:capture).and_return(["", "", success_status])
     end
 
     it "calls get_authorization_token on ECR client" do
@@ -179,7 +186,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     it "uses --password-stdin for docker login" do
       described_class.authenticate_ecr(ecr_client)
 
-      expect(Open3).to have_received(:capture2).with(
+      expect(Turbofan::Subprocess).to have_received(:capture).with(
         "docker", "login", "--username", "AWS", "--password-stdin",
         "https://123456789.dkr.ecr.us-east-1.amazonaws.com",
         stdin_data: "my-password"
@@ -190,16 +197,33 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       result = described_class.authenticate_ecr(ecr_client)
       expect(result).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com")
     end
+
+    it "raises when docker login fails" do
+      allow(Turbofan::Subprocess).to receive(:capture).and_raise(
+        Turbofan::Subprocess::Error.new(command: ["docker", "login"], exit_code: 1, stdout: "", stderr: "auth boom")
+      )
+
+      expect {
+        described_class.authenticate_ecr(ecr_client)
+      }.to raise_error(Turbofan::Subprocess::Error)
+    end
   end
 
   describe ".git_sha" do
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
     it "returns a tag prefixed with 'git-'" do
-      allow(described_class).to receive(:`).and_return("abc1234\n")
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "rev-parse", "--short", "HEAD", allow_failure: true)
+        .and_return(["abc1234\n", "", success_status])
       expect(described_class.git_sha).to eq("git-abc1234")
     end
 
     it "returns nil outside a git repo" do
-      allow(described_class).to receive(:`).and_return("")
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "rev-parse", "--short", "HEAD", allow_failure: true)
+        .and_return(["", "fatal: not a git repository\n", failure_status])
       expect(described_class.git_sha).to be_nil
     end
   end
@@ -210,12 +234,14 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     let(:schemas_dir) { File.join(tmpdir, "schemas") }
     let(:repository_uri) { "123456789.dkr.ecr.us-east-1.amazonaws.com/my-repo" }
 
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
     before do
       FileUtils.mkdir_p(step_dir)
       FileUtils.mkdir_p(schemas_dir)
       File.write(File.join(step_dir, "worker.rb"), "class MyStep; end")
       File.write(File.join(schemas_dir, "input.json"), '{"type": "object"}')
-      allow(described_class).to receive(:system).and_return(true)
+      allow(Turbofan::Subprocess).to receive(:capture).and_return(["", "", success_status])
     end
 
     context "when image already exists in ECR" do
@@ -232,7 +258,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
           repository_uri: repository_uri
         )
 
-        expect(described_class).not_to have_received(:system)
+        expect(Turbofan::Subprocess).not_to have_received(:capture)
       end
     end
 
@@ -250,8 +276,8 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
           repository_uri: repository_uri
         )
 
-        # Should have called system at least twice (build + push)
-        expect(described_class).to have_received(:system).at_least(:twice)
+        # Should have called Subprocess.capture at least twice (build + push)
+        expect(Turbofan::Subprocess).to have_received(:capture).at_least(:twice)
       end
 
       it "also tags and pushes with git commit SHA" do
@@ -265,10 +291,10 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
           repository_uri: repository_uri
         )
 
-        expect(described_class).to have_received(:system).with(
+        expect(Turbofan::Subprocess).to have_received(:capture).with(
           "docker", "tag", /#{Regexp.escape(repository_uri)}:sha-/, "#{repository_uri}:git-abc1234"
         )
-        expect(described_class).to have_received(:system).with(
+        expect(Turbofan::Subprocess).to have_received(:capture).with(
           "docker", "push", "#{repository_uri}:git-abc1234"
         )
       end

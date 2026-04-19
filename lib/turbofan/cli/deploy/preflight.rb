@@ -3,7 +3,10 @@ module Turbofan
     module Deploy
       module Preflight
         def self.buildkit_available?
-          system("docker", "buildx", "version", out: File::NULL, err: File::NULL) == true
+          _, _, status = Turbofan::Subprocess.capture("docker", "buildx", "version", allow_failure: true)
+          status.success?
+        rescue Errno::ENOENT
+          false
         end
 
         def self.aws_credentials_valid?
@@ -14,7 +17,8 @@ module Turbofan
         end
 
         def self.git_clean?
-          `git status --porcelain`.strip.empty?
+          stdout, _, _ = Turbofan::Subprocess.capture("git", "status", "--porcelain", allow_failure: true)
+          stdout.strip.empty?
         end
 
         def self.warn_running_executions(sfn_client, state_machine_arn)
