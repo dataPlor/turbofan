@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-04-19
+
+0.6.1 is the post-ship followup pass on the 0.6.0 legend review. Every
+item flagged by Jeremy Evans, Mike Perham, Matz, Xavier Noria, and
+Andrew Kane has a corresponding commit. No new migration steps for
+users — this is purely additive on top of 0.6.0.
+
+### Added
+- **`WorkerStall` CloudWatch metric** — `FanOut.threaded_work` accepts
+  a `metrics:` kwarg; when set, the stall coordinator emits a
+  `WorkerStall` datapoint (count 1) alongside the existing stderr
+  warning. Dimensions inherited from the Metrics instance
+  (Pipeline/Stage/Step/Size). Operators can now alert on stalls from
+  CloudWatch dashboards instead of grepping logs.
+- **`RetryBudgetExhausted` CloudWatch metric** — separate from
+  `RetriesExhausted`. Distinguishes "gave up on wall-clock budget"
+  (often recoverable service degradation) from "gave up on attempt
+  count" (persistent failure). Different alert thresholds apply.
+- **`Turbofan::Retryable.call(max_retry_seconds:)` per-call override** —
+  kwarg accepts a finite value (per-call budget), `nil` (bypass the
+  global config even when set), or omission (falls back to
+  `Turbofan.config.max_retry_seconds`). Disambiguated internally via
+  a private `UNSET` sentinel. Terminal-write call sites
+  (`Metrics#flush`, `OutputSerializer.call`, `Payload.serialize`) now
+  pass `nil` so SIGTERM-time flushes don't self-abort from the global
+  budget.
+- **Polymorphic `input_schema` / `output_schema`** — the macros now
+  accept any of:
+  - `input_schema "hello.json"` — filename String (original behavior)
+  - `input_schema({type: "object", ...})` — Hash literal
+  - `input_schema HelloSchema` — Class/Module responding to `.schema`
+  The macro name now agrees with what it takes.
+- **Zeitwerk inflector-completeness spec** — walks
+  `Turbofan.loader.all_expected_cpaths` and asserts every file→constant
+  mapping resolves. Catches future contributions that add an acronym
+  file (SNS, IAM, ECR, etc.) without updating the inflector rules, at
+  normal spec-run time instead of only at cold boot.
+- **`Step.turbofan.uses_s3` / `Step.turbofan.writes_to_s3`** — façade
+  now exposes these S3-dependency filters as part of the public DSL
+  surface. Previously accessible as `turbofan_uses_s3`/etc. on
+  ClassMethods; now routed exclusively through the façade.
+
+### Changed
+- **Removed `Turbofan.schemas_path` / `Turbofan.schemas_path=` shim** —
+  these were duplicates of `Turbofan.config.schemas_path`. 20 internal
+  call sites migrated to the canonical form. Undocumented shim; no
+  user migration expected.
+- **Privatized 5 ClassMethods on Step** — `uses_resources`,
+  `writes_to_resources`, `uses_s3`, `writes_to_s3`,
+  `add_duckdb_extensions`. Previously public-by-accident (no external
+  docs, no external lib/ callers except iam.rb's `uses_s3`/
+  `writes_to_s3` which now uses the façade). Tightens the public
+  surface per Jeremy Evans's audit.
+
+### Fixed
+- **`Metrics#flush` under retry-budget pressure** — `Retryable.call`
+  inside `flush` previously shared the global `max_retry_seconds`
+  budget, which meant a SIGTERM-time flush could abort itself and
+  lose the telemetry of the failure it was recording. Now passes
+  `max_retry_seconds: nil` explicitly. Same fix applied to
+  `OutputSerializer.call` and `Payload.serialize`.
+
+### Removed
+- **`oj` runtime dependency** — the gem was declared but never
+  `require`d. Codebase uses stdlib `JSON` everywhere; modern Ruby's
+  perf delta is small enough that dropping the dep wins on
+  maintenance.
+
+### Docs
+- **Explicit "no mutex in trap context" banner** above
+  `Turbofan::Runtime::Context#interrupt!` / `#interrupted?`. Prevents
+  a future contributor from "fixing" what looks like a data race by
+  wrapping in `Mutex#synchronize` — which would raise `ThreadError`
+  from the SIGTERM trap handler and break graceful shutdown.
+- **Zeitwerk-warning header on `lib/turbofan/errors.rb`** explaining
+  why a `lib/turbofan/errors/` subdirectory would break the loader
+  (file defines multiple top-level error constants; Zeitwerk would
+  demand a `Turbofan::Errors` parent module that doesn't exist).
+
 ## [0.6.0] — 2026-04-19
 
 ### Added
