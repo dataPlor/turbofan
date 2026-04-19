@@ -14,7 +14,9 @@ module Turbofan
   # Callers that explicitly want to tolerate failure pass allow_failure: true
   # and receive the status object without a raise.
   module Subprocess
-    class Error < StandardError
+    # Inherits from Turbofan::Error so `rescue Turbofan::Error` catches
+    # command failures along with every other gem-originated error.
+    class Error < Turbofan::Error
       attr_reader :command, :exit_code, :stdout, :stderr
 
       # Only the first few argv tokens go into the default message, so that

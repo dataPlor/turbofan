@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "turbofan/errors"  # must be first — other files reference Turbofan::Error
 require_relative "turbofan/configuration"
 require_relative "turbofan/discovery"
 require_relative "turbofan/extensions"
@@ -47,11 +48,6 @@ require_relative "turbofan/deploy/pipeline_context"
 require_relative "turbofan/status"
 
 module Turbofan
-  class SchemaIncompatibleError < StandardError; end
-  class SchemaValidationError < StandardError; end
-  class ResourceUnavailableError < StandardError; end
-  class ExtensionLoadError < StandardError; end
-
   # Raised on SIGTERM (Spot reclaim / Batch termination). Subclasses
   # SystemExit so `ensure` blocks still run, but the final process exit
   # status is 143 — which AWS Batch's retry strategy matches via

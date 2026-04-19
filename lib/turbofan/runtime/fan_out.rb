@@ -120,7 +120,7 @@ module Turbofan
       # Wraps a single-worker failure with the work item that triggered it.
       # Preserves the original exception's backtrace so callers can trace the
       # root cause without losing which thread/work item raised.
-      class WorkerError < StandardError
+      class WorkerError < Turbofan::Error
         attr_reader :work_item, :cause
 
         def initialize(work_item, cause)
@@ -134,7 +134,7 @@ module Turbofan
       # Aggregates multiple worker failures from a single threaded_work run.
       # Exposes `#errors` (Array<WorkerError>) so callers can iterate all
       # failures instead of only seeing "first + N others".
-      class WorkerErrors < StandardError
+      class WorkerErrors < Turbofan::Error
         attr_reader :errors
 
         def initialize(errors)

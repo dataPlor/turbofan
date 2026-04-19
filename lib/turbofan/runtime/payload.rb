@@ -7,7 +7,7 @@ require "aws-sdk-s3"
 module Turbofan
   module Runtime
     module Payload
-      class HydrationError < StandardError; end
+      class HydrationError < Turbofan::Error; end
 
       def self.serialize(result, s3_client:, bucket:, execution_id:, step_name:)
         json = JSON.generate(result)

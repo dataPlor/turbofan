@@ -2,7 +2,7 @@
 
 module Turbofan
   module Router
-    class InvalidSizeError < StandardError; end
+    class InvalidSizeError < Turbofan::ValidationError; end
 
     def self.included(base)
       base.extend(ClassMethods)
