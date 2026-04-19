@@ -26,33 +26,60 @@ module Turbofan
         @duckdb_extensions = duckdb_extensions
         @interrupted = false
         @duckdb_mutex = Mutex.new
+        # Guards lazy construction of per-Context singletons (logger,
+        # metrics, s3 client, etc.) so two threads inside a fan_out
+        # block don't race to construct two instances. The Metrics race
+        # was the dangerous one: two instances would accept emit() calls
+        # on separate @pending arrays and only one would get flushed,
+        # silently losing half the datapoints. Flagged by Mike Perham.
+        @init_mutex = Mutex.new
       end
 
+      # Double-checked locking: the outer defined?/return is safe lock-free
+      # under MRI's GIL (ivar assignment is a single bytecode op, so the
+      # ivar is either fully set or undefined — no torn reads). The mutex
+      # is only paid on the first call per attribute.
       def uses_resources
-        @uses_resources ||= @uses.select { |d| d[:type] == :resource }
+        return @uses_resources if defined?(@uses_resources)
+        @init_mutex.synchronize do
+          return @uses_resources if defined?(@uses_resources)
+          @uses_resources = @uses.select { |d| d[:type] == :resource }
+        end
       end
 
       def writes_to_resources
-        @writes_to_resources ||= @writes_to.select { |d| d[:type] == :resource }
+        return @writes_to_resources if defined?(@writes_to_resources)
+        @init_mutex.synchronize do
+          return @writes_to_resources if defined?(@writes_to_resources)
+          @writes_to_resources = @writes_to.select { |d| d[:type] == :resource }
+        end
       end
 
       def logger
-        @logger ||= Logger.new(
-          execution_id: @execution_id,
-          step_name: @step_name,
-          stage: @stage,
-          pipeline_name: @pipeline_name,
-          array_index: @array_index
-        )
+        return @logger if defined?(@logger)
+        @init_mutex.synchronize do
+          return @logger if defined?(@logger)
+          @logger = Logger.new(
+            execution_id: @execution_id,
+            step_name: @step_name,
+            stage: @stage,
+            pipeline_name: @pipeline_name,
+            array_index: @array_index
+          )
+        end
       end
 
       def metrics
-        @metrics ||= Metrics.new(
-          pipeline_name: @pipeline_name,
-          stage: @stage,
-          step_name: @step_name,
-          size: @size
-        )
+        return @metrics if defined?(@metrics)
+        @init_mutex.synchronize do
+          return @metrics if defined?(@metrics)
+          @metrics = Metrics.new(
+            pipeline_name: @pipeline_name,
+            stage: @stage,
+            step_name: @step_name,
+            size: @size
+          )
+        end
       end
 
       # Disable SDK's built-in retry so Turbofan::Retryable owns all retry
@@ -62,11 +89,19 @@ module Turbofan
       # `max_attempts: 1` + `retry_mode: 'standard'` is the modern idiom.
       # (`retry_limit: 0` is legacy-mode-only; ignored in standard/adaptive.)
       def s3
-        @s3 ||= Aws::S3::Client.new(retry_mode: "standard", max_attempts: 1)
+        return @s3 if defined?(@s3)
+        @init_mutex.synchronize do
+          return @s3 if defined?(@s3)
+          @s3 = Aws::S3::Client.new(retry_mode: "standard", max_attempts: 1)
+        end
       end
 
       def secrets_client
-        @secrets_client ||= Aws::SecretsManager::Client.new(retry_mode: "standard", max_attempts: 1)
+        return @secrets_client if defined?(@secrets_client)
+        @init_mutex.synchronize do
+          return @secrets_client if defined?(@secrets_client)
+          @secrets_client = Aws::SecretsManager::Client.new(retry_mode: "standard", max_attempts: 1)
+        end
       end
 
       def duckdb
