@@ -47,7 +47,7 @@ module Turbofan
 
         # Verify CE stacks exist
         steps.each do |sname, sclass|
-          ce_sym = sclass.turbofan_compute_environment || pipeline_class.turbofan_compute_environment
+          ce_sym = sclass.turbofan.compute_environment || pipeline_class.turbofan_compute_environment
           next unless ce_sym
           ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
           ce_stack_name = ce_class.stack_name(stage)

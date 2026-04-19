@@ -913,13 +913,44 @@ External containers must implement the S3 data protocol directly:
 
 **Note:** External containers do not go through the Ruby wrapper's input normalization. They receive raw data as stored in S3 or env vars — the envelope `{"inputs": [...]}` format. They must read the `"inputs"` key themselves.
 
-#### Reader Attributes
+#### Reader Façade
 
-`turbofan_uses`, `turbofan_writes_to`, `turbofan_resource_keys`, `turbofan_needs_duckdb?`, `turbofan_duckdb_extensions`, `turbofan_secrets`, `turbofan_sizes`, `turbofan_timeout`, `turbofan_retries`, `turbofan_retry_on`, `turbofan_default_cpu`, `turbofan_default_ram`, `turbofan_compute_environment`, `turbofan_subnets`, `turbofan_security_groups`, `turbofan_storage`, `resolved_subnets`, `resolved_security_groups`, `turbofan_input_schema_file`, `turbofan_output_schema_file`, `turbofan_input_schema`, `turbofan_output_schema`, `turbofan_tags`, `turbofan_docker_image`
+All step DSL state is reached through the `.turbofan` façade — a read-only seam that replaces the legacy per-attribute `turbofan_*` readers (removed in 0.7):
 
-#### `turbofan_external?`
-
-Returns `true` if `docker_image` is set.
+```ruby
+MyStep.turbofan.uses            # => [{type: :resource, key: :postgres}]
+MyStep.turbofan.writes_to       # => [...]
+MyStep.turbofan.resource_keys   # => [:postgres]
+MyStep.turbofan.needs_duckdb?   # => true
+MyStep.turbofan.execution       # => :batch
+MyStep.turbofan.lambda?         # => false
+MyStep.turbofan.fargate?        # => false
+MyStep.turbofan.external?       # => false (docker_image unset)
+MyStep.turbofan.sizes           # => {s: {...}, m: {...}}
+MyStep.turbofan.batch_size      # step-level default
+MyStep.turbofan.batch_size_for(:m) # per-size override, falls back to default
+MyStep.turbofan.timeout         # => 3600
+MyStep.turbofan.retries         # => 3
+MyStep.turbofan.retry_on        # => ["States.Timeout"] or nil
+MyStep.turbofan.default_cpu     # => 2
+MyStep.turbofan.default_ram     # => 4
+MyStep.turbofan.tags            # => {"owner" => "data"}
+MyStep.turbofan.compute_environment # => :my_ce or nil
+MyStep.turbofan.duckdb_extensions   # => [:json, :parquet]
+MyStep.turbofan.subnets         # => [...] or nil (raw declaration)
+MyStep.turbofan.security_groups # => [...] or nil (raw declaration)
+MyStep.turbofan.resolved_subnets         # falls back to Turbofan.config.subnets
+MyStep.turbofan.resolved_security_groups # falls back to Turbofan.config.security_groups
+MyStep.turbofan.storage         # => 50 (GiB) or nil
+MyStep.turbofan.docker_image    # => "ecr..." or nil
+MyStep.turbofan.input_schema    # parsed Hash (or nil)
+MyStep.turbofan.output_schema   # parsed Hash (or nil)
+MyStep.turbofan.input_schema_file  # filename String (or nil)
+MyStep.turbofan.output_schema_file # filename String (or nil)
+MyStep.turbofan.uses_s3         # S3-typed subset of `uses`
+MyStep.turbofan.writes_to_s3    # S3-typed subset of `writes_to`
+MyStep.turbofan.inspect         # dumps every field — handy in pry/irb
+```
 
 ---
 
@@ -1354,8 +1385,8 @@ Emits [OpenLineage](https://openlineage.io)-compatible events for data lineage t
 Each event includes:
 - **Run**: execution ID + step name as the run ID, with parent run facet linking to the pipeline execution
 - **Job**: pipeline name as namespace, step name as job name, with `sourceCodeLocation` facet for the step class
-- **Inputs**: datasets from `turbofan_uses` (S3 URIs → `"s3"` namespace, resource keys → `"postgres"` namespace)
-- **Outputs**: datasets from `turbofan_writes_to`
+- **Inputs**: datasets from `turbofan.uses` (S3 URIs → `"s3"` namespace, resource keys → `"postgres"` namespace)
+- **Outputs**: datasets from `turbofan.writes_to`
 
 Events conform to the OpenLineage spec v2.0.2 and can be consumed by Marquez, Atlan, DataHub, or any OpenLineage-compatible tool.
 

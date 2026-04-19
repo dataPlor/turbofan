@@ -14,8 +14,8 @@ RSpec.describe "Turbofan::Step DSL — uses block form (8a)" do
     end
     stub_const("BlockUsesStep", step)
 
-    expect(step.turbofan_duckdb_extensions).to contain_exactly(:json, :parquet)
-    expect(step.turbofan_uses).to include({type: :resource, key: :duckdb})
+    expect(step.turbofan.duckdb_extensions).to contain_exactly(:json, :parquet)
+    expect(step.turbofan.uses).to include({type: :resource, key: :duckdb})
   end
 
   it "raises when the block form is used on a non-:duckdb target" do
@@ -48,7 +48,7 @@ RSpec.describe "Turbofan::Step DSL — runs_on (8b)" do
       runs_on :batch
     end
     stub_const("RunsOnBatchStep", step)
-    expect(step.turbofan_execution).to eq(:batch)
+    expect(step.turbofan.execution).to eq(:batch)
   end
 
   it "accepts :lambda and :fargate" do
@@ -57,7 +57,7 @@ RSpec.describe "Turbofan::Step DSL — runs_on (8b)" do
         include Turbofan::Step
       end
       step.runs_on(model)
-      expect(step.turbofan_execution).to eq(model)
+      expect(step.turbofan.execution).to eq(model)
     end
   end
 
@@ -102,7 +102,7 @@ RSpec.describe "Turbofan::Step DSL — .turbofan Façade (8c)" do
   end
 
   it "exposes turbofan.execution (current attr name) identical to legacy turbofan_execution" do
-    expect(step.turbofan.execution).to eq(step.turbofan_execution)
+    expect(step.turbofan.execution).to eq(step.turbofan.execution)
     expect(step.turbofan.execution).to eq(:batch)
   end
 
@@ -131,12 +131,6 @@ RSpec.describe "Turbofan::Step DSL — .turbofan Façade (8c)" do
     expect(output).to include("batch_size=50")
   end
 
-  it "legacy readers still work for 0.6 backward-compat" do
-    expect(step.turbofan_uses).to eq(step.turbofan.uses)
-    expect(step.turbofan_batch_size).to eq(step.turbofan.batch_size)
-    expect(step.turbofan_tags).to eq(step.turbofan.tags)
-  end
-
   it "subclass gets its own façade, isolated from parent state" do
     child = Class.new(step) do
       uses :redis
@@ -161,8 +155,8 @@ RSpec.describe "Turbofan::Step DSL — polymorphic input_schema/output_schema (0
       input_schema schema_hash
     end
     stub_const("HashInputStep", step)
-    expect(step.turbofan_input_schema).to eq(schema_hash)
-    expect(step.turbofan_input_schema_file).to be_nil
+    expect(step.turbofan.input_schema).to eq(schema_hash)
+    expect(step.turbofan.input_schema_file).to be_nil
   end
 
   it "accepts a Hash literal for output_schema" do
@@ -172,8 +166,8 @@ RSpec.describe "Turbofan::Step DSL — polymorphic input_schema/output_schema (0
       output_schema schema_hash
     end
     stub_const("HashOutputStep", step)
-    expect(step.turbofan_output_schema).to eq(schema_hash)
-    expect(step.turbofan_output_schema_file).to be_nil
+    expect(step.turbofan.output_schema).to eq(schema_hash)
+    expect(step.turbofan.output_schema_file).to be_nil
   end
 
   it "accepts a Class/Module responding to .schema" do
@@ -188,7 +182,7 @@ RSpec.describe "Turbofan::Step DSL — polymorphic input_schema/output_schema (0
       input_schema MySchemaClass
     end
     stub_const("ClassSchemaStep", step)
-    expect(step.turbofan_input_schema).to eq(schema_hash)
+    expect(step.turbofan.input_schema).to eq(schema_hash)
   end
 
   it "still accepts a filename String (backward-compat)" do
@@ -197,7 +191,7 @@ RSpec.describe "Turbofan::Step DSL — polymorphic input_schema/output_schema (0
       input_schema "passthrough.json"
     end
     stub_const("FilenameInputStep", step)
-    expect(step.turbofan_input_schema_file).to eq("passthrough.json")
+    expect(step.turbofan.input_schema_file).to eq("passthrough.json")
   end
 
   it "raises for a Class that doesn't respond to .schema" do

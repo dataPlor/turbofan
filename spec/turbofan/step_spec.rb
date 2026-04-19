@@ -38,7 +38,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores the compute_environment" do
-      expect(step_class.turbofan_compute_environment).to eq(:test_ce)
+      expect(step_class.turbofan.compute_environment).to eq(:test_ce)
     end
   end
 
@@ -395,7 +395,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores the custom timeout" do
-      expect(step_class.turbofan_timeout).to eq(7200)
+      expect(step_class.turbofan.timeout).to eq(7200)
     end
   end
 
@@ -517,7 +517,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "defaults timeout to nil (no timeout)" do
-      expect(step_class.turbofan_timeout).to be_nil
+      expect(step_class.turbofan.timeout).to be_nil
     end
 
     it "defaults retries to 3" do
@@ -762,7 +762,7 @@ RSpec.describe Turbofan::Step do
         runs_on :batch
       end
       step_class.compute_environment(:test_ce)
-      expect(step_class.turbofan_compute_environment).to eq(:test_ce)
+      expect(step_class.turbofan.compute_environment).to eq(:test_ce)
     end
 
     it "raises ArgumentError if not given a Symbol" do
@@ -781,7 +781,7 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :batch
       end
-      expect(step_class.turbofan_compute_environment).to be_nil
+      expect(step_class.turbofan.compute_environment).to be_nil
     end
   end
 

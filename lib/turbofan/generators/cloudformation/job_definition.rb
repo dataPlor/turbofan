@@ -41,7 +41,7 @@ module Turbofan
           resource_suffix = size_name ? Naming.pascal_case(size_name) : ""
 
           retry_cfg = retry_strategy(step_class)
-          timeout_val = step_class.turbofan_timeout
+          timeout_val = step_class.turbofan.timeout
 
           # Hash retry+timeout config into the name so CloudFormation triggers
           # REPLACEMENT when they change. Without this, CFN applies a "No
@@ -61,8 +61,8 @@ module Turbofan
             "RetryStrategy" => retry_strategy(step_class)
           }
 
-          if step_class.turbofan_timeout
-            properties["Timeout"] = {"AttemptDurationSeconds" => step_class.turbofan_timeout}
+          if step_class.turbofan.timeout
+            properties["Timeout"] = {"AttemptDurationSeconds" => step_class.turbofan.timeout}
           end
 
           if consumable_resource_refs.any?

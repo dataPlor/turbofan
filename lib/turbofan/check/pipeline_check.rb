@@ -169,21 +169,21 @@ module Turbofan
         steps.each do |step_name, step_class|
           if step_class.turbofan.fargate?
             # Fargate: CE is optional (networking comes from step-level or Turbofan.config)
-            if step_class.turbofan_compute_environment
+            if step_class.turbofan.compute_environment
               begin
-                Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
+                Turbofan::ComputeEnvironment.resolve(step_class.turbofan.compute_environment)
               rescue ArgumentError => e
                 errors << "Step :#{step_name}: #{e.message}"
               end
             end
           else
-            unless step_class.turbofan_compute_environment
+            unless step_class.turbofan.compute_environment
               errors << "Step :#{step_name} has no compute_environment (must be set on each step)"
             end
 
-            if step_class.turbofan_compute_environment
+            if step_class.turbofan.compute_environment
               begin
-                Turbofan::ComputeEnvironment.resolve(step_class.turbofan_compute_environment)
+                Turbofan::ComputeEnvironment.resolve(step_class.turbofan.compute_environment)
               rescue ArgumentError => e
                 errors << "Step :#{step_name}: #{e.message}"
               end

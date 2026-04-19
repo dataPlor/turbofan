@@ -74,14 +74,14 @@ module Turbofan
             # Lambda function with container image from ECR
             image_uri = sclass.turbofan.external? ? sclass.turbofan.docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
             memory_mb = ((sclass.turbofan.default_ram || 1) * 1024).to_i
-            timeout_val = sclass.turbofan_timeout || 900
+            timeout_val = sclass.turbofan.timeout || 900
             resources.merge!(lambda_step_function(
               prefix: prefix, step_name: sname, step_class: sclass, image_uri: image_uri,
               memory_mb: memory_mb, timeout: timeout_val, tags: step_tags
             ))
           else
             # Batch: resolve CE (required for job queue)
-            ce_sym = sclass.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+            ce_sym = sclass.turbofan.compute_environment || @pipeline.turbofan_compute_environment
             raise "No compute_environment resolved for step :#{sname}. Declare compute_environment on the step or pipeline." unless ce_sym
             Turbofan::ComputeEnvironment.resolve(ce_sym)
 
@@ -224,8 +224,8 @@ module Turbofan
       end
 
       def custom_step_tags(step_class)
-        return [] unless step_class.turbofan_tags.any?
-        step_class.turbofan_tags.map { |k, v| {"Key" => k.to_s, "Value" => v.to_s} }
+        return [] unless step_class.turbofan.tags.any?
+        step_class.turbofan.tags.map { |k, v| {"Key" => k.to_s, "Value" => v.to_s} }
       end
 
       def pipeline_tags

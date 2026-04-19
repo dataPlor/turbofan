@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed (breaking)
+- **`Step#turbofan_*` attr_readers removed.** All ~20 legacy readers
+  (`turbofan_uses`, `turbofan_execution`, `turbofan_tags`, etc.) are
+  deleted — migrate to the `.turbofan` façade: `MyStep.turbofan.uses`,
+  `.execution`, `.tags`. Originally staged for 1.0, pulled forward to
+  0.7 because the install base is entirely internal and correctness
+  outweighs graceful migration here. The façade has been available
+  since 0.6.0; no new API to learn.
+- **`execution :batch` macro removed** — use `runs_on :batch`.
+- **`uses(:duckdb, extensions: [...])` kwarg form removed** — use the
+  block form: `uses(:duckdb) { extensions :json, :parquet }`.
+
 ## [0.6.1] — 2026-04-19
 
 0.6.1 is the post-ship followup pass on the 0.6.0 legend review. Every

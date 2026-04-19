@@ -423,7 +423,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     let(:asl) { generator.generate }
 
     it "the Step DSL supports timeout configuration" do
-      expect(step_with_timeout.turbofan_timeout).to eq(7200)
+      expect(step_with_timeout.turbofan.timeout).to eq(7200)
     end
 
     it "generated Task state includes TimeoutSeconds matching the custom value" do
@@ -463,7 +463,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       let(:asl) { generator.generate }
 
       it "does not emit TimeoutSeconds when timeout is nil" do
-        expect(default_timeout_step.turbofan_timeout).to be_nil
+        expect(default_timeout_step.turbofan.timeout).to be_nil
         state = asl["States"]["default_step"]
         expect(state).not_to have_key("TimeoutSeconds")
       end

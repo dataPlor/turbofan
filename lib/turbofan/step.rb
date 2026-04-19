@@ -34,10 +34,9 @@ module Turbofan
     #   MyStep.turbofan.execution    # => :batch
     #   MyStep.turbofan.inspect      # walks all fields — useful in pry/irb
     #
-    # The legacy readers (MyStep.turbofan_uses, etc.) still exist through
-    # 0.6.x as direct attr_readers and continue to work unchanged — this
-    # façade is purely additive for 0.6. The legacy readers are slated
-    # for removal in 1.0 per CHANGELOG [Unreleased].
+    # The legacy `turbofan_*` attr_readers (`turbofan_uses`, etc.) were
+    # removed in 0.7. All step-DSL state is reached exclusively through
+    # this façade.
     class ConfigFacade
       FIELDS = %i[
         uses writes_to secrets sizes batch_size execution timeout
@@ -151,22 +150,11 @@ module Turbofan
       end
 
       # Returns a read-only façade exposing this step's DSL state.
-      # Preferred over the legacy `turbofan_*` attr_readers, which are
-      # slated for removal in 1.0.
+      # Replaces the 20+ `turbofan_*` attr_readers removed in 0.7 — all
+      # DSL state is reached through `.turbofan.<field>`.
       def turbofan
         @turbofan_facade ||= ConfigFacade.new(self)
       end
-
-      attr_reader :turbofan_uses, :turbofan_writes_to,
-        :turbofan_secrets, :turbofan_sizes, :turbofan_batch_size,
-        :turbofan_execution, :turbofan_timeout,
-        :turbofan_retries, :turbofan_retry_on, :turbofan_default_cpu,
-        :turbofan_default_ram,
-        :turbofan_compute_environment,
-        :turbofan_input_schema_file, :turbofan_output_schema_file,
-        :turbofan_tags, :turbofan_docker_image,
-        :turbofan_duckdb_extensions,
-        :turbofan_subnets, :turbofan_security_groups, :turbofan_storage
 
       # Declare the step's input JSON schema. Accepts three shapes
       # (Matz's "the name should agree with what it takes" critique —

@@ -378,7 +378,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     it "fetch_brand needs duckdb (postgres resource) and uses NvmeCe" do
       expect(fetch_brand_class.turbofan.needs_duckdb?).to be true
       expect(fetch_brand_class.turbofan.resource_keys).to include(:places_read)
-      expect(fetch_brand_class.turbofan_compute_environment).to eq(:nvme_ce)
+      expect(fetch_brand_class.turbofan.compute_environment).to eq(:nvme_ce)
     end
 
     it "read_visits has S3 dependency" do
@@ -396,7 +396,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "score_items has timeout 300" do
-      expect(score_items_class.turbofan_timeout).to eq(300)
+      expect(score_items_class.turbofan.timeout).to eq(300)
     end
 
     it "aggregate has writes_to S3 dependency" do
@@ -416,7 +416,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "controlled_step has timeout 60" do
-      expect(controlled_step_class.turbofan_timeout).to eq(60)
+      expect(controlled_step_class.turbofan.timeout).to eq(60)
     end
   end
 

@@ -86,7 +86,7 @@ module Turbofan
         end
 
         def resolve_queue_name(step_class)
-          ce_sym = step_class&.turbofan_compute_environment || @pipeline.turbofan_compute_environment
+          ce_sym = step_class&.turbofan&.compute_environment || @pipeline.turbofan_compute_environment
           return "#{@prefix}-queue" unless ce_sym
 
           ce_class = Turbofan::ComputeEnvironment.resolve(ce_sym)
@@ -95,7 +95,7 @@ module Turbofan
 
         def config_hash_for(step_class)
           retry_cfg = Generators::CloudFormation::JobDefinition.send(:retry_strategy, step_class)
-          timeout_cfg = step_class&.turbofan_timeout
+          timeout_cfg = step_class&.turbofan&.timeout
           Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_cfg}")[0, 6]
         end
 
@@ -175,11 +175,11 @@ module Turbofan
 
           state["Catch"] = CATCH_ALL_FAILURE
 
-          if step_class&.turbofan_timeout
-            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          if step_class&.turbofan&.timeout
+            state["TimeoutSeconds"] = step_class.turbofan.timeout
           end
 
-          if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan.retry_on && !step.fan_out?
+          if step_class&.respond_to?(:turbofan) && step_class.turbofan.retry_on && !step.fan_out?
             state["Retry"] = [{
               "ErrorEquals" => step_class.turbofan.retry_on,
               "MaxAttempts" => step_class.turbofan.retries,
@@ -232,8 +232,8 @@ module Turbofan
           }
 
           step_class = resolve_step_class(step_name)
-          if step_class&.turbofan_timeout
-            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          if step_class&.turbofan&.timeout
+            state["TimeoutSeconds"] = step_class.turbofan.timeout
           end
 
           if last
@@ -260,7 +260,7 @@ module Turbofan
           # Networking priority: step-level > CE (backward compat) > Turbofan.config
           subnets = if step_class.turbofan.subnets
             step_class.turbofan.subnets
-          elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
+          elsif (ce_sym = step_class.turbofan.compute_environment || @pipeline.turbofan_compute_environment)
             Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_subnets
           else
             Turbofan.config.subnets
@@ -268,7 +268,7 @@ module Turbofan
 
           security_groups = if step_class.turbofan.security_groups
             step_class.turbofan.security_groups
-          elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
+          elsif (ce_sym = step_class.turbofan.compute_environment || @pipeline.turbofan_compute_environment)
             Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_security_groups
           else
             Turbofan.config.security_groups
@@ -300,8 +300,8 @@ module Turbofan
             "Catch" => CATCH_ALL_FAILURE
           }
 
-          if step_class.turbofan_timeout
-            state["TimeoutSeconds"] = step_class.turbofan_timeout
+          if step_class.turbofan.timeout
+            state["TimeoutSeconds"] = step_class.turbofan.timeout
           end
 
           if last
@@ -443,7 +443,7 @@ module Turbofan
           }
 
           step_class = resolve_step_class(step_name)
-          state["TimeoutSeconds"] = step_class.turbofan_timeout if step_class&.turbofan_timeout
+          state["TimeoutSeconds"] = step_class.turbofan.timeout if step_class&.turbofan&.timeout
 
           state
         end

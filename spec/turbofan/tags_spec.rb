@@ -15,11 +15,11 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores tags as a hash with string keys" do
-      expect(step_class.turbofan_tags).to eq("stack" => "geo", "stack-component" => "validation")
+      expect(step_class.turbofan.tags).to eq("stack" => "geo", "stack-component" => "validation")
     end
 
     it "converts symbol keys to strings" do
-      expect(step_class.turbofan_tags.keys).to all(be_a(String))
+      expect(step_class.turbofan.tags.keys).to all(be_a(String))
     end
   end
 
@@ -34,7 +34,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "defaults to an empty hash when no tags declared" do
-      expect(step_class.turbofan_tags).to eq({})
+      expect(step_class.turbofan.tags).to eq({})
     end
   end
 
@@ -83,7 +83,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "preserves string keys and converts symbol keys" do
-      expect(step_class.turbofan_tags).to eq("already-string" => "value", "other" => "sym")
+      expect(step_class.turbofan.tags).to eq("already-string" => "value", "other" => "sym")
     end
   end
 
@@ -119,7 +119,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "last tags call wins" do
-      expect(step_class.turbofan_tags).to eq("stack" => "visitation")
+      expect(step_class.turbofan.tags).to eq("stack" => "visitation")
     end
   end
 
@@ -135,7 +135,7 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores an empty hash" do
-      expect(step_class.turbofan_tags).to eq({})
+      expect(step_class.turbofan.tags).to eq({})
     end
   end
 
@@ -173,12 +173,12 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores non-string values as-is" do
-      expect(step_class.turbofan_tags["version"]).to eq(2)
-      expect(step_class.turbofan_tags["enabled"]).to be(true)
+      expect(step_class.turbofan.tags["version"]).to eq(2)
+      expect(step_class.turbofan.tags["enabled"]).to be(true)
     end
 
     it "still converts keys to strings" do
-      expect(step_class.turbofan_tags.keys).to all(be_a(String))
+      expect(step_class.turbofan.tags.keys).to all(be_a(String))
     end
   end
 
@@ -243,8 +243,8 @@ RSpec.describe "Tags DSL" do # rubocop:disable RSpec/DescribeClass
       step_a
       step_b
 
-      expect(step_a.turbofan_tags).to eq("stack" => "geo")
-      expect(step_b.turbofan_tags).to eq({})
+      expect(step_a.turbofan.tags).to eq("stack" => "geo")
+      expect(step_b.turbofan.tags).to eq({})
     end
   end
 end

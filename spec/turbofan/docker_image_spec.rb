@@ -93,7 +93,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
 
     it "stores both docker_image and tags independently" do
       expect(step_class.turbofan.docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
-      expect(step_class.turbofan_tags).to eq("stack" => "ml", "model" => "sentiment")
+      expect(step_class.turbofan.tags).to eq("stack" => "ml", "model" => "sentiment")
       expect(step_class.turbofan.external?).to be true
     end
   end
