@@ -34,6 +34,12 @@ module Turbofan
   # Zeitwerk must be told to ignore it.
   loader.ignore("#{__dir__}/turbofan/errors.rb")
 
+  # runtime.rb and deploy.rb are entry-point files that `require_relative`
+  # back into this very file and then call eager_load_dir. They define
+  # the Turbofan::Runtime / Turbofan::Deploy namespace modules explicitly
+  # (standard Zeitwerk file+directory pattern), so Zeitwerk manages them
+  # as normal — no ignore needed.
+
   # Lambda-bundle files are shipped INTO AWS Lambda zip archives at deploy
   # time; they are not Ruby constants in the gem's autoload tree. Their
   # `require_relative "router"` / `"turbofan_router"` lines only resolve
