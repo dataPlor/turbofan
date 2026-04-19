@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 require "digest"
 require "turbofan/generators/cloudformation/lambdas/packager"

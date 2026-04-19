@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "aws-sdk-batch"
 require "aws-sdk-cloudformation"
 require "aws-sdk-states"

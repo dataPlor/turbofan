@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass

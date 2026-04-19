@@ -5,4 +5,5 @@ gemspec
 group :development, :test do
   gem "rspec", "~> 3"
   gem "rexml"
+  gem "rubocop", "~> 1", require: false
 end

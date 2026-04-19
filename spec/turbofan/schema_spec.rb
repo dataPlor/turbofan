@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeClass

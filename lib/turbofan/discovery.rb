@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Turbofan
   module Discovery
     # Captured here because classes can override #name (e.g. anonymous

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "turbofan/configuration"
 require_relative "turbofan/discovery"
 require_relative "turbofan/extensions"

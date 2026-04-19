@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Turbofan
   class CLI < Thor
     module Deploy

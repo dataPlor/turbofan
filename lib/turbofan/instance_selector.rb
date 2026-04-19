@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Turbofan
   module InstanceSelector
     WASTE_THRESHOLD = 0.10

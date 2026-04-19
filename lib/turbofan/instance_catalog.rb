@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Turbofan
   module InstanceCatalog
     Entry = Struct.new(:type, :family, :vcpus, :ram_gb, :nvme, keyword_init: true) do

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Helper methods for building common DAG shapes in specs.
 #
 # Usage:

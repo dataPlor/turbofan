@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass

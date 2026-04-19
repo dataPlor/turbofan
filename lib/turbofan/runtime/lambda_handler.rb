@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "json"
 
 # Load the step's entrypoint (worker.rb + dependencies).

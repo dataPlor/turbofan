@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Shared examples that validate ASL structural self-consistency.
 # Any spec that generates ASL can include these to verify the output
 # is well-formed regardless of the specific pipeline shape.

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/DescribeClass

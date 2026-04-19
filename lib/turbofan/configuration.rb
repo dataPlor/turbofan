@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Turbofan
   class Configuration
     attr_accessor :bucket, :schemas_path, :default_region,

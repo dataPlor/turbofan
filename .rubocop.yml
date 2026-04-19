@@ -1,0 +1,22 @@
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: disable
+  DisabledByDefault: true
+  Exclude:
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "spec/fixtures/**/*"
+
+# Enforce frozen_string_literal magic comment everywhere, both lib and spec.
+# This is the one cop we run today; the rubocop CI job is advisory until a
+# broader style baseline is tuned.
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+  Include:
+    - "lib/**/*.rb"
+    - "spec/**/*.rb"
+    - "exe/*"
+    - "*.gemspec"
+    - "Gemfile"
+    - "Rakefile"

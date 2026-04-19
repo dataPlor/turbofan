@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schemas do # rubocop:disable RSpec/DescribeMethod

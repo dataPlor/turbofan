@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "json"
 
 INTEGRATION_CONFIG = JSON.parse(File.read(File.join(__dir__, "integration_config.json")))

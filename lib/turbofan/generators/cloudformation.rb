@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "json"
 require_relative "asl"
 require_relative "cloudformation/job_definition"

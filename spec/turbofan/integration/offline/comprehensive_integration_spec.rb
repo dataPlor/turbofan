@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 require "json"
 require_relative "../support/pipeline_setup"
