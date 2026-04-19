@@ -16,11 +16,13 @@ module Turbofan
       def write_inputs(items, s3_client:, bucket:, execution_id:, step_name:)
         return if items.empty?
 
-        s3_client.put_object(
-          bucket: bucket,
-          key: s3_key(execution_id, step_name, "input", "items.json"),
-          body: JSON.generate(items)
-        )
+        Turbofan::Retryable.call do
+          s3_client.put_object(
+            bucket: bucket,
+            key: s3_key(execution_id, step_name, "input", "items.json"),
+            body: JSON.generate(items)
+          )
+        end
       end
 
       def read_input(array_index:, s3_client:, bucket:, execution_id:, step_name:, chunk: nil, parent_index: nil)
