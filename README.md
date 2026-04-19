@@ -1384,6 +1384,9 @@ end
 | `notification_topic_arn` | `nil` | SNS topic ARN for pipeline notifications. |
 | `docker_registry` | `nil` | ECR registry prefix for container images. |
 | `duckdb_version` | `"1.4.3"` | DuckDB version for extension download URLs and install paths. Must match the DuckDB C library / gem version in your Dockerfiles. |
+| `fan_out_early_exit_threshold` | `nil` | When set to a positive Integer N, `FanOut.threaded_work` aborts remaining items after N non-transient worker failures. Guards against poison-pill work items chewing through CPU budget. Transient errors (AWS throttles) don't count. See [Poison-pill semantics](#poison-pill-semantics-for-fan-out-dlq). |
+| `max_retry_seconds` | `nil` | Cumulative-sleep budget for a single `Turbofan::Retryable.call`. When exceeded, raises `Turbofan::RetryBudgetExhausted` before the next sleep. Prevents a throttled retry loop from blocking through a Spot 2-minute SIGTERM notice. Set to e.g. `90` to bound well below Spot reclamation horizon. |
+| `worker_stall_seconds` | `nil` | When set to a positive Integer, arms a coordinator thread in `FanOut.threaded_work` that warns for any worker holding an item past the threshold without finishing. Catches deadlock / slow-SQL / hung-HTTP bugs. Zero overhead when disabled. |
 
 Access the current config at any time via `Turbofan.config`.
 

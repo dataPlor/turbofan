@@ -14,10 +14,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ResourceUnavailableError`, `ExtensionLoadError`,
   `Router::InvalidSizeError`, `Subprocess::Error`,
   `Runtime::Payload::HydrationError`, `Runtime::FanOut::WorkerError`/
-  `WorkerErrors`) are now reparented under this hierarchy. Users can
-  `rescue Turbofan::Error` for generic handling or the specific
-  subclasses for targeted logic. `Turbofan::Interrupted` intentionally
-  stays a `SystemExit` subclass (AWS Batch exit-code 143 contract).
+  `WorkerErrors`, `RetryBudgetExhausted`) are now reparented under this
+  hierarchy. Users can `rescue Turbofan::Error` for generic handling or
+  the specific subclasses for targeted logic. `Turbofan::Interrupted`
+  intentionally stays a `SystemExit` subclass (AWS Batch exit-code 143
+  contract).
+- `Turbofan::Retryable.call` accepts an optional `metrics:` kwarg
+  parallel to the existing `logger:` kwarg. When present, emits two
+  distinct CloudWatch metrics: `RetryAttempt` (one datapoint per
+  retry — graph for throttle rate) and `RetriesExhausted` (one per
+  terminal failure — page-worthy signal, distinct from retry-rate).
+  Dimensions inherited from the `Metrics` instance
+  (Pipeline/Stage/Step/Size only — no high-cardinality error codes or
+  request IDs).
+- `Turbofan::RetryBudgetExhausted` — raised by `Retryable.call` when
+  the accumulated sleep time across retries would exceed
+  `Turbofan.config.max_retry_seconds`. Exposes `#elapsed_seconds`,
+  `#budget_seconds`, `#last_error`. Distinct signal from the existing
+  max-attempts path (which re-raises the original transient error).
+- `Turbofan.config.fan_out_early_exit_threshold` — when set to a
+  positive Integer N, `FanOut.threaded_work` stops dequeuing remaining
+  items after N non-transient worker failures. Transient errors (AWS
+  throttles, networking — anything `Retryable.transient?` returns true
+  for) do NOT count toward the threshold, so a throttle storm can't
+  false-positive as a poison-pill burst. nil default preserves the
+  existing all-workers-complete contract.
+- `Turbofan.config.max_retry_seconds` — cumulative-sleep budget for a
+  single `Retryable.call`. Prevents a retry loop from holding a thread
+  longer than a Spot reclamation horizon (default SIGTERM notice is
+  ~2 minutes; `MAX_ATTEMPTS_LIMIT * cap` could otherwise block ~10
+  minutes).
+- `Turbofan.config.worker_stall_seconds` — arms a coordinator thread
+  in `FanOut.threaded_work` that warns when a worker holds an item
+  past the threshold without finishing. Catches deadlock / slow-SQL /
+  hung-HTTP bugs. nil default = no coordinator thread.
+- README: new "Poison-pill semantics for fan-out (DLQ)" subsection
+  explains the three knobs operators have for fan-out failure
+  handling (`tolerated_failure_rate`, `fan_out_early_exit_threshold`,
+  `retries`) and states Turbofan's intentional non-imposition of a
+  per-record DLQ contract.
 - `Turbofan::Discovery.class_name_of(mod)` — public helper for
   getting a class's pre-override `Module#name`. Replaces the now-removed
   `Turbofan::GET_CLASS_NAME` duplicate unbound method.
@@ -101,6 +136,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Discovery::CLASS_NAME`). Use `Turbofan::Discovery.class_name_of(c)`.
 
 ### Fixed
+- `Turbofan::Runtime::Context` lazy-memoized attributes (`logger`,
+  `metrics`, `s3`, `secrets_client`, `uses_resources`,
+  `writes_to_resources`) were constructed via `@foo ||= ...`, which
+  races under concurrent `fan_out` workers — two threads could
+  construct separate instances and only one would be retained. For
+  `metrics`, this was a silent-data-loss bug: two racing `Metrics`
+  instances each accepted `emit()` calls on their own `@pending`
+  array, and only one got flushed. Now guarded by double-checked
+  locking behind a per-Context `@init_mutex`.
+- `Turbofan::Runtime::Metrics#emit` and `#flush` now synchronize on a
+  per-instance mutex. The append in `emit` and the batch-extract +
+  shift in `flush` were both racy; under concurrent `emit` during
+  `flush`, a batch could be serialized to CloudWatch payload form then
+  re-appended-to before being shifted, causing double-send.
 - `Turbofan::Step` and `Turbofan::Pipeline` now install an
   `inherited(subclass)` hook so `class B < A` (where A includes Step)
   correctly initializes B's `@turbofan_*` ivars. Previously the

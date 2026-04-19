@@ -178,6 +178,12 @@ module Turbofan
         threshold = Turbofan.config.fan_out_early_exit_threshold
         non_transient_count_mutex = Mutex.new
         non_transient_count = 0
+        # `aborted` and `coordinator_shutdown` below are plain booleans
+        # written by one thread and read by others. Under CRuby's GIL
+        # boolean read/write is atomic, so no torn reads; we pay for
+        # the mutex only on the counter increment path. Same model as
+        # Context#interrupted? (see context.rb for the explicit GIL
+        # caveat). Non-CRuby runtimes must preserve this guarantee.
         aborted = false
 
         thread_count = [work_items.size, THREAD_POOL_SIZE].min

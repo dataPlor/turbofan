@@ -51,7 +51,8 @@ module Turbofan
           @mutex.synchronize { @pending.shift(batch.size) }
         end
       rescue Aws::Errors::ServiceError => e
-        warn("[Turbofan] WARNING: Failed to flush #{@pending.size} remaining metrics: #{e.message}")
+        remaining = @mutex.synchronize { @pending.size }
+        warn("[Turbofan] WARNING: Failed to flush #{remaining} remaining metrics: #{e.message}")
         # Intentionally do NOT clear @pending — if this Metrics instance is
         # flushed again, we get another chance. Container teardown is the
         # only path that truly drops them.
