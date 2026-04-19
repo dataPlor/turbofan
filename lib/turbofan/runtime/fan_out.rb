@@ -36,7 +36,7 @@ module Turbofan
           s3_key(execution_id, step_name, "input", "items.json")
         end
 
-        response = s3_client.get_object(bucket: bucket, key: key)
+        response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
         JSON.parse(response.body.read)[array_index]
       end
 
@@ -53,7 +53,9 @@ module Turbofan
             chunk_count.times do |index|
               begin
                 key = s3_key(execution_id, step_name, "output", chunk_key.to_s, "#{index}.json")
-                response = s3_client.get_object(bucket: bucket, key: key)
+                # Retryable doesn't retry NoSuchKey — it propagates to the outer
+                # rescue below for sentinel-skip (Batch minimum array padding).
+                response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
                 yield JSON.parse(response.body.read)
               rescue Aws::S3::Errors::NoSuchKey
                 nil # sentinel chunk — no output written, skip
@@ -63,7 +65,7 @@ module Turbofan
         else
           count.times do |index|
             key = s3_key(execution_id, step_name, "output", "#{index}.json")
-            response = s3_client.get_object(bucket: bucket, key: key)
+            response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
             yield JSON.parse(response.body.read)
           end
         end
@@ -80,7 +82,7 @@ module Turbofan
           work = Array.new(count) { |index| [index] }
           threaded_work(work) do |index|
             key = s3_key(execution_id, step_name, "output", "#{index}.json")
-            response = s3_client.get_object(bucket: bucket, key: key)
+            response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
             results[index] = JSON.parse(response.body.read)
           end
           results
@@ -101,7 +103,8 @@ module Turbofan
         threaded_work(work) do |chunk, index, ri|
           key = s3_key(execution_id, step_name, "output", chunk.to_s, "#{index}.json")
           begin
-            response = s3_client.get_object(bucket: bucket, key: key)
+            # Retryable doesn't retry NoSuchKey — it propagates for sentinel-skip.
+            response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
             results[ri] = JSON.parse(response.body.read)
           rescue Aws::S3::Errors::NoSuchKey
             # Sentinel chunk (padding for Batch minimum array size) — no output written
