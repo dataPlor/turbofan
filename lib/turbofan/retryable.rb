@@ -12,10 +12,12 @@ module Turbofan
   #     Rescue the `Aws::Errors::ServiceError` umbrella + `Seahorse::Client::
   #     NetworkingError` and filter via `transient?`.
   #
-  #   * Callers MUST pass `retry_limit: 0` when constructing AWS SDK clients
-  #     that will be wrapped by Retryable. Otherwise SDK's built-in 3-retry
-  #     stacks on top of ours, producing 15 attempts and obscuring telemetry.
-  #     See `context.rb` and `metrics.rb` for the `retry_limit: 0` setting.
+  #   * Callers MUST pass `retry_mode: "standard", max_attempts: 1` when
+  #     constructing AWS SDK clients that will be wrapped by Retryable.
+  #     Otherwise SDK's built-in 3-retry stacks on top of ours, producing 15
+  #     attempts and obscuring telemetry. (The legacy `retry_limit: 0` kwarg
+  #     is ignored in standard/adaptive retry modes.) See `context.rb` and
+  #     `metrics.rb` for the settings on lazily-constructed clients.
   #
   #   * Full-jitter backoff (AWS recommendation): delay = uniform(0, backoff)
   #     where backoff = min(cap, base * 2^(attempt-1)). Prevents thundering
