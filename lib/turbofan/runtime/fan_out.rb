@@ -115,8 +115,43 @@ module Turbofan
       end
       private_class_method :collect_chunked_outputs
 
+      # Wraps a single-worker failure with the work item that triggered it.
+      # Preserves the original exception's backtrace so callers can trace the
+      # root cause without losing which thread/work item raised.
+      class WorkerError < StandardError
+        attr_reader :work_item, :cause
+
+        def initialize(work_item, cause)
+          @work_item = work_item
+          @cause = cause
+          super("Worker failed for #{work_item.inspect}: #{cause.class}: #{cause.message}")
+          set_backtrace(cause.backtrace) if cause.backtrace
+        end
+      end
+
+      # Aggregates multiple worker failures from a single threaded_work run.
+      # Exposes `#errors` (Array<WorkerError>) so callers can iterate all
+      # failures instead of only seeing "first + N others".
+      class WorkerErrors < StandardError
+        attr_reader :errors
+
+        def initialize(errors)
+          @errors = errors
+          summary = errors.first(3).map { |e| "#{e.work_item.inspect}: #{e.cause.class}" }.join("; ")
+          more = errors.size > 3 ? " (and #{errors.size - 3} more)" : ""
+          super("#{errors.size} worker(s) failed: #{summary}#{more}")
+        end
+      end
+
       # Processes an array of work items in parallel using a thread pool.
       # Each work item is an Array that gets splatted into the block.
+      #
+      # Failure modes:
+      #   - Zero failures → returns normally
+      #   - One failure → raises a WorkerError wrapping the original exception
+      #     (preserves backtrace, adds work-item identifier)
+      #   - Multiple failures → raises a WorkerErrors aggregating all of them
+      #     (each individual error available via #errors)
       def threaded_work(work_items, &block)
         return if work_items.empty?
 
@@ -136,7 +171,7 @@ module Turbofan
               begin
                 yield(*item)
               rescue => e
-                errors << e
+                errors << WorkerError.new(item, e)
               end
             end
           end
@@ -147,10 +182,8 @@ module Turbofan
 
         all_errors = []
         all_errors << errors.pop until errors.empty?
-        first = all_errors.first
-        raise first if all_errors.size == 1
-
-        raise first.class, "#{first.message} (and #{all_errors.size - 1} other error(s) in parallel work)"
+        raise all_errors.first if all_errors.size == 1
+        raise WorkerErrors.new(all_errors)
       end
       private_class_method :threaded_work
     end

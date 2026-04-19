@@ -332,4 +332,65 @@ RSpec.describe Turbofan::Runtime::FanOut do
       expect(result).to eq(outputs)
     end
   end
+
+  describe "threaded_work error handling" do
+    it "raises WorkerError wrapping the failing work item + original cause" do
+      work = [[0], [1], [2]]
+      expect {
+        described_class.send(:threaded_work, work) do |i|
+          raise "boom-#{i}" if i == 1
+        end
+      }.to raise_error(Turbofan::Runtime::FanOut::WorkerError) do |e|
+        expect(e.work_item).to eq([1])
+        expect(e.cause).to be_a(RuntimeError)
+        expect(e.cause.message).to eq("boom-1")
+        expect(e.message).to include("[1]")
+        expect(e.message).to include("boom-1")
+      end
+    end
+
+    it "raises WorkerErrors aggregate when multiple workers fail" do
+      work = [[0], [1], [2], [3]]
+      expect {
+        described_class.send(:threaded_work, work) do |i|
+          raise "boom-#{i}" if i.even?
+        end
+      }.to raise_error(Turbofan::Runtime::FanOut::WorkerErrors) do |e|
+        expect(e.errors.size).to eq(2)
+        expect(e.errors.map(&:work_item)).to match_array([[0], [2]])
+        expect(e.errors.map { |err| err.cause.class }).to all(eq(RuntimeError))
+      end
+    end
+
+    it "WorkerErrors message summarizes up to 3 failures + notes beyond" do
+      errors = (0..4).map do |i|
+        Turbofan::Runtime::FanOut::WorkerError.new([i], RuntimeError.new("e#{i}"))
+      end
+      agg = Turbofan::Runtime::FanOut::WorkerErrors.new(errors)
+      expect(agg.message).to include("5 worker(s) failed")
+      expect(agg.message).to include("and 2 more")
+    end
+
+    it "preserves original backtrace through WorkerError" do
+      caught = nil
+      begin
+        described_class.send(:threaded_work, [[:a]]) { |_| raise "x" }
+      rescue Turbofan::Runtime::FanOut::WorkerError => e
+        caught = e
+      end
+      expect(caught.backtrace).not_to be_nil
+      expect(caught.backtrace.first).to match(/fan_out_spec/)
+    end
+
+    it "chunked work items (3-tuple) are preserved in WorkerError" do
+      work = [["chunk_a", 0, 0], ["chunk_b", 1, 1]]
+      expect {
+        described_class.send(:threaded_work, work) do |_chunk, index, _ri|
+          raise "boom" if index == 1
+        end
+      }.to raise_error(Turbofan::Runtime::FanOut::WorkerError) do |e|
+        expect(e.work_item).to eq(["chunk_b", 1, 1])
+      end
+    end
+  end
 end
