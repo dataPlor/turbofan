@@ -411,15 +411,33 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
   end
 
   describe "SIGTERM handling" do
-    it "installs a SIGTERM trap that exits with 143" do
-      # Test in a subprocess to avoid killing the test process
+    # Repository-local tmp dir that's sandbox-writable (vs. Dir.mktmpdir which
+    # can hit /var/folders permissions in restricted environments).
+    let(:tmp_root)     { File.expand_path("../../../tmp", __dir__) }
+    let(:run_id)       { "#{Process.pid}-#{rand(100000)}" }
+    let(:storage_path) { File.join(tmp_root, "sigterm-storage-#{run_id}") }
+
+    before do
+      FileUtils.mkdir_p(tmp_root)
+      FileUtils.mkdir_p(storage_path)
+    end
+
+    after { FileUtils.rm_rf(storage_path) }
+
+    # Characterization spec for the SIGTERM lifecycle. Asserts observable
+    # behaviors the retry strategy + operability depend on:
+    #   (1) exit code 143 (Batch retry rule: on exit 143 → RETRY w/o counter)
+    #   (2) storage_path cleaned (no leftover data on NVMe between retries)
+    # Cross-process flag/metrics observation is covered by unit specs on
+    # Context and Metrics separately — fork boundary makes mock-based
+    # verification unreliable.
+    it "cleans storage and exits 143 on SIGTERM" do
+      child_storage_path = storage_path
       read_pipe, write_pipe = IO.pipe
 
       pid = fork do
         read_pipe.close
-        described_class.new(step_class)
 
-        # Slow step that gives us time to send SIGTERM
         slow_step = Class.new do
           include Turbofan::Step
 
@@ -429,7 +447,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
           input_schema "passthrough.json"
           output_schema "passthrough.json"
           def self.name = "SlowStep"
-          def call(_input, context)
+          def call(_input, _context)
             sleep 10
             {}
           end
@@ -440,14 +458,14 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
         context = Turbofan::Runtime::Context.new(
           execution_id: "test", attempt_number: 1, step_name: "SlowStep",
           stage: "dev", pipeline_name: "test", array_index: nil,
-          storage_path: nil, uses: [], writes_to: []
+          storage_path: child_storage_path, uses: [], writes_to: []
         )
         cw = instance_double("Aws::CloudWatch::Client", put_metric_data: nil) # rubocop:disable RSpec/VerifiedDoubleReference
         metrics = Turbofan::Runtime::Metrics.new(
           cloudwatch_client: cw, pipeline_name: "test", stage: "dev", step_name: "SlowStep"
         )
         allow(context).to receive_messages(metrics: metrics, s3: nil)
-        allow(wrapper).to receive_messages(setup_storage: nil, build_context: context)
+        allow(wrapper).to receive_messages(setup_storage: child_storage_path, build_context: context)
         allow(Turbofan::Runtime::InputResolver).to receive(:call).and_return({"inputs" => [{}]})
 
         write_pipe.puts("ready")
@@ -457,16 +475,18 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       end
 
       write_pipe.close
-      # Wait for child to be ready
       read_pipe.gets
       read_pipe.close
 
-      sleep 0.1 # brief pause to let trap install
+      sleep 0.1 # let trap install before killing
       Process.kill("TERM", pid)
       _, status = Process.waitpid2(pid)
 
-      # Exit code 143 = 128 + 15 (SIGTERM)
+      # (1) Exit code 143 — Batch retry contract
       expect(status.exitstatus).to eq(143)
+      # (2) Storage cleaned (was created in before block, should be gone)
+      expect(File.directory?(storage_path)).to be(false),
+        "expected storage_path to have been cleaned"
     end
   end
 

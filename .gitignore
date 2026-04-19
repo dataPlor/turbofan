@@ -4,3 +4,6 @@ vendor/
 .ruby-lsp/
 spec/turbofan/integration/config.yml
 PLAN-*
+tmp/
+.DS_Store
+debug_asl.rb
