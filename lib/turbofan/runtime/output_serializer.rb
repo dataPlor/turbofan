@@ -20,7 +20,10 @@ module Turbofan
             ""
           end
           key = FanOut.s3_key(context.execution_id, step_name, "output", "#{segment}#{context.array_index}.json")
-          Turbofan::Retryable.call(logger: context.logger, metrics: context.metrics) do
+          # max_retry_seconds: nil — terminal write. Losing the step's
+          # output to a retry-budget abort would silently fail the
+          # downstream step rather than fail this one loudly.
+          Turbofan::Retryable.call(max_retry_seconds: nil, logger: context.logger, metrics: context.metrics) do
             context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
           end
           JSON.generate(result)

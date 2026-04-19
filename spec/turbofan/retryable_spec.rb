@@ -510,5 +510,29 @@ RSpec.describe Turbofan::Retryable do
       expect(names).not_to include("RetriesExhausted"),
         "budget-trip path must emit RetryBudgetExhausted only, not RetriesExhausted"
     end
+
+    it "respects an explicit max_retry_seconds: nil kwarg override even when config is set" do
+      Turbofan.config.max_retry_seconds = 0.001  # would abort immediately globally
+      attempts = 0
+      described_class.call(max: 3, base: 0.5, max_retry_seconds: nil, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 3
+        :ok
+      end
+      # Third attempt succeeds; no RetryBudgetExhausted raised despite the
+      # tight global budget, because the per-call override was nil.
+      expect(attempts).to eq(3)
+    end
+
+    it "per-call max_retry_seconds: finite overrides an unset global" do
+      Turbofan.config.max_retry_seconds = nil
+      expect {
+        described_class.call(max: 10, base: 2.0, max_retry_seconds: 1.0, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      }.to raise_error(Turbofan::RetryBudgetExhausted) do |e|
+        expect(e.budget_seconds).to eq(1.0)
+      end
+    end
   end
 end

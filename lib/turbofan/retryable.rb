@@ -89,7 +89,17 @@ module Turbofan
     # the Metrics object are used. Error codes, request IDs, and other
     # high-cardinality values are NOT added as dimensions (CloudWatch
     # bills per unique combination).
+    # Sentinel distinguishing "caller didn't pass max_retry_seconds:"
+    # from "caller passed max_retry_seconds: nil to explicitly bypass."
+    # Default arg uses the config value; explicit nil bypasses even when
+    # the global config is set. Used by terminal-write call sites
+    # (Metrics#flush, OutputSerializer, Payload.serialize) that must
+    # not self-abort during SIGTERM.
+    UNSET = Object.new.freeze
+    private_constant :UNSET
+
     def self.call(max: 5, base: 0.5, cap: 30,
+                  max_retry_seconds: UNSET,
                   sleeper: Kernel.method(:sleep),
                   jitter_rand: Kernel.method(:rand),
                   logger: nil,
@@ -101,7 +111,9 @@ module Turbofan
 
       attempt = 0
       elapsed_sleep = 0.0
-      budget = Turbofan.config.max_retry_seconds
+      # Per-call override wins over the global config. `nil` (either
+      # passed explicitly or from config) means unbounded.
+      budget = max_retry_seconds.equal?(UNSET) ? Turbofan.config.max_retry_seconds : max_retry_seconds
       begin
         yield
       rescue => e

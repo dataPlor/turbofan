@@ -12,7 +12,10 @@ module Turbofan
       def self.serialize(result, s3_client:, bucket:, execution_id:, step_name:)
         json = JSON.generate(result)
         key = FanOut.s3_key(execution_id, step_name, "output.json")
-        Turbofan::Retryable.call do
+        # max_retry_seconds: nil — terminal write, same rationale as
+        # OutputSerializer and Metrics#flush. Losing output under budget
+        # pressure silently fails the downstream step.
+        Turbofan::Retryable.call(max_retry_seconds: nil) do
           s3_client.put_object(bucket: bucket, key: key, body: json)
         end
         json

@@ -42,7 +42,14 @@ module Turbofan
         until @pending.empty?
           batch = @mutex.synchronize { @pending.first(BATCH_SIZE) }
           metric_data = batch.map { |entry| build_metric_datum(entry) }
-          Turbofan::Retryable.call do
+          # max_retry_seconds: nil bypasses the global retry budget.
+          # Metrics#flush is typically called from the container's ensure
+          # block as the process winds down (SIGTERM path); if the global
+          # budget aborted the flush, we'd lose the telemetry for the
+          # very failure we're trying to record. Explicit nil means this
+          # flush runs to its full 5-attempt ceiling regardless of
+          # Turbofan.config.max_retry_seconds.
+          Turbofan::Retryable.call(max_retry_seconds: nil) do
             cloudwatch_client.put_metric_data(
               namespace: "Turbofan/#{@pipeline_name}",
               metric_data: metric_data
