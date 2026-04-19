@@ -4,7 +4,7 @@ require "fileutils"
 require "digest"
 
 RSpec.describe Turbofan::Deploy::ImageBuilder do
-  let(:tmpdir) { Dir.mktmpdir("turbofan-image-builder") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-image-builder", SPEC_TMP_ROOT) }
 
   after { FileUtils.rm_rf(tmpdir) }
 
@@ -53,7 +53,7 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
     it "uses relative paths so tags are stable across machines" do
       tag1 = described_class.content_tag(step_dir, schemas_dir)
 
-      other_tmpdir = Dir.mktmpdir("turbofan-image-builder-other")
+      other_tmpdir = Dir.mktmpdir("turbofan-image-builder-other", SPEC_TMP_ROOT)
       other_step_dir = File.join(other_tmpdir, "step")
       other_schemas_dir = File.join(other_tmpdir, "schemas")
       FileUtils.mkdir_p(other_step_dir)

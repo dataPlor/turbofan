@@ -119,7 +119,7 @@ RSpec.describe Turbofan::Deploy::DependencyResolver do
 
   describe ".cleanup_build_context" do
     it "removes the tmpdir completely" do
-      tmpdir = Dir.mktmpdir("turbofan-deps-test-")
+      tmpdir = Dir.mktmpdir("turbofan-deps-test-", SPEC_TMP_ROOT)
       FileUtils.touch(File.join(tmpdir, "test.rb"))
 
       described_class.cleanup_build_context(tmpdir)

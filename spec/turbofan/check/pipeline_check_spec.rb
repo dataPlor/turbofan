@@ -597,7 +597,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
     end
 
     context "with DAG edge schema incompatibility" do
-      let(:schemas_dir) { Dir.mktmpdir("turbofan-schema-test") }
+      let(:schemas_dir) { Dir.mktmpdir("turbofan-schema-test", SPEC_TMP_ROOT) }
       let(:pipeline_class) do
         ce = ce_class
         stub_const("StepA", Class.new {
@@ -712,7 +712,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
     end
 
     context "when schema file contains invalid JSON" do
-      let(:schemas_dir) { Dir.mktmpdir("turbofan-bad-schema-test") }
+      let(:schemas_dir) { Dir.mktmpdir("turbofan-bad-schema-test", SPEC_TMP_ROOT) }
       let(:pipeline_class) do
         Class.new do
           include Turbofan::Pipeline

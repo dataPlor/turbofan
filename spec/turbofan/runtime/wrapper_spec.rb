@@ -411,16 +411,12 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
   end
 
   describe "SIGTERM handling" do
-    # Repository-local tmp dir that's sandbox-writable (vs. Dir.mktmpdir which
-    # can hit /var/folders permissions in restricted environments).
-    let(:tmp_root)     { File.expand_path("../../../tmp", __dir__) }
+    # Use the spec_helper's sandbox-writable tmp root rather than
+    # Dir.mktmpdir (which hits /var/folders EPERM in restricted envs).
     let(:run_id)       { "#{Process.pid}-#{rand(100000)}" }
-    let(:storage_path) { File.join(tmp_root, "sigterm-storage-#{run_id}") }
+    let(:storage_path) { File.join(SPEC_TMP_ROOT, "sigterm-storage-#{run_id}") }
 
-    before do
-      FileUtils.mkdir_p(tmp_root)
-      FileUtils.mkdir_p(storage_path)
-    end
+    before { FileUtils.mkdir_p(storage_path) }
 
     after { FileUtils.rm_rf(storage_path) }
 
@@ -548,7 +544,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
 
   describe "storage path management" do
     it "creates and cleans up a job-specific temp directory" do
-      Dir.mktmpdir do |tmpdir|
+      Dir.mktmpdir(nil, SPEC_TMP_ROOT) do |tmpdir|
         job_dir = File.join(tmpdir, "test-job")
         FileUtils.mkdir_p(job_dir)
 
@@ -570,7 +566,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
 
     it "sets ENV['TMPDIR'] to storage_path/tmp when local storage is available" do
-      Dir.mktmpdir do |tmpdir|
+      Dir.mktmpdir(nil, SPEC_TMP_ROOT) do |tmpdir|
         job_dir = File.join(tmpdir, "test-job")
         FileUtils.mkdir_p(job_dir)
 
@@ -722,7 +718,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
   end
 
   describe "schema validation" do
-    let(:schemas_dir) { Dir.mktmpdir("turbofan-wrapper-schemas") }
+    let(:schemas_dir) { Dir.mktmpdir("turbofan-wrapper-schemas", SPEC_TMP_ROOT) }
 
     before do
       Turbofan.schemas_path = schemas_dir
@@ -887,7 +883,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
 
     it "does not fail schema validation on __ fields even with additionalProperties: false" do
-      schemas_dir = Dir.mktmpdir("turbofan-strict-schema")
+      schemas_dir = Dir.mktmpdir("turbofan-strict-schema", SPEC_TMP_ROOT)
       Turbofan.schemas_path = schemas_dir
       File.write(File.join(schemas_dir, "strict_input.json"), JSON.generate({
         "type" => "object",

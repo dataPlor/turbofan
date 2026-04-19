@@ -4,7 +4,7 @@ require "fileutils"
 require "securerandom"
 
 RSpec.describe Turbofan::Deploy::PipelineLoader do
-  let(:tmpdir) { Dir.mktmpdir("turbofan-loader-test") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-loader-test", SPEC_TMP_ROOT) }
   let(:turbofans_root) { File.join(tmpdir, "turbofans") }
   let(:pipeline_file) { File.join(turbofans_root, "pipelines", "my_pipeline.rb") }
   let(:schemas_dir) { File.join(turbofans_root, "schemas") }

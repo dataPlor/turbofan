@@ -104,7 +104,7 @@ RSpec.describe Turbofan::CLI::Deploy::Preflight do # rubocop:disable RSpec/Multi
 end
 
 RSpec.describe "Deploy pre-flight integration", type: :integration do # rubocop:disable RSpec/DescribeClass
-  let(:tmpdir) { Dir.mktmpdir("turbofan-preflight-test") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-preflight-test", SPEC_TMP_ROOT) }
   let(:pipeline_name) { "my_pipeline" }
   let(:stage) { "production" }
 

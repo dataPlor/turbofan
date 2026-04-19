@@ -203,7 +203,7 @@ RSpec.describe Turbofan::Runtime::Context do
         end
       end
 
-      let(:storage_dir) { Dir.mktmpdir("storage") }
+      let(:storage_dir) { Dir.mktmpdir("storage", SPEC_TMP_ROOT) }
       let(:ctx) do
         build_context(storage_path: storage_dir, uses: [{type: :resource, key: :places_read}])
       end

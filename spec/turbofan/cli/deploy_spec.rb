@@ -3,7 +3,7 @@ require "tmpdir"
 require "fileutils"
 
 RSpec.describe Turbofan::CLI::Deploy do
-  let(:tmpdir) { Dir.mktmpdir("turbofan-deploy-test") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-deploy-test", SPEC_TMP_ROOT) }
   let(:pipeline_name) { "test_pipeline" }
   let(:stage) { "production" }
   let(:stack_name) { "turbofan-test-pipeline-production" }

@@ -3,7 +3,7 @@ require "tmpdir"
 require "fileutils"
 
 RSpec.describe "turbofan step new Dockerfile BuildKit schemas" do # rubocop:disable RSpec/DescribeClass
-  let(:tmpdir) { Dir.mktmpdir("turbofan-test") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-test", SPEC_TMP_ROOT) }
   let(:step_dir) { File.join(tmpdir, "turbofans", "steps", "my_step") }
   let(:dockerfile_content) { File.read(File.join(step_dir, "Dockerfile")) }
 

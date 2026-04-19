@@ -57,7 +57,7 @@ RSpec.describe Turbofan::CLI::Run do
     end
 
     context "with --input-file" do
-      let(:tmpdir) { Dir.mktmpdir("turbofan-run-test") }
+      let(:tmpdir) { Dir.mktmpdir("turbofan-run-test", SPEC_TMP_ROOT) }
 
       after { FileUtils.rm_rf(tmpdir) }
 

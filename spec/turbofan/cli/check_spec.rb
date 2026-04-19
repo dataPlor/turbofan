@@ -3,7 +3,7 @@ require "tmpdir"
 require "fileutils"
 
 RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
-  let(:tmpdir) { Dir.mktmpdir("turbofan-check-test") }
+  let(:tmpdir) { Dir.mktmpdir("turbofan-check-test", SPEC_TMP_ROOT) }
 
   after do
     FileUtils.rm_rf(tmpdir)
