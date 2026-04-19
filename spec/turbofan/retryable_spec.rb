@@ -445,4 +445,48 @@ RSpec.describe Turbofan::Retryable do
       # No assertion beyond "did not raise" — nil metrics means no-op.
     end
   end
+
+  describe "retry budget (Turbofan.config.max_retry_seconds)" do
+    after { Turbofan.config.max_retry_seconds = nil }
+
+    it "does not enforce when config is nil (default, backward-compat)" do
+      attempts = 0
+      described_class.call(max: 3, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 3
+        :ok
+      end
+      expect(attempts).to eq(3)
+    end
+
+    it "raises RetryBudgetExhausted before sleep would exceed the budget" do
+      Turbofan.config.max_retry_seconds = 1.0
+      # jitter_rand: 1.0 + base: 2.0 → attempt 1 sleeps 2s, exceeds budget.
+      expect {
+        described_class.call(max: 10, base: 2.0, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      }.to raise_error(Turbofan::RetryBudgetExhausted) do |e|
+        expect(e.budget_seconds).to eq(1.0)
+        expect(e.last_error).to be_a(Aws::S3::Errors::ServiceError)
+      end
+    end
+
+    it "budget is wall-clock over sleeps, not per-sleep" do
+      Turbofan.config.max_retry_seconds = 3.0
+      # jitter 1.0 + base 1.0 → sleep 1s, 2s, 4s. First two retries total 3s
+      # (right at the budget); the third retry's 4s would exceed it.
+      attempts = 0
+      expect {
+        described_class.call(max: 10, base: 1.0, sleeper: ->(_) {}, jitter_rand: -> { 1.0 }) do
+          attempts += 1
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      }.to raise_error(Turbofan::RetryBudgetExhausted)
+      # First attempt + 2 retries executed; third retry's sleep would have
+      # pushed elapsed beyond budget, so RetryBudgetExhausted was raised
+      # before that sleep.
+      expect(attempts).to eq(3)
+    end
+  end
 end

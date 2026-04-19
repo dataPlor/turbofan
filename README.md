@@ -206,6 +206,18 @@ The container wrapper installs a SIGTERM handler for graceful Spot interruption:
 4. Cleans up NVMe temp directory
 5. Exits with code 143 so the retry strategy recognizes it as infrastructure failure
 
+#### Poison-pill semantics for fan-out (DLQ)
+
+When a fan-out step has N array-job children and one child hits a non-transient error (a real bug in the worker, not an AWS throttle), the current behavior is **fail-fast at the Map state**: Step Functions marks the Map state FAILED, which fails the execution. There is **no per-child dead-letter queue** for poison pills by default.
+
+Operators have three knobs:
+
+- **`tolerated_failure_rate`** on the fan-out: accept up to X% child failures before the Map state fails. The ToleranceLambda (`lib/turbofan/generators/cloudformation/tolerance_lambda.rb`) inspects the Batch job summary and passes/fails the Map state against this threshold.
+- **`Turbofan.config.fan_out_early_exit_threshold`**: inside a single worker's `threaded_work`, stop dequeuing remaining items after N non-transient failures. Guards against one bad record blowing up CPU budget across the remaining chunks of a child. Transient errors (throttles) do not count toward this threshold.
+- **`retries` on the step**: Batch-level retries per child. Does not address poison pills (the same record re-plays and re-fails); use for infrastructure failures only.
+
+If you need a true DLQ (route the failing record elsewhere for later replay without failing the Map state), handle it inside your worker — catch the poison-pill exception, write the record to a DLQ S3 prefix or SQS queue, return success for the surrounding batch. Turbofan does not impose a DLQ contract because "what counts as poison" is domain-specific.
+
 ### What's Deferred
 
 - **Idempotency / checkpointing** — In a fan-out context (10,000 parallel jobs), defining "resume from where you left off" is complex. A step-level restart from the last successful step's S3 output is feasible; item-level retry within a fan-out requires per-item status tracking.

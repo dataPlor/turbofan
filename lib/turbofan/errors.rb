@@ -25,4 +25,22 @@ module Turbofan
   # Specific configuration failures.
   class ResourceUnavailableError < ConfigError; end
   class ExtensionLoadError < ConfigError; end
+
+  # Raised by Retryable.call when the accumulated sleep time across
+  # retries exceeds Turbofan.config.max_retry_seconds. Distinct from a
+  # retry-exhausted-by-attempt-count case (which re-raises the original
+  # transient error) because "we ran out of budget" is a different
+  # operational signal than "we attempted 5 times and all 5 failed."
+  class RetryBudgetExhausted < Error
+    attr_reader :elapsed_seconds, :budget_seconds, :last_error
+
+    def initialize(elapsed_seconds:, budget_seconds:, last_error:)
+      @elapsed_seconds = elapsed_seconds
+      @budget_seconds = budget_seconds
+      @last_error = last_error
+      super("Retry budget exhausted: slept #{elapsed_seconds.round(2)}s, " \
+            "budget #{budget_seconds}s. Last error: #{last_error.class}: #{last_error.message}")
+      set_backtrace(last_error.backtrace) if last_error.respond_to?(:backtrace) && last_error.backtrace
+    end
+  end
 end

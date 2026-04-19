@@ -181,7 +181,17 @@ module Turbofan
         aborted = false
 
         thread_count = [work_items.size, THREAD_POOL_SIZE].min
-        threads = Array.new(thread_count) do
+
+        # Stall detection: per-worker heartbeat timestamps. A coordinator
+        # thread wakes periodically and warns for any worker whose
+        # heartbeat is older than Turbofan.config.worker_stall_seconds.
+        # nil (default) = no coordinator, no overhead.
+        stall_threshold = Turbofan.config.worker_stall_seconds
+        heartbeats = stall_threshold ? Array.new(thread_count, nil) : nil
+        heartbeat_items = stall_threshold ? Array.new(thread_count, nil) : nil
+        coordinator_shutdown = false
+
+        threads = Array.new(thread_count) do |worker_idx|
           Thread.new do
             loop do
               # Check abort flag before dequeuing. Once tripped, drain
@@ -191,6 +201,10 @@ module Turbofan
                 queue.pop(true)
               rescue ThreadError
                 break
+              end
+              if heartbeats
+                heartbeats[worker_idx] = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+                heartbeat_items[worker_idx] = item
               end
               begin
                 yield(*item)
@@ -206,12 +220,41 @@ module Turbofan
                   non_transient_count += 1
                   aborted = true if non_transient_count >= threshold
                 end
+              ensure
+                if heartbeats
+                  heartbeats[worker_idx] = nil
+                  heartbeat_items[worker_idx] = nil
+                end
+              end
+            end
+          end
+        end
+
+        coordinator = if stall_threshold
+          # Wake at ~quarter of the threshold so stall warnings fire
+          # proportionally: 0.25s wake for a 1s threshold, 15s wake for
+          # a 60s threshold. Floor at 50ms to avoid CPU burn at very
+          # small thresholds (mostly for test scenarios).
+          coordinator_interval = [stall_threshold / 4.0, 0.05].max
+          Thread.new do
+            until coordinator_shutdown
+              sleep coordinator_interval
+              next if coordinator_shutdown
+              now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+              heartbeats.each_with_index do |started_at, idx|
+                next unless started_at
+                stalled_for = now - started_at
+                next if stalled_for < stall_threshold
+                warn("[Turbofan] WorkerStall: thread #{idx} has held #{heartbeat_items[idx].inspect} " \
+                     "for #{stalled_for.round(1)}s without finishing (threshold: #{stall_threshold}s)")
               end
             end
           end
         end
 
         threads.each(&:join)
+        coordinator_shutdown = true
+        coordinator&.join
         return if errors.empty?
 
         all_errors = []

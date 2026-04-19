@@ -458,4 +458,48 @@ RSpec.describe Turbofan::Runtime::FanOut do
         "all items should process despite 'transient' errors; saw #{drained.size}/10"
     end
   end
+
+  describe "threaded_work stall detection (Turbofan.config.worker_stall_seconds)" do
+    after { Turbofan.config.worker_stall_seconds = nil }
+
+    it "emits a WorkerStall warn when a worker holds an item past the threshold" do
+      Turbofan.config.worker_stall_seconds = 0.2
+      captured = StringIO.new
+      orig = $stderr
+      $stderr = captured
+      begin
+        described_class.send(:threaded_work, [[:slow_item]]) do |_|
+          sleep 0.5
+        end
+      ensure
+        $stderr = orig
+      end
+      expect(captured.string).to include("WorkerStall")
+      expect(captured.string).to include(":slow_item")
+    end
+
+    it "does not warn when workers finish before the threshold" do
+      Turbofan.config.worker_stall_seconds = 0.5
+      captured = StringIO.new
+      orig = $stderr
+      $stderr = captured
+      begin
+        described_class.send(:threaded_work, [[:fast_item]]) do |_|
+          sleep 0.05
+        end
+      ensure
+        $stderr = orig
+      end
+      expect(captured.string).not_to include("WorkerStall")
+    end
+
+    it "has zero overhead when config is nil (no coordinator thread)" do
+      # Baseline: threads + 1 main thread. Coordinator thread would add 1.
+      before_count = Thread.list.size
+      described_class.send(:threaded_work, [[:a], [:b], [:c]]) { |_| }
+      after_count = Thread.list.size
+      # All worker threads joined. No coordinator should linger.
+      expect(after_count).to eq(before_count)
+    end
+  end
 end

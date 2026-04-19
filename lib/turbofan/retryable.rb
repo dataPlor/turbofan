@@ -100,6 +100,8 @@ module Turbofan
       raise ArgumentError, "cap must be > 0, got #{cap}" unless cap.is_a?(Numeric) && cap > 0
 
       attempt = 0
+      elapsed_sleep = 0.0
+      budget = Turbofan.config.max_retry_seconds
       begin
         yield
       rescue => e
@@ -114,6 +116,19 @@ module Turbofan
         end
         backoff = [cap, base * (2**(attempt - 1))].min.to_f
         delay = jitter_rand.call * backoff
+        # Retry budget check BEFORE sleeping. Guards against the
+        # "Retryable.call holds the thread for ~10 min on a Spot node
+        # with 2-min SIGTERM notice" failure mode Mike flagged. When
+        # Turbofan.config.max_retry_seconds is nil (default), budget
+        # is skipped.
+        if budget && elapsed_sleep + delay > budget
+          metrics&.emit("RetriesExhausted", 1)
+          raise Turbofan::RetryBudgetExhausted.new(
+            elapsed_seconds: elapsed_sleep,
+            budget_seconds: budget,
+            last_error: e
+          )
+        end
         logger&.info("Retryable: transient error, retrying",
           attempt: attempt,
           max: max,
@@ -122,6 +137,7 @@ module Turbofan
           delay_ms: (delay * 1000).round)
         metrics&.emit("RetryAttempt", 1)
         sleeper.call(delay)
+        elapsed_sleep += delay
         retry
       end
     end
