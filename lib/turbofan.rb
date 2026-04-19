@@ -55,6 +55,10 @@ module Turbofan
   # status is 143 — which AWS Batch's retry strategy matches via
   # `onExitCode: 143 → RETRY` without counting against the retry limit.
   class Interrupted < SystemExit
+    # Intentionally public: this constant is an AWS Batch contract
+    # (matched by `onExitCode: 143 → RETRY` in the generated CloudFormation
+    # retry strategy). External callers and tests legitimately reference
+    # it to assert the contract, so it is NOT marked private_constant.
     EXIT_CODE = 143
 
     def initialize(message = "SIGTERM received")

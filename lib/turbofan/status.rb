@@ -4,6 +4,7 @@ module Turbofan
   class Status
     PENDING_STATUSES = %w[SUBMITTED PENDING RUNNABLE STARTING].freeze
     BATCH_STATUSES = (PENDING_STATUSES + %w[RUNNING SUCCEEDED FAILED]).freeze
+    private_constant :PENDING_STATUSES, :BATCH_STATUSES
 
     def self.fetch(sfn_client:, batch_client:, execution_arn:, pipeline_name:, stage:, steps:)
       execution = sfn_client.describe_execution(execution_arn: execution_arn)

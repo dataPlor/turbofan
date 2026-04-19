@@ -77,6 +77,7 @@ module Turbofan
       private
 
       RESERVED_DAG_METHODS = %i[fan_out trigger_input].freeze
+      private_constant :RESERVED_DAG_METHODS
 
       def define_component_methods!(builder)
         components = Turbofan.discover_components

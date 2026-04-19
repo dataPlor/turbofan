@@ -70,6 +70,7 @@ module Turbofan
       end
 
       VALID_EXECUTION_MODELS = %i[batch lambda fargate].freeze
+      private_constant :VALID_EXECUTION_MODELS
 
       def execution(model)
         unless VALID_EXECUTION_MODELS.include?(model)
