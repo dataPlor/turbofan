@@ -162,15 +162,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Discovery::CLASS_NAME`). Use `Turbofan::Discovery.class_name_of(c)`.
 
 ### Deprecated
-- `execution :batch` DSL macro — use `runs_on :batch`. Will be removed
-  in 0.7. Quiet-by-default warning via `Turbofan::Deprecations`.
-- `uses(:duckdb, extensions: [...])` kwarg form — use the block form
-  `uses(:duckdb) { extensions :json, :parquet }`. Will be removed in
-  0.7. Quiet-by-default warning.
+
+Two removal milestones are staged to let users migrate incrementally.
+Enable `Turbofan.config.deprecations = true` (or run with `$VERBOSE`)
+to surface the quiet-by-default warnings in CI and catch every call
+site.
+
+**Scheduled for removal in 0.7:**
+- `execution :batch` DSL macro — migrate to `runs_on :batch`. Pairs
+  grammatically with `compute_environment :foo`.
+- `uses(:duckdb, extensions: [...])` kwarg form — migrate to the block
+  form: `uses(:duckdb) { extensions :json, :parquet }`.
+
+**Scheduled for removal in 1.0:**
 - The `Step#turbofan_*` attr_readers (`turbofan_uses`,
-  `turbofan_execution`, etc.) — use the new `.turbofan` façade:
-  `MyStep.turbofan.uses`, `.execution`, etc. Both work in 0.6 without
-  warnings; the legacy readers will be removed in 1.0.
+  `turbofan_execution`, etc., ~20 of them) — migrate to the new
+  `.turbofan` façade: `MyStep.turbofan.uses`, `.execution`, etc. Both
+  surfaces work in 0.6.x without warnings; warnings begin in 0.8 so
+  the deprecation period is a full minor-version family rather than a
+  single release.
 
 ### Fixed
 - `Turbofan::Runtime::Context` lazy-memoized attributes (`logger`,

@@ -737,7 +737,7 @@ Include this module in a class to define a step.
 class ValidatePlaces
   include Turbofan::Step
 
-  execution :batch
+  runs_on :batch
   compute_environment :compute_bound_with_nvme
   cpu 2
   ram 4096
@@ -745,7 +745,9 @@ class ValidatePlaces
   retries 2
 
   uses :places_read                        # Postgres, readonly ATTACH
-  uses :duckdb, extensions: [:spatial]     # Pre-download + auto-load DuckDB extensions
+  uses :duckdb do                          # Pre-download + auto-load DuckDB extensions
+    extensions :spatial
+  end
   uses "s3://data-lake/parquet/"           # S3, read-only IAM policy
   writes_to "s3://output-bucket/results/"  # S3, read+write IAM policy
 
@@ -776,7 +778,7 @@ These methods work on all execution models:
 | `output_schema(filename)` | Yes | — | JSON Schema filename for output validation. |
 | `timeout(seconds)` | No | `3600` | Step timeout in seconds. |
 | `retries(count, on: nil)` | No | `3` | Retry attempts. When `on:` is nil, retries at the Batch level. When `on:` is an array of Step Functions error names (e.g., `["States.TaskFailed"]`), generates a Step Functions `Retry`. |
-| `uses(target, extensions: nil)` | No | `[]` | Read-only dependency. Symbol (resource key) or S3 URI string. `:duckdb` accepts `extensions:` array. |
+| `uses(target) { extensions ... }` | No | `[]` | Read-only dependency. Symbol (resource key) or S3 URI string. For `:duckdb`, use the block form to declare extensions. Legacy `uses(:duckdb, extensions: [...])` kwarg still works but is deprecated (removed in 0.7). |
 | `reads_from(target)` | No | — | Alias for `uses`. |
 | `writes_to(target)` | No | `[]` | Read-write dependency. Same argument types as `uses`. |
 | `inject_secret(name, from:)` | No | `[]` | Secrets Manager env var. `name` is the env var, `from:` is the ARN. |
@@ -793,7 +795,7 @@ Every step declares how it runs via `execution`. All three models use the same D
 | `:lambda` | Lambda (container image) | <5 sec | 15 min | 10 GB | Short preprocessing, filters, enrichment |
 | `:fargate` | ECS Fargate | 30-60 sec | Unlimited | 120 GB | Medium jobs, predictable startup, VPC access |
 
-#### `execution :batch`
+#### `runs_on :batch`
 
 Runs as an AWS Batch job on EC2 Spot instances. The only execution model that supports `fan_out`.
 
@@ -812,7 +814,7 @@ Runs as an AWS Batch job on EC2 Spot instances. The only execution model that su
 ```ruby
 class ProcessPartitions
   include Turbofan::Step
-  execution :batch
+  runs_on :batch
   compute_environment :compute_bound
   cpu 4
   ram 8
@@ -822,7 +824,7 @@ class ProcessPartitions
 end
 ```
 
-#### `execution :lambda`
+#### `runs_on :lambda`
 
 Runs as an AWS Lambda function using a container image. Lambda CPU scales implicitly with memory — you only declare `ram`.
 
@@ -838,7 +840,7 @@ Turbofan automatically wraps your Docker image with `aws_lambda_ric` at build ti
 ```ruby
 class FilterGkeys
   include Turbofan::Step
-  execution :lambda
+  runs_on :lambda
   compute_environment :compute_bound
   ram 4
   input_schema "filter_input.json"
@@ -846,7 +848,7 @@ class FilterGkeys
 end
 ```
 
-#### `execution :fargate`
+#### `runs_on :fargate`
 
 Runs as an ECS Fargate task. Resources are provisioned directly — no Batch compute environment needed.
 
@@ -866,7 +868,7 @@ Runs as an ECS Fargate task. Resources are provisioned directly — no Batch com
 ```ruby
 class LoadObservations
   include Turbofan::Step
-  execution :fargate
+  runs_on :fargate
   cpu 2
   ram 8
   storage 100
@@ -1160,8 +1162,8 @@ Provided as the second argument to `call(inputs, context)`. Gives steps access t
 | `metrics` | `Turbofan::Runtime::Metrics` — CloudWatch metric emitter. Values must be Numeric. |
 | `s3` | `Aws::S3::Client` instance. |
 | `secrets_client` | `Aws::SecretsManager::Client` instance. |
-| `duckdb` | DuckDB connection (lazy-initialized). Auto-provisioned if any Postgres resource is declared via `uses`/`writes_to`, if `uses :duckdb` is explicit, or if DuckDB extensions are declared. When `storage_path` is available, uses a file-based database (`{storage_path}/duckdb.db`) with `temp_directory` set to `{storage_path}/tmp/`; otherwise uses in-memory mode. After connection init, any extensions declared via `uses :duckdb, extensions: [...]` are loaded automatically via `LOAD`. |
-| `duckdb_extensions` | Array of DuckDB extension names (symbols) declared via `uses :duckdb, extensions: [...]`. Empty by default. |
+| `duckdb` | DuckDB connection (lazy-initialized). Auto-provisioned if any Postgres resource is declared via `uses`/`writes_to`, if `uses :duckdb` is explicit, or if DuckDB extensions are declared. When `storage_path` is available, uses a file-based database (`{storage_path}/duckdb.db`) with `temp_directory` set to `{storage_path}/tmp/`; otherwise uses in-memory mode. After connection init, any extensions declared via `uses :duckdb do extensions ... end` are loaded automatically via `LOAD`. |
+| `duckdb_extensions` | Array of DuckDB extension names (symbols) declared via `uses :duckdb do extensions ... end`. Empty by default. |
 | `interrupted?` | Returns `true` if SIGTERM has been received. |
 | `interrupt!` | Sets the interrupted flag. Called by the SIGTERM handler. |
 
@@ -1334,7 +1336,7 @@ Resolves DuckDB extension download URLs and install paths. Used by the Dockerfil
 | `PLATFORM` | `"linux_arm64"` | Target platform (matches Graviton ARM instances). |
 | `COMMUNITY` | `[:h3, :delta]` | Extensions served from the community repo. All others use the core repo. |
 
-When `duckdb: true`, the generated Dockerfile always pre-downloads `postgres_scanner`. Any additional extensions declared via `uses :duckdb, extensions: [...]` are appended. At runtime, `LOAD` finds the files at the expected path — no `INSTALL`, no internet.
+When `duckdb: true`, the generated Dockerfile always pre-downloads `postgres_scanner`. Any additional extensions declared via `uses :duckdb do extensions ... end` are appended. At runtime, `LOAD` finds the files at the expected path — no `INSTALL`, no internet.
 
 ---
 
