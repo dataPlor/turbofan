@@ -168,7 +168,7 @@ module Turbofan
       #   retry-able error, and aborting early would make the operator's
       #   "your burst is being throttled" scenario indistinguishable from
       #   "your code has a real bug." Mike Perham flagged this specifically.
-      def threaded_work(work_items, &block)
+      def threaded_work(work_items, metrics: nil, &block)
         return if work_items.empty?
 
         queue = Queue.new
@@ -253,6 +253,12 @@ module Turbofan
                 next if stalled_for < stall_threshold
                 warn("[Turbofan] WorkerStall: thread #{idx} has held #{heartbeat_items[idx].inspect} " \
                      "for #{stalled_for.round(1)}s without finishing (threshold: #{stall_threshold}s)")
+                # Emit WorkerStall as a CloudWatch metric alongside the
+                # warn. stderr lands in CloudWatch Logs but operators
+                # grep, not dashboard, over logs; the metric surfaces on
+                # the same dashboard as RetryAttempt and RetriesExhausted
+                # so the full observability story is in one place.
+                metrics&.emit("WorkerStall", 1)
               end
             end
           end

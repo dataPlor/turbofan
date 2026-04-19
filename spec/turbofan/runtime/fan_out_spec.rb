@@ -501,5 +501,37 @@ RSpec.describe Turbofan::Runtime::FanOut do
       # All worker threads joined. No coordinator should linger.
       expect(after_count).to eq(before_count)
     end
+
+    it "emits WorkerStall CloudWatch metric when metrics kwarg is passed and a worker stalls" do
+      Turbofan.config.worker_stall_seconds = 0.2
+      recorder = Class.new do
+        attr_reader :emitted
+        def initialize = @emitted = Queue.new
+        def emit(name, value, unit: nil) = @emitted << {name: name, value: value}
+      end.new
+      begin
+        described_class.send(:threaded_work, [[:slow_item]], metrics: recorder) do |_|
+          sleep 0.5
+        end
+      ensure
+        Turbofan.config.worker_stall_seconds = nil
+      end
+      emitted = []
+      emitted << recorder.emitted.pop until recorder.emitted.empty?
+      stall_emits = emitted.select { |e| e[:name] == "WorkerStall" }
+      expect(stall_emits).not_to be_empty
+      expect(stall_emits.first[:value]).to eq(1)
+    end
+
+    it "does not emit WorkerStall when metrics is nil (no regression)" do
+      Turbofan.config.worker_stall_seconds = 0.2
+      begin
+        expect {
+          described_class.send(:threaded_work, [[:slow_item]]) { |_| sleep 0.5 }
+        }.not_to raise_error
+      ensure
+        Turbofan.config.worker_stall_seconds = nil
+      end
+    end
   end
 end
