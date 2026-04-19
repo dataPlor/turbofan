@@ -37,7 +37,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "aws-sdk-cloudwatch", "~> 1"
   spec.add_dependency "aws-sdk-cloudwatchlogs", "~> 1"
   spec.add_dependency "aws-sdk-secretsmanager", "~> 1"
-  spec.add_dependency "oj", "~> 3"
   spec.add_dependency "json_schemer", "~> 2"
   spec.add_dependency "zeitwerk", "~> 2.6"
 
