@@ -158,6 +158,15 @@ module Turbofan
       # is impossible here. We rely on CRuby's GIL, which guarantees atomic
       # read/write of boolean values — torn reads are impossible. Non-CRuby
       # runtimes must provide equivalent guarantees for this to be safe.
+      #
+      # ⚠ DO NOT wrap `interrupt!` or `interrupted?` in `Mutex#synchronize`,
+      # `@init_mutex.synchronize`, or any other mutex. `interrupt!` is
+      # invoked from the SIGTERM trap handler installed in
+      # runtime/wrapper.rb. Attempting to take a mutex in trap context
+      # raises `ThreadError: can't be called from trap context` and aborts
+      # the graceful-shutdown path — leaving the worker in a state where
+      # SIGTERM is effectively unhandled. Atomic-boolean-under-GIL is
+      # intentional. (Flagged by Jeremy Evans.)
       def interrupted?
         @interrupted
       end
