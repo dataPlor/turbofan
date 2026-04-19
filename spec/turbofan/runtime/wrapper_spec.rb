@@ -488,6 +488,62 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       expect(File.directory?(storage_path)).to be(false),
         "expected storage_path to have been cleaned"
     end
+
+    # Unit-level tests for the rescue branch that handles Turbofan::Interrupted.
+    # These bypass the signal trap (tested via fork above) and exercise the
+    # lifecycle by raising Interrupted directly from step code — cheaper + more
+    # observable than round-tripping through SIGTERM.
+    describe "when step raises Turbofan::Interrupted" do
+      let(:interrupting_step) do
+        make_step(name: "InterruptingStep") do |_inputs, _ctx|
+          raise Turbofan::Interrupted.new("test interrupt")
+        end
+      end
+
+      it "re-raises the Interrupted exception with exit status 143" do
+        expect {
+          run_wrapper(interrupting_step, env: {"TURBOFAN_INPUT" => '{"inputs":[{}]}'})
+        }.to raise_error(Turbofan::Interrupted) { |e| expect(e.status).to eq(143) }
+      end
+
+      it "does not emit failure metrics for graceful shutdowns" do
+        expect(Turbofan::Runtime::StepMetrics).not_to receive(:emit_failure)
+        begin
+          run_wrapper(interrupting_step, env: {"TURBOFAN_INPUT" => '{"inputs":[{}]}'})
+        rescue Turbofan::Interrupted
+          # expected
+        end
+      end
+
+      it "does not emit a Lineage fail_event for graceful shutdowns" do
+        allow(Turbofan::Runtime::Lineage).to receive(:fail_event).and_call_original
+        begin
+          run_wrapper(interrupting_step, env: {"TURBOFAN_INPUT" => '{"inputs":[{}]}'})
+        rescue Turbofan::Interrupted
+          # expected — Interrupted propagates through ensure
+        end
+        expect(Turbofan::Runtime::Lineage).not_to have_received(:fail_event)
+      end
+    end
+
+    describe "#install_sigterm_handler API" do
+      # Regression guard: the storage_path: kwarg was removed after cleanup
+      # moved to the ensure block exclusively.
+      it "accepts only a context argument" do
+        wrapper = described_class.new(step_class)
+        context = instance_double(Turbofan::Runtime::Context, interrupt!: nil)
+
+        # Restore whatever trap existed so we don't leak state across tests.
+        original = Signal.trap("TERM", "DEFAULT")
+        begin
+          expect { wrapper.send(:install_sigterm_handler, context) }.not_to raise_error
+          expect { wrapper.send(:install_sigterm_handler, context, storage_path: "/tmp/x") }
+            .to raise_error(ArgumentError)
+        ensure
+          Signal.trap("TERM", original)
+        end
+      end
+    end
   end
 
   describe "storage path management" do
