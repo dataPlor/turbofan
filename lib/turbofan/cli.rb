@@ -4,6 +4,12 @@ module Turbofan
   class CLI < Thor
     PROTECTED_STAGES = %w[production staging].freeze
 
+    map %w[-v --version] => :version
+    desc "version", "Print the Turbofan gem version"
+    def version
+      $stdout.puts Turbofan::VERSION
+    end
+
     desc "new NAME", "Create a new Turbofan pipeline"
     def new(name)
       Turbofan::CLI::New.call(name)
