@@ -37,8 +37,12 @@ module Turbofan
 
       private
 
+      # Disable SDK's built-in retry so Turbofan::Retryable owns all retry
+      # decisions when flush wraps put_metric_data. See lib/turbofan/retryable.rb.
+      # `max_attempts: 1` works across standard/adaptive/legacy modes; the
+      # legacy-only `retry_limit: 0` would be ignored in modern modes.
       def cloudwatch_client
-        @cloudwatch_client ||= Aws::CloudWatch::Client.new
+        @cloudwatch_client ||= Aws::CloudWatch::Client.new(retry_mode: "standard", max_attempts: 1)
       end
 
       def build_metric_datum(entry)

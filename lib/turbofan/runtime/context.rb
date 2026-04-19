@@ -53,12 +53,18 @@ module Turbofan
         )
       end
 
+      # Disable SDK's built-in retry so Turbofan::Retryable owns all retry
+      # decisions. Otherwise SDK's default 3-retry stacks on top of our 5,
+      # yielding 15 total attempts and obscuring retry telemetry.
+      #
+      # `max_attempts: 1` + `retry_mode: 'standard'` is the modern idiom.
+      # (`retry_limit: 0` is legacy-mode-only; ignored in standard/adaptive.)
       def s3
-        @s3 ||= Aws::S3::Client.new
+        @s3 ||= Aws::S3::Client.new(retry_mode: "standard", max_attempts: 1)
       end
 
       def secrets_client
-        @secrets_client ||= Aws::SecretsManager::Client.new
+        @secrets_client ||= Aws::SecretsManager::Client.new(retry_mode: "standard", max_attempts: 1)
       end
 
       def duckdb
