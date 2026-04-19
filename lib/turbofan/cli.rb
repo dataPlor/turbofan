@@ -2,6 +2,18 @@
 
 require "thor"
 
+# Tripwire for Mike Perham's runtime-vs-deploy-confusion concern: if a
+# container worker loaded via `require "turbofan/runtime"` accidentally
+# references Turbofan::CLI, Zeitwerk would silently autoload this file
+# + the full set of deploy-side aws-sdk-* gems, inflating RSS by 30+ MB
+# and adding cold-start latency. Make that loud instead of quiet.
+if ENV["TURBOFAN_RUNTIME_ONLY"] == "1"
+  raise "Turbofan::CLI loaded in runtime-only mode. " \
+    "Something in this worker referenced a CLI constant — trace the " \
+    "require/const path and remove it. If this is intentional, unset " \
+    "ENV['TURBOFAN_RUNTIME_ONLY']."
+end
+
 module Turbofan
   class CLI < Thor
     PROTECTED_STAGES = %w[production staging].freeze

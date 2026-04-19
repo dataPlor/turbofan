@@ -47,8 +47,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LICENSE` file (MIT) bundled in the gem archive.
 - GitHub Actions workflow now runs Ruby 3.2/3.3/3.4 on ubuntu and
   macOS, plus a `gem build` smoke job that installs the packaged gem
-  and verifies `require "turbofan"` loads. Bundle-audit blocks on
-  CVEs; rubocop is advisory.
+  and verifies all three entry points (`turbofan`, `turbofan/runtime`,
+  `turbofan/deploy`) load. Bundle-audit blocks on CVEs; rubocop is
+  advisory.
+- **Zeitwerk-managed autoloading.** The 45-line `require_relative`
+  cascade in `lib/turbofan.rb` is replaced with a Zeitwerk loader.
+  Adds `zeitwerk ~> 2.6` as a runtime dependency. `Turbofan.loader` is
+  exposed (read-only) so downstream gems can call `.ignore` before
+  their own setup.
+- **`require "turbofan/runtime"`** — slim entry point for container
+  workers. Loads only the runtime harness + the 3 AWS SDKs actually
+  needed at runtime (s3, secretsmanager, cloudwatch). Skips the 8
+  deploy-side SDKs (cloudformation, batch, ec2, ecr, states, sts, ecs,
+  cloudwatchlogs), shaving an estimated 200–400ms of cold-start + 30–
+  80MB RSS on Lambda/Batch.
+- **`require "turbofan/deploy"`** — mirror entry point for deploy-only
+  consumers (CI jobs that only build CloudFormation). Loads the deploy
+  + generators subtrees.
+- `require "turbofan"` is unchanged — still loads the full gem
+  (runtime + deploy + CLI).
+- `Turbofan::Discovery.subclasses_of` now returns results sorted by
+  fully-qualified class name. `ObjectSpace.each_object` iteration order
+  is GC-dependent; sorting produces reproducible CloudFormation diffs
+  and ASL state ordering across runs/platforms.
 
 ### Changed
 - **Breaking (internal API):** `Turbofan::Runtime::FanOut.threaded_work`

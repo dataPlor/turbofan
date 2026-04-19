@@ -26,6 +26,15 @@
 # * aws-sdk-cloudformation, aws-sdk-batch, aws-sdk-ec2, aws-sdk-ecr,
 #   aws-sdk-states, aws-sdk-sts, aws-sdk-ecs, aws-sdk-cloudwatchlogs
 
+# Signals to other parts of the gem that we're in runtime-only mode.
+# If the worker accidentally references Turbofan::CLI or a Deploy::*
+# constant, Zeitwerk would silently autoload those files + their
+# deploy-side aws-sdk-* gems — introducing a surprise latency spike on
+# whatever worker touched them. The tripwire in cli.rb / deploy/*
+# catches this early so the violation surfaces at load-time (loud)
+# rather than at the first fan-out (quiet but costly).
+ENV["TURBOFAN_RUNTIME_ONLY"] ||= "1"
+
 require_relative "../turbofan"
 
 module Turbofan

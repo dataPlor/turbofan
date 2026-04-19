@@ -37,6 +37,8 @@ jobs:
         run: |
           gem install ./turbofan-*.gem
           ruby -rturbofan -e 'raise "VERSION missing" unless Turbofan::VERSION.is_a?(String); puts "loaded turbofan #{Turbofan::VERSION}"'
+          ruby -r turbofan/runtime -e 'raise "Runtime::Wrapper missing" unless defined?(Turbofan::Runtime::Wrapper); puts "loaded turbofan/runtime"'
+          ruby -r turbofan/deploy -e 'raise "Deploy::ImageBuilder missing" unless defined?(Turbofan::Deploy::ImageBuilder); puts "loaded turbofan/deploy"'
 
   rubocop:
     runs-on: ubuntu-latest

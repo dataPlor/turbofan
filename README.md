@@ -15,6 +15,18 @@ Building batch processing pipelines on AWS typically requires creating 50+ files
 - **Cost visibility**: Turbofan tags every resource — EC2 instances, S3 objects, log groups — with pipeline, step, stage, and execution identifiers, making costs queryable via AWS Cost and Usage Reports.
 - **Polyglot execution**: Orchestrate any Docker container — Python, Node, Rust, Go — while keeping the pipeline definition in Ruby. Each step runs in its own container with its own dependencies.
 
+## Entry points
+
+Turbofan exposes three `require` paths, tuned to different consumers:
+
+| `require` | Who uses it | Loads |
+|-----------|-------------|-------|
+| `require "turbofan"` | CLI / deploy hosts / full-gem consumers | Everything (runtime + deploy + CLI + 12 aws-sdk gems) |
+| `require "turbofan/runtime"` | Containerized workers (Dockerfile) | Runtime harness + 3 aws-sdk gems (s3, secretsmanager, cloudwatch). Skips 8 deploy-side SDKs. |
+| `require "turbofan/deploy"` | CI jobs generating CloudFormation only | Deploy + generators subtrees. Skips the runtime harness. |
+
+For a container `worker.rb`, prefer `require "turbofan/runtime"` — it shaves ~200–400ms of cold-start and ~30–80MB RSS on Lambda/Batch by skipping the deploy-side AWS SDK gems that the runtime doesn't need.
+
 ## Architecture
 
 ```
