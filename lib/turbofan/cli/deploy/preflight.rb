@@ -22,7 +22,13 @@ module Turbofan
           # missing docker. Protected-stage deploys rely on this check to
           # gate pushes; returning a default here would mask a misconfigured
           # environment instead of failing loudly.
-          stdout, _, _ = Turbofan::Subprocess.capture("git", "status", "--porcelain", allow_failure: true)
+          #
+          # Guard against the non-repo case: `git status` in a non-git
+          # directory exits non-zero with an empty stdout. Without this
+          # check, the empty-stdout assertion would fail-open and report
+          # "clean" for a directory that isn't a repo at all.
+          stdout, stderr, status = Turbofan::Subprocess.capture("git", "status", "--porcelain", allow_failure: true)
+          raise "git status failed: #{stderr.strip}" unless status.success?
           stdout.strip.empty?
         end
 

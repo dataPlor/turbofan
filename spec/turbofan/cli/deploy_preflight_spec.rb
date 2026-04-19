@@ -80,6 +80,15 @@ RSpec.describe Turbofan::CLI::Deploy::Preflight do # rubocop:disable RSpec/Multi
 
       expect(described_class.git_clean?).to be false
     end
+
+    it "raises when git fails (e.g. not a repo) instead of fail-open 'clean'" do
+      failure_status = instance_double(Process::Status, success?: false)
+      allow(Turbofan::Subprocess).to receive(:capture)
+        .with("git", "status", "--porcelain", allow_failure: true)
+        .and_return(["", "fatal: not a git repository\n", failure_status])
+
+      expect { described_class.git_clean? }.to raise_error(/git status failed/)
+    end
   end
 
   describe ".warn_running_executions" do

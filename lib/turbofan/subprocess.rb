@@ -15,13 +15,22 @@ module Turbofan
     class Error < StandardError
       attr_reader :command, :exit_code, :stdout, :stderr
 
+      # Only the first few argv tokens go into the default message, so that
+      # commands carrying sensitive args (proxy URLs with embedded
+      # credentials, --build-arg secrets, etc.) don't leak through exception
+      # messages into logs. The full argv is still available via #command
+      # for callers that need it for debugging.
+      COMMAND_PREVIEW_TOKENS = 3
+
       def initialize(command:, exit_code:, stdout:, stderr:)
         @command = command
         @exit_code = exit_code
         @stdout = stdout
         @stderr = stderr
         stderr_excerpt = stderr.to_s.strip
-        super("Command failed (exit #{exit_code}): #{command.join(' ')}" +
+        preview = command.first(COMMAND_PREVIEW_TOKENS).join(" ")
+        suffix = command.length > COMMAND_PREVIEW_TOKENS ? " ..." : ""
+        super("Command failed (exit #{exit_code}): #{preview}#{suffix}" +
               (stderr_excerpt.empty? ? "" : "\nstderr: #{stderr_excerpt}"))
       end
     end

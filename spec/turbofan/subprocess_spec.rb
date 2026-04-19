@@ -72,5 +72,15 @@ RSpec.describe Turbofan::Subprocess do
       expect(err.message).to include("git status")
       expect(err.message).to include("not a repo")
     end
+
+    it "truncates long commands in the default message to avoid leaking sensitive args" do
+      sensitive_cmd = ["docker", "build", "--build-arg", "HTTP_PROXY=http://user:secret@proxy.example", "-t", "image", "."]
+      err = described_class.new(command: sensitive_cmd, exit_code: 1, stdout: "", stderr: "")
+      expect(err.message).not_to include("secret")
+      expect(err.message).not_to include("proxy.example")
+      expect(err.message).to include("...")
+      # Full command is still on the attribute for debugging
+      expect(err.command).to eq(sensitive_cmd)
+    end
   end
 end
