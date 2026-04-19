@@ -22,7 +22,7 @@ RSpec.describe Turbofan::Runtime::StepMetrics do
     it "returns 0.0 when all methods fail" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/proc/self/status").and_return(false)
-      allow(described_class).to receive(:`).and_raise(StandardError, "ps failed")
+      allow(Turbofan::Subprocess).to receive(:capture).and_raise(StandardError, "ps failed")
 
       result = described_class.send(:peak_memory_mb)
       expect(result).to eq(0.0)

@@ -27,7 +27,8 @@ module Turbofan
             return match[1].to_i / 1024.0
           end
         end
-        `ps -o rss= -p #{Process.pid}`.strip.to_i / 1024.0
+        stdout, _, _ = Turbofan::Subprocess.capture("ps", "-o", "rss=", "-p", Process.pid.to_s, allow_failure: true)
+        stdout.strip.to_i / 1024.0
       rescue StandardError
         0.0
       end

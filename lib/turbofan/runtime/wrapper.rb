@@ -89,7 +89,8 @@ module Turbofan
           path = "#{mount}/#{job_id}-attempt#{attempt}"
           FileUtils.mkdir_p(path)
           ENV["TURBOFAN_STORAGE_PATH"] = path
-          df = `df -h #{mount} 2>/dev/null`.lines.last&.strip
+          stdout, _, _ = Turbofan::Subprocess.capture("df", "-h", mount, allow_failure: true)
+          df = stdout.lines.last&.strip
           warn("[Turbofan] Storage: NVMe at #{path} (#{df})")
           path
         elsif ENV.key?("ECS_CONTAINER_METADATA_URI_V4")
