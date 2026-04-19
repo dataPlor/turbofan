@@ -987,9 +987,9 @@ RSpec.describe Turbofan::Step do
       expect {
         Class.new do
           include Turbofan::Step
-          execution :kubernetes
+          runs_on :kubernetes
         end
-      }.to raise_error(ArgumentError, /execution must be one of/)
+      }.to raise_error(ArgumentError, /runs_on must be one of/)
     end
 
     it "turbofan_lambda? returns true for :lambda" do

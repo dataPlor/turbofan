@@ -106,3 +106,135 @@ RSpec.describe "Turbofan::Step DSL — uses block form (8a)" do
     expect(warn_count).to eq(1)
   end
 end
+
+RSpec.describe "Turbofan::Step DSL — runs_on (8b)" do
+  after { Turbofan::Deprecations.reset_seen! }
+
+  it "accepts `runs_on :batch` and stores it in turbofan_execution" do
+    step = Class.new do
+      include Turbofan::Step
+      runs_on :batch
+    end
+    stub_const("RunsOnBatchStep", step)
+    expect(step.turbofan_execution).to eq(:batch)
+  end
+
+  it "accepts :lambda and :fargate" do
+    [:lambda, :fargate].each do |model|
+      step = Class.new do
+        include Turbofan::Step
+      end
+      step.runs_on(model)
+      expect(step.turbofan_execution).to eq(model)
+    end
+  end
+
+  it "raises on invalid models" do
+    expect {
+      Class.new do
+        include Turbofan::Step
+        runs_on :ec2
+      end
+    }.to raise_error(ArgumentError, /runs_on must be one of/)
+  end
+
+  it "the legacy `execution` macro still works as an alias" do
+    step = Class.new do
+      include Turbofan::Step
+      execution :lambda
+    end
+    stub_const("LegacyExecutionStep", step)
+    expect(step.turbofan_execution).to eq(:lambda)
+  end
+
+  it "emits a deprecation warning for `execution` when warnings are enabled" do
+    Turbofan.config.deprecations = true
+    captured = StringIO.new
+    orig = $stderr
+    $stderr = captured
+    begin
+      Class.new do
+        include Turbofan::Step
+        execution :batch
+      end
+    ensure
+      $stderr = orig
+      Turbofan.config.deprecations = nil
+    end
+    expect(captured.string).to include("Turbofan Deprecation")
+    expect(captured.string).to include("runs_on")
+  end
+end
+
+RSpec.describe "Turbofan::Step DSL — .turbofan Façade (8c)" do
+  let(:step) do
+    Class.new do
+      include Turbofan::Step
+      runs_on :batch
+      uses :postgres
+      writes_to :places_db
+      cpu 4
+      ram 8
+      batch_size 50
+      retries 5
+      tags(owner: "data", team: "platform")
+    end
+  end
+
+  before { stub_const("FacadeTestStep", step) }
+
+  it "exposes turbofan.uses without the turbofan_ prefix" do
+    expect(step.turbofan.uses).to eq([{type: :resource, key: :postgres}])
+  end
+
+  it "exposes turbofan.execution (current attr name) identical to legacy turbofan_execution" do
+    expect(step.turbofan.execution).to eq(step.turbofan_execution)
+    expect(step.turbofan.execution).to eq(:batch)
+  end
+
+  it "exposes turbofan.tags, batch_size, retries, cpu, ram" do
+    expect(step.turbofan.tags).to eq({"owner" => "data", "team" => "platform"})
+    expect(step.turbofan.batch_size).to eq(50)
+    expect(step.turbofan.retries).to eq(5)
+    expect(step.turbofan.default_cpu).to eq(4)
+    expect(step.turbofan.default_ram).to eq(8)
+  end
+
+  it "exposes predicate readers (lambda?, fargate?, external?)" do
+    expect(step.turbofan.lambda?).to be false
+    expect(step.turbofan.fargate?).to be false
+    expect(step.turbofan.external?).to be false
+  end
+
+  it "memoizes the façade (same object across calls)" do
+    expect(step.turbofan).to equal(step.turbofan)
+  end
+
+  it "inspect dumps all fields for debugging" do
+    output = step.turbofan.inspect
+    expect(output).to include("ConfigFacade")
+    expect(output).to include("execution=:batch")
+    expect(output).to include("batch_size=50")
+  end
+
+  it "legacy readers still work for 0.6 backward-compat" do
+    expect(step.turbofan_uses).to eq(step.turbofan.uses)
+    expect(step.turbofan_batch_size).to eq(step.turbofan.batch_size)
+    expect(step.turbofan_tags).to eq(step.turbofan.tags)
+  end
+
+  it "subclass gets its own façade, isolated from parent state" do
+    child = Class.new(step) do
+      uses :redis
+    end
+    stub_const("FacadeChild", child)
+
+    # Per Turbofan::Step.inherited(), subclasses start with fresh DSL
+    # state (empty containers, nil scalars) — they don't inherit parent
+    # uses/writes_to/etc. This is the isolation guarantee subclassing
+    # specs assert separately.
+    expect(child.turbofan).not_to equal(step.turbofan)
+    expect(child.turbofan.uses.map { |d| d[:key] }).to eq([:redis])
+    expect(step.turbofan.uses.map { |d| d[:key] }).to eq([:postgres])
+  end
+end

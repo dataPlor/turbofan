@@ -18,6 +18,60 @@ module Turbofan
     end
     private_constant :UsesDuckdbDSL
 
+    # Read-only façade exposing a step's declared DSL state through a
+    # single public seam. Replaces the 20+ `turbofan_*` attr_readers
+    # that previously polluted each user Step class's public API.
+    #
+    # Use:
+    #
+    #   class MyStep
+    #     include Turbofan::Step
+    #     runs_on :batch
+    #     uses :postgres
+    #   end
+    #
+    #   MyStep.turbofan.uses         # => [{type: :resource, key: :postgres}]
+    #   MyStep.turbofan.execution    # => :batch
+    #   MyStep.turbofan.inspect      # walks all fields — useful in pry/irb
+    #
+    # The legacy readers (MyStep.turbofan_uses, etc.) still exist through
+    # 0.6.x as direct attr_readers and continue to work unchanged — this
+    # façade is purely additive for 0.6. The legacy readers are slated
+    # for removal in 1.0 per CHANGELOG [Unreleased].
+    class ConfigFacade
+      FIELDS = %i[
+        uses writes_to secrets sizes batch_size execution timeout
+        retries retry_on default_cpu default_ram compute_environment
+        input_schema_file output_schema_file tags docker_image
+        duckdb_extensions subnets security_groups storage
+      ].freeze
+
+      def initialize(step_class)
+        @step_class = step_class
+      end
+
+      FIELDS.each do |field|
+        define_method(field) do
+          @step_class.instance_variable_get(:"@turbofan_#{field}")
+        end
+      end
+
+      # Computed readers that forward to existing class methods so
+      # callers see the same parsed/memoized values as the legacy API.
+      def input_schema = @step_class.turbofan_input_schema
+      def output_schema = @step_class.turbofan_output_schema
+      def resource_keys = @step_class.turbofan_resource_keys
+      def needs_duckdb? = @step_class.turbofan_needs_duckdb?
+      def lambda? = @step_class.turbofan_lambda?
+      def fargate? = @step_class.turbofan_fargate?
+      def external? = @step_class.turbofan_external?
+
+      def inspect
+        attrs = FIELDS.map { |f| "#{f}=#{public_send(f).inspect}" }.join(" ")
+        "#<Turbofan::Step::ConfigFacade #{Turbofan::Discovery.class_name_of(@step_class)} #{attrs}>"
+      end
+    end
+
     # Per-class DSL state defaults. Frozen so the constant itself can't
     # be mutated; .dup'd per-class in initializers so each Step subclass
     # gets an independent mutable copy of the container values (Arrays,
@@ -70,6 +124,13 @@ module Turbofan
         Turbofan::Step.init_state(subclass)
       end
 
+      # Returns a read-only façade exposing this step's DSL state.
+      # Preferred over the legacy `turbofan_*` attr_readers, which are
+      # slated for removal in 1.0.
+      def turbofan
+        @turbofan_facade ||= ConfigFacade.new(self)
+      end
+
       attr_reader :turbofan_uses, :turbofan_writes_to,
         :turbofan_secrets, :turbofan_sizes, :turbofan_batch_size,
         :turbofan_execution, :turbofan_timeout,
@@ -117,11 +178,28 @@ module Turbofan
       VALID_EXECUTION_MODELS = %i[batch lambda fargate].freeze
       private_constant :VALID_EXECUTION_MODELS
 
-      def execution(model)
+      # Declare where this step runs: `runs_on :batch`, `runs_on :lambda`,
+      # or `runs_on :fargate`. Pairs grammatically with
+      # `compute_environment :foo` — both are nouns describing the step's
+      # runtime environment.
+      def runs_on(model)
         unless VALID_EXECUTION_MODELS.include?(model)
-          raise ArgumentError, "execution must be one of #{VALID_EXECUTION_MODELS.inspect}, got #{model.inspect}"
+          raise ArgumentError, "runs_on must be one of #{VALID_EXECUTION_MODELS.inspect}, got #{model.inspect}"
         end
         @turbofan_execution = model
+      end
+
+      # Deprecated alias for runs_on. Was the original name until 0.6;
+      # the rename to runs_on pairs better with compute_environment
+      # (Matz's grammatical-symmetry suggestion). Slated for removal in
+      # 0.7. Emits a one-time deprecation warning per class when
+      # $VERBOSE or Turbofan.config.deprecations is set.
+      def execution(model)
+        Turbofan::Deprecations.warn_once(
+          self, :execution_macro,
+          "`execution :#{model}` is deprecated; use `runs_on :#{model}`. Will be removed in 0.7."
+        )
+        runs_on(model)
       end
 
       def turbofan_lambda?

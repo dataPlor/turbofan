@@ -53,6 +53,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handling (`tolerated_failure_rate`, `fan_out_early_exit_threshold`,
   `retries`) and states Turbofan's intentional non-imposition of a
   per-record DLQ contract.
+- **Block form for DuckDB extensions:** `uses :duckdb do extensions
+  :json, :parquet end` replaces the kwarg form
+  `uses :duckdb, extensions: [...]`. Old form still works but is
+  deprecated; will be removed in 0.7. Reads more like "configure the
+  named thing" than "pass a kwarg that's only valid for one target."
+- **`runs_on` macro on Step**, replacing `execution`:
+
+      class MyStep
+        include Turbofan::Step
+        runs_on :batch     # was: execution :batch
+        compute_environment :compute
+      end
+
+  Pairs grammatically with `compute_environment` (both are nouns
+  describing the step's runtime environment). The `execution` macro
+  still works as a deprecated alias; will be removed in 0.7.
+- **`Step.turbofan` Façade:** a single public seam replacing the 20+
+  `turbofan_*` attr_readers that previously polluted each user Step
+  class's public API. Example: `MyStep.turbofan.uses`,
+  `MyStep.turbofan.execution`, `MyStep.turbofan.batch_size`. Includes
+  an `#inspect` that dumps every field — handy in pry/irb.
+- **`Turbofan::Deprecations.warn_once`** — internal helper for
+  quiet-by-default deprecation warnings. Emits only when `$VERBOSE` is
+  true or `Turbofan.config.deprecations` is set. Memoizes per (class,
+  key) pair so a user with 100 step classes never gets 100 identical
+  warnings. New `Turbofan.config.deprecations` config slot.
 - `Turbofan::Discovery.class_name_of(mod)` — public helper for
   getting a class's pre-override `Module#name`. Replaces the now-removed
   `Turbofan::GET_CLASS_NAME` duplicate unbound method.
@@ -134,6 +160,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (AWS Batch retry contract).
 - Removed `Turbofan::GET_CLASS_NAME` (duplicated the existing
   `Discovery::CLASS_NAME`). Use `Turbofan::Discovery.class_name_of(c)`.
+
+### Deprecated
+- `execution :batch` DSL macro — use `runs_on :batch`. Will be removed
+  in 0.7. Quiet-by-default warning via `Turbofan::Deprecations`.
+- `uses(:duckdb, extensions: [...])` kwarg form — use the block form
+  `uses(:duckdb) { extensions :json, :parquet }`. Will be removed in
+  0.7. Quiet-by-default warning.
+- The `Step#turbofan_*` attr_readers (`turbofan_uses`,
+  `turbofan_execution`, etc.) — use the new `.turbofan` façade:
+  `MyStep.turbofan.uses`, `.execution`, etc. Both work in 0.6 without
+  warnings; the legacy readers will be removed in 1.0.
 
 ### Fixed
 - `Turbofan::Runtime::Context` lazy-memoized attributes (`logger`,
