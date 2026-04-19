@@ -10,7 +10,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         uses :duckdb
@@ -181,7 +181,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -193,7 +193,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 4
           input_schema "passthrough.json"

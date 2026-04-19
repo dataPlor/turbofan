@@ -18,7 +18,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
     Class.new do
       include Turbofan::Step
 
-      execution :batch
+      runs_on :batch
       compute_environment :test_ce
       cpu 2
       batch_size 100
@@ -322,7 +322,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 4
         batch_size 50
@@ -373,7 +373,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 4
         batch_size 1
@@ -645,7 +645,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         batch_size 100
@@ -659,7 +659,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         batch_size 50
@@ -885,7 +885,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "chunking lambda", :schemas
     let(:routed_step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         size :s, cpu: 1, ram: 2
         size :m, cpu: 2, ram: 4

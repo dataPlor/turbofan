@@ -213,7 +213,7 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 100
@@ -240,7 +240,7 @@ RSpec.describe Turbofan::Dag do # rubocop:disable RSpec/MultipleDescribes
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 100

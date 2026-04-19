@@ -10,7 +10,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -97,7 +97,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -107,7 +107,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Load", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -164,7 +164,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -174,7 +174,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Transform", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -184,7 +184,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Load", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 
@@ -230,7 +230,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
         stub_const("Process", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 1
 

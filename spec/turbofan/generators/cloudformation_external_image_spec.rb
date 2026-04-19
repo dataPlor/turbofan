@@ -16,7 +16,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
     Class.new do
       include Turbofan::Step
 
-      execution :batch
+      runs_on :batch
       compute_environment :test_ce
       cpu 2
       docker_image "123456789012.dkr.ecr.us-east-1.amazonaws.com/external-repo:v1.2.3"
@@ -30,7 +30,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
     Class.new do
       include Turbofan::Step
 
-      execution :batch
+      runs_on :batch
       compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
@@ -180,7 +180,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "nginx:1.25-alpine"

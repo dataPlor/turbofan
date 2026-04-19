@@ -18,7 +18,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     Class.new do
       include Turbofan::Step
 
-      execution :batch
+      runs_on :batch
       compute_environment :test_ce
       cpu 2
       ram 4
@@ -189,7 +189,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -451,7 +451,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -464,7 +464,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -507,7 +507,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -553,7 +553,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       step_with_own_ce = Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -723,7 +723,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         ram 4
         input_schema "passthrough.json"
@@ -771,7 +771,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -824,7 +824,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     let(:fargate_step) do
       Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         cpu 2
         ram 4
         subnets ["subnet-fg1"]
@@ -872,7 +872,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       let(:fargate_step_with_storage) do
         Class.new do
           include Turbofan::Step
-          execution :fargate
+          runs_on :fargate
           cpu 2
           ram 4
           storage 100
@@ -914,7 +914,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     it "includes SecretsAccess policy on task role when step has secrets" do
       step_with_secret = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         cpu 2
         ram 4
         subnets ["subnet-fg1"]
@@ -944,7 +944,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     it "includes uses/writes_to S3 ARNs in task role S3Access policy" do
       step_with_s3 = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         cpu 2
         ram 4
         subnets ["subnet-fg1"]

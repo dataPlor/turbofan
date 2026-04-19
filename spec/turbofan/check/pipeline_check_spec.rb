@@ -16,7 +16,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -27,7 +27,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("Load", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -52,7 +52,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -66,7 +66,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -94,7 +94,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -116,7 +116,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -142,7 +142,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("BrokenStep", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
 
           input_schema "passthrough.json"
@@ -164,7 +164,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -195,7 +195,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           input_schema "passthrough.json"
           output_schema "passthrough.json"
         end
@@ -231,7 +231,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("SizedStep", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
 
           input_schema "passthrough.json"
@@ -255,7 +255,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -284,7 +284,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           input_schema "passthrough.json"
@@ -317,7 +317,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           ram 4
           input_schema "passthrough.json"
@@ -350,7 +350,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -384,7 +384,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           input_schema "passthrough.json"
           output_schema "passthrough.json"
@@ -409,7 +409,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("Extract", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -420,7 +420,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("Load", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -445,7 +445,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 2
           ram 4
@@ -459,7 +459,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -495,7 +495,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -524,7 +524,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -553,7 +553,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -582,7 +582,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -605,7 +605,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("StepA", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -616,7 +616,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         stub_const("StepB", Class.new {
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -639,7 +639,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -652,7 +652,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -697,7 +697,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :nonexistent_ce
           cpu 1
           ram 2
@@ -728,7 +728,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -767,7 +767,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -796,7 +796,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -827,7 +827,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :check_ce
           cpu 1
           ram 2
@@ -850,7 +850,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -870,7 +870,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -890,7 +890,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -911,7 +911,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -932,7 +932,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             size :s, cpu: 1, ram: 2, batch_size: 100
             size :l, cpu: 4, ram: 8
@@ -952,7 +952,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             size :s, cpu: 1, ram: 2, batch_size: 100
             size :l, cpu: 4, ram: 8
@@ -972,7 +972,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             batch_size 10
             size :s, cpu: 1, ram: 2, batch_size: 100
@@ -993,7 +993,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             batch_size 10
             size :s, cpu: 1, ram: 2, batch_size: 100
@@ -1016,7 +1016,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             size :s, cpu: 1, ram: 2
             size :l, cpu: 4, ram: 8
@@ -1036,7 +1036,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             size :s, cpu: 1, ram: 2
             size :l, cpu: 4, ram: 8
@@ -1057,7 +1057,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -1077,7 +1077,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 1
             ram 2
@@ -1121,12 +1121,12 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         end
       end
 
-      context "when fan-out step uses execution :lambda" do
+      context "when fan-out step uses runs_on :lambda" do
         let(:pipeline_class) do
           ce = ce_class
           stub_const("Process", Class.new {
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 2
             input_schema "passthrough.json"
@@ -1145,7 +1145,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 2
             input_schema "passthrough.json"
@@ -1153,7 +1153,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           end
         end
 
-        it "errors when fan-out step is not execution :batch" do
+        it "errors when fan-out step is not runs_on :batch" do
           result = described_class.run(pipeline: pipeline_class, steps: {process: step_class})
           expect(result.passed?).to be false
           expect(result.errors.any? { |e| e.include?(":process") && e.include?("fan-out") && e.include?(":lambda") }).to be true
@@ -1165,7 +1165,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             input_schema "passthrough.json"
             output_schema "passthrough.json"
@@ -1191,7 +1191,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 4
             input_schema "passthrough.json"
@@ -1218,7 +1218,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 12
             input_schema "passthrough.json"
@@ -1245,7 +1245,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             cpu 2
             ram 4
@@ -1273,7 +1273,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :fargate
+            runs_on :fargate
             compute_environment :check_ce
             ram 4
             input_schema "passthrough.json"
@@ -1300,7 +1300,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :fargate
+            runs_on :fargate
             compute_environment :check_ce
             cpu 2
             input_schema "passthrough.json"
@@ -1327,7 +1327,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 4
             size :s, cpu: 1, ram: 2
@@ -1353,7 +1353,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
         let(:step_class) do
           Class.new do
             include Turbofan::Step
-            execution :fargate
+            runs_on :fargate
             cpu 2
             ram 4
             input_schema "passthrough.json"
@@ -1380,7 +1380,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 2
             ram 4
@@ -1407,7 +1407,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 4
             input_schema "passthrough.json"
@@ -1433,7 +1433,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 4
             input_schema "passthrough.json"
@@ -1459,7 +1459,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 2
             ram 4
@@ -1486,7 +1486,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :lambda
+            runs_on :lambda
             compute_environment :check_ce
             ram 4
             input_schema "passthrough.json"
@@ -1512,7 +1512,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           ce = ce_class
           Class.new do
             include Turbofan::Step
-            execution :batch
+            runs_on :batch
             compute_environment :check_ce
             cpu 2
             ram 4

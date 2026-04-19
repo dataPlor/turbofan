@@ -1458,7 +1458,7 @@ RSpec.describe Turbofan::Status do
     let(:sized_step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2

@@ -9,7 +9,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1
           size :m, cpu: 2
@@ -45,7 +45,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1
           size :m, cpu: 2
@@ -80,7 +80,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
         end
@@ -97,7 +97,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1
           size :l, cpu: 4
@@ -134,7 +134,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1
           size :l, cpu: 4
@@ -145,7 +145,7 @@ RSpec.describe Turbofan::Check::RouterCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :small, ram: 8
           size :large, ram: 32

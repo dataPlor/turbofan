@@ -10,12 +10,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     klass
   end
 
-  describe "execution :lambda step" do
+  describe "runs_on :lambda step" do
     let(:lambda_step) do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :lambda
+        runs_on :lambda
         compute_environment :test_ce
         ram 4
         input_schema "passthrough.json"
@@ -72,12 +72,12 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
     end
   end
 
-  describe "execution :fargate step" do
+  describe "runs_on :fargate step" do
     let(:fargate_step) do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         compute_environment :test_ce
         cpu 2
         ram 4
@@ -153,7 +153,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         ram 4
@@ -166,7 +166,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :lambda
+        runs_on :lambda
         compute_environment :test_ce
         ram 2
         input_schema "passthrough.json"
@@ -178,7 +178,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         compute_environment :test_ce
         cpu 1
         ram 2
@@ -227,7 +227,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       ce_class
       step = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         cpu 1
         ram 2
         subnets ["subnet-step"]
@@ -255,7 +255,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       allow(ce).to receive(:resolved_security_groups).and_return(["sg-ce"])
       step = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         compute_environment :test_ce
         cpu 1
         ram 2
@@ -281,7 +281,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       allow(Turbofan.config).to receive(:security_groups).and_return(["sg-config"])
       step = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         cpu 1
         ram 2
         input_schema "passthrough.json"
@@ -307,7 +307,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       allow(ce).to receive(:resolved_security_groups).and_return(["sg-ce"])
       step = Class.new do
         include Turbofan::Step
-        execution :fargate
+        runs_on :fargate
         compute_environment :test_ce
         cpu 1
         ram 2

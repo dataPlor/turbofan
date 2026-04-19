@@ -7,7 +7,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
@@ -27,7 +27,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
       end
@@ -46,7 +46,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image ""
@@ -66,7 +66,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "first-image:v1"
@@ -83,7 +83,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
@@ -102,7 +102,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
         compute_environment :test_ce
         cpu 4
@@ -128,7 +128,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/foo:latest"
@@ -152,7 +152,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_a) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest"
@@ -162,7 +162,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_b) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
       end

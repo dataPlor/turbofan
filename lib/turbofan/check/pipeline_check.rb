@@ -50,49 +50,49 @@ module Turbofan
         steps.each do |step_name, step_class|
           unless step_class.turbofan_execution
             errors << "Step :#{step_name} has no execution model declared " \
-                      "(add `execution :batch`, `execution :lambda`, or `execution :fargate`)"
+                      "(add `runs_on :batch`, `runs_on :lambda`, or `runs_on :fargate`)"
             next
           end
 
           case step_class.turbofan_execution
           when :batch
             if step_class.turbofan_subnets
-              errors << "Step :#{step_name} (execution :batch) declares subnets but Batch networking comes from the compute environment"
+              errors << "Step :#{step_name} (runs_on :batch) declares subnets but Batch networking comes from the compute environment"
             end
             if step_class.turbofan_security_groups
-              errors << "Step :#{step_name} (execution :batch) declares security_groups but Batch networking comes from the compute environment"
+              errors << "Step :#{step_name} (runs_on :batch) declares security_groups but Batch networking comes from the compute environment"
             end
             if step_class.turbofan_storage
-              errors << "Step :#{step_name} (execution :batch) declares storage but storage is only valid for :fargate steps"
+              errors << "Step :#{step_name} (runs_on :batch) declares storage but storage is only valid for :fargate steps"
             end
           when :lambda
             unless step_class.turbofan_default_ram
-              errors << "Step :#{step_name} (execution :lambda) requires `ram` declaration"
+              errors << "Step :#{step_name} (runs_on :lambda) requires `ram` declaration"
             end
             if step_class.turbofan_default_ram && step_class.turbofan_default_ram > 10
-              errors << "Step :#{step_name} (execution :lambda) ram exceeds Lambda maximum of 10 GB"
+              errors << "Step :#{step_name} (runs_on :lambda) ram exceeds Lambda maximum of 10 GB"
             end
             if step_class.turbofan_default_cpu
-              warnings << "Step :#{step_name} (execution :lambda) declares cpu but Lambda ignores it (cpu scales with ram)"
+              warnings << "Step :#{step_name} (runs_on :lambda) declares cpu but Lambda ignores it (cpu scales with ram)"
             end
             if step_class.turbofan_sizes.any?
-              warnings << "Step :#{step_name} (execution :lambda) declares sizes but sizes are only used with execution :batch fan-out"
+              warnings << "Step :#{step_name} (runs_on :lambda) declares sizes but sizes are only used with runs_on :batch fan-out"
             end
             if step_class.turbofan_subnets
-              errors << "Step :#{step_name} (execution :lambda) declares subnets but Lambda steps do not support VPC networking via the Step DSL"
+              errors << "Step :#{step_name} (runs_on :lambda) declares subnets but Lambda steps do not support VPC networking via the Step DSL"
             end
             if step_class.turbofan_security_groups
-              errors << "Step :#{step_name} (execution :lambda) declares security_groups but Lambda steps do not support VPC networking via the Step DSL"
+              errors << "Step :#{step_name} (runs_on :lambda) declares security_groups but Lambda steps do not support VPC networking via the Step DSL"
             end
             if step_class.turbofan_storage
-              errors << "Step :#{step_name} (execution :lambda) declares storage but storage is only valid for :fargate steps"
+              errors << "Step :#{step_name} (runs_on :lambda) declares storage but storage is only valid for :fargate steps"
             end
           when :fargate
             unless step_class.turbofan_default_cpu
-              errors << "Step :#{step_name} (execution :fargate) requires `cpu` declaration"
+              errors << "Step :#{step_name} (runs_on :fargate) requires `cpu` declaration"
             end
             unless step_class.turbofan_default_ram
-              errors << "Step :#{step_name} (execution :fargate) requires `ram` declaration"
+              errors << "Step :#{step_name} (runs_on :fargate) requires `ram` declaration"
             end
           end
         end
@@ -111,7 +111,7 @@ module Turbofan
 
           unless step_class.turbofan_execution == :batch
             errors << "Step :#{dag_step.name} is a fan-out step but uses execution :#{step_class.turbofan_execution} " \
-                      "(fan-out requires execution :batch)"
+                      "(fan-out requires runs_on :batch)"
           end
         end
       end

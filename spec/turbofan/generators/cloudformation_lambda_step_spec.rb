@@ -10,12 +10,12 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
     klass
   end
 
-  describe "execution :lambda step" do
+  describe "runs_on :lambda step" do
     let(:lambda_step) do
       ce_class
       Class.new do
         include Turbofan::Step
-        execution :lambda
+        runs_on :lambda
         compute_environment :test_ce
         ram 4
         input_schema "passthrough.json"

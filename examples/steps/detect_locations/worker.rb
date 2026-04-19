@@ -1,6 +1,6 @@
 class DetectLocations
   include Turbofan::Step
-  execution :batch
+  runs_on :batch
 
   family :c
   cpu 2

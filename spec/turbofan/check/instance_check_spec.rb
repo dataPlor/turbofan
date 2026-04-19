@@ -9,7 +9,7 @@ RSpec.describe Turbofan::Check::InstanceCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           uses :duckdb
@@ -48,7 +48,7 @@ RSpec.describe Turbofan::Check::InstanceCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 48
           uses :duckdb
@@ -72,7 +72,7 @@ RSpec.describe Turbofan::Check::InstanceCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1
           size :m, cpu: 2
@@ -109,7 +109,7 @@ RSpec.describe Turbofan::Check::InstanceCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           uses :duckdb
@@ -120,7 +120,7 @@ RSpec.describe Turbofan::Check::InstanceCheck do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           ram 16
         end

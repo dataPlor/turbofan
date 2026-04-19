@@ -67,7 +67,7 @@ RSpec.describe "Schedule DSL" do # rubocop:disable RSpec/DescribeClass
     let(:pipeline_class) do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -89,7 +89,7 @@ RSpec.describe "Schedule DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
@@ -113,7 +113,7 @@ RSpec.describe "Schedule DSL" do # rubocop:disable RSpec/DescribeClass
     let(:pipeline_class) do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -135,7 +135,7 @@ RSpec.describe "Schedule DSL" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"

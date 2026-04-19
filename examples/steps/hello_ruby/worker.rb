@@ -1,6 +1,6 @@
 class HelloRuby
   include Turbofan::Step
-  execution :batch
+  runs_on :batch
 
   if defined?(ComputeEnvironments::TurbofanTempTest)
     compute_environment ComputeEnvironments::TurbofanTempTest

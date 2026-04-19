@@ -42,7 +42,7 @@ RSpec.describe Turbofan::Runtime::Lineage do
     end
 
     it "includes step_class name in job facets when provided" do
-      step_class = stub_const("MyApp::ProcessStep", Class.new { include Turbofan::Step; execution :batch })
+      step_class = stub_const("MyApp::ProcessStep", Class.new { include Turbofan::Step; runs_on :batch })
       event = described_class.start_event(context: context, step_class: step_class)
 
       expect(event.dig(:job, :facets, :sourceCodeLocation)).to eq(type: "ruby", name: "MyApp::ProcessStep")

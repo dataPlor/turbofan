@@ -138,31 +138,13 @@ RSpec.describe "Turbofan::Step DSL — runs_on (8b)" do
     }.to raise_error(ArgumentError, /runs_on must be one of/)
   end
 
-  it "the legacy `execution` macro still works as an alias" do
-    step = Class.new do
-      include Turbofan::Step
-      execution :lambda
-    end
-    stub_const("LegacyExecutionStep", step)
-    expect(step.turbofan_execution).to eq(:lambda)
-  end
-
-  it "emits a deprecation warning for `execution` when warnings are enabled" do
-    Turbofan.config.deprecations = true
-    captured = StringIO.new
-    orig = $stderr
-    $stderr = captured
-    begin
+  it "the legacy `execution` macro was removed in 0.7" do
+    expect {
       Class.new do
         include Turbofan::Step
         execution :batch
       end
-    ensure
-      $stderr = orig
-      Turbofan.config.deprecations = nil
-    end
-    expect(captured.string).to include("Turbofan Deprecation")
-    expect(captured.string).to include("runs_on")
+    }.to raise_error(NoMethodError, /undefined method ['`]execution/)
   end
 end
 

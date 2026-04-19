@@ -3,7 +3,7 @@
 class RetryDemo
   include Turbofan::Step
 
-  execution :batch
+  runs_on :batch
   input_schema "passthrough.json"
   output_schema "passthrough.json"
 

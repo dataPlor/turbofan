@@ -235,19 +235,6 @@ module Turbofan
         @turbofan_execution = model
       end
 
-      # Deprecated alias for runs_on. Was the original name until 0.6;
-      # the rename to runs_on pairs better with compute_environment
-      # (Matz's grammatical-symmetry suggestion). Slated for removal in
-      # 0.7. Emits a one-time deprecation warning per class when
-      # $VERBOSE or Turbofan.config.deprecations is set.
-      def execution(model)
-        Turbofan::Deprecations.warn_once(
-          self, :execution_macro,
-          "`execution :#{model}` is deprecated; use `runs_on :#{model}`. Will be removed in 0.7."
-        )
-        runs_on(model)
-      end
-
       def turbofan_lambda?
         @turbofan_execution == :lambda
       end
@@ -368,21 +355,21 @@ module Turbofan
 
       def subnets(value)
         if @turbofan_execution && @turbofan_execution != :fargate
-          raise ArgumentError, "subnets is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+          raise ArgumentError, "subnets is only valid for runs_on :fargate steps (this step uses :#{@turbofan_execution})"
         end
         @turbofan_subnets = Array(value)
       end
 
       def security_groups(value)
         if @turbofan_execution && @turbofan_execution != :fargate
-          raise ArgumentError, "security_groups is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+          raise ArgumentError, "security_groups is only valid for runs_on :fargate steps (this step uses :#{@turbofan_execution})"
         end
         @turbofan_security_groups = Array(value)
       end
 
       def storage(value)
         if @turbofan_execution && @turbofan_execution != :fargate
-          raise ArgumentError, "storage is only valid for execution :fargate steps (this step uses :#{@turbofan_execution})"
+          raise ArgumentError, "storage is only valid for runs_on :fargate steps (this step uses :#{@turbofan_execution})"
         end
         unless value.is_a?(Integer) && value >= 21 && value <= 200
           raise ArgumentError, "storage must be an integer between 21 and 200 (GiB), got #{value.inspect}"

@@ -8,7 +8,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -18,7 +18,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -68,7 +68,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -78,7 +78,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Transform", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -118,7 +118,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Extract", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -128,7 +128,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Transform", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -138,7 +138,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Load", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -176,7 +176,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Discover", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -186,7 +186,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 100
@@ -197,7 +197,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Aggregate", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -254,7 +254,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 100
@@ -283,7 +283,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -338,7 +338,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -380,7 +380,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -408,7 +408,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("StepA", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -431,7 +431,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("StepB", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -467,7 +467,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Only", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -507,7 +507,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -536,7 +536,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Only", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -572,7 +572,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("OnlyStep", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -610,7 +610,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Export", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -620,7 +620,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("Compute", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 100
@@ -631,7 +631,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       stub_const("LoadObs", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 

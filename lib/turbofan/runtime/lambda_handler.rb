@@ -16,7 +16,7 @@ Dir.glob("/app/worker.rb").each { |f| require f }
 module Turbofan
   module Runtime
     # Lambda handler shim that adapts Lambda's (event:, context:) interface
-    # to Turbofan's Wrapper.run. Used for execution :lambda steps.
+    # to Turbofan's Wrapper.run. Used for runs_on :lambda steps.
     #
     # The Lambda event contains execution context (execution_id, step_name,
     # prev_step, etc.) that would normally come from Batch env vars.

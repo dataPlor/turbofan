@@ -9,7 +9,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
@@ -21,7 +21,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2
@@ -36,7 +36,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
@@ -210,7 +210,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
@@ -222,7 +222,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         size :s, cpu: 1
         size :m, cpu: 2
@@ -267,7 +267,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Discover", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 
@@ -277,7 +277,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Process", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         batch_size 3
@@ -288,7 +288,7 @@ RSpec.describe Turbofan::Generators::ASL, :schemas do
       stub_const("Aggregate", Class.new {
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
 

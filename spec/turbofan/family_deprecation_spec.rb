@@ -8,7 +8,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-          execution :batch
+          runs_on :batch
           family :c
         end
       }.to raise_error(NoMethodError)
@@ -18,7 +18,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-          execution :batch
+          runs_on :batch
           family :m
         end
       }.to raise_error(NoMethodError)
@@ -38,7 +38,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
 
       step_class = Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :family_removed_ce
         cpu 1
       end
@@ -52,7 +52,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-          execution :batch
+          runs_on :batch
           cpu 2
         end
       }.not_to raise_error
@@ -62,7 +62,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       expect {
         Class.new do
           include Turbofan::Step
-          execution :batch
+          runs_on :batch
           ram 4096
         end
       }.not_to raise_error
@@ -76,7 +76,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
 
       step_class = Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :direct_ce
         cpu 2
       end
@@ -92,7 +92,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
 
       step_class = Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         compute_environment :direct_ce2
         ram 4096
       end
@@ -108,7 +108,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       # This step has no compute_environment — should be an error, not a warning
       stub_const("NoCeStep", Class.new {
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       })
@@ -122,7 +122,7 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
     let(:step_class) do
       Class.new do
         include Turbofan::Step
-        execution :batch
+        runs_on :batch
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end

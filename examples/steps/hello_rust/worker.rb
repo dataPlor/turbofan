@@ -2,7 +2,7 @@ class HelloRust
   include Turbofan::Step
 
   compute_environment ComputeEnvironments::TurbofanTempTest
-  execution :batch
+  runs_on :batch
   cpu 1
   ram 2
   batch_size 1

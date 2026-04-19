@@ -18,7 +18,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         size :s, cpu: 1, ram: 2
         size :m, cpu: 2, ram: 4
@@ -166,7 +166,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       it "does not include turbofan:size tag on unsized job definitions" do
         single_size_step = Class.new do
           include Turbofan::Step
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           batch_size 1
@@ -217,7 +217,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -270,7 +270,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1, ram: 8
           size :l, cpu: 4, ram: 32
@@ -353,7 +353,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           cpu 2
           input_schema "passthrough.json"
@@ -365,7 +365,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         Class.new do
           include Turbofan::Step
 
-          execution :batch
+          runs_on :batch
           compute_environment :test_ce
           size :s, cpu: 1, ram: 2
           size :l, cpu: 4, ram: 8

@@ -16,7 +16,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
     Class.new do
       include Turbofan::Step
 
-      execution :batch
+      runs_on :batch
       compute_environment :test_ce
       cpu 2
       input_schema "passthrough.json"
@@ -105,7 +105,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"
@@ -118,7 +118,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 1
         input_schema "passthrough.json"
@@ -172,7 +172,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
       Class.new do
         include Turbofan::Step
 
-        execution :batch
+        runs_on :batch
         compute_environment :test_ce
         cpu 2
         input_schema "passthrough.json"

@@ -18,7 +18,7 @@ module WrapperTestHelper
       include Turbofan::Step
 
       compute_environment :test_ce
-      execution :batch
+      runs_on :batch
       cpu 1
       input_schema "passthrough.json"
       output_schema "passthrough.json"

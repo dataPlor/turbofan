@@ -6,7 +6,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
   it "allows calling a step as a method in the pipeline block" do
     step_class = Class.new do
       include Turbofan::Step
-      execution :batch
+      runs_on :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -30,7 +30,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
   it "returns a DagProxy with the step's output schema" do
     step_class = Class.new do
       include Turbofan::Step
-      execution :batch
+      runs_on :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -56,7 +56,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
   it "validates schema compatibility at DAG edges" do
     geocode = Class.new do
       include Turbofan::Step
-      execution :batch
+      runs_on :batch
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
@@ -67,7 +67,7 @@ RSpec.describe "TaskFlow DSL", :schemas do # rubocop:disable RSpec/DescribeClass
     # Step that expects a property not in geocode's output
     validate = Class.new do
       include Turbofan::Step
-      execution :batch
+      runs_on :batch
       input_schema "incompatible_input.json"
       output_schema "geocode_output.json"
       compute_environment :test_ce
