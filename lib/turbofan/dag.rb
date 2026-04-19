@@ -3,18 +3,41 @@
 require "tsort"
 
 module Turbofan
-  DagStep = Struct.new(:name, :fan_out, :tolerated_failure_rate, :fan_out_timeout, :fan_in, keyword_init: true) do
-    def initialize(name, fan_out: false, tolerated_failure_rate: 0, fan_in: true, **rest)
+  # Immutable value object describing a step's position in the DAG.
+  # Data.define instances are frozen on construction — every field is
+  # read-only. Use `.with(field: value)` for modifications during DAG
+  # assembly (DagBuilder#fan_out replaces steps rather than mutating).
+  #
+  # This is intentionally a value object, not a handle to the user's
+  # Step class. Look up the Step class separately via Turbofan.discover_components
+  # or the pipeline's step registry.
+  DagStep = Data.define(:name, :fan_out, :tolerated_failure_rate, :fan_out_timeout, :fan_in) do
+    def fan_out?
+      fan_out
+    end
+  end
+
+  # Override DagStep.new to preserve the old positional-name + kw-rest API
+  # (`DagStep.new(:process, fan_out: true)`). We alias Data's generated
+  # keyword-only constructor as `_data_new` and call it from the wrapper.
+  # `def self.new` inside the Data.define block doesn't work reliably
+  # because `super` resolution differs across Ruby patch versions.
+  class << DagStep
+    alias_method :_data_new, :new
+
+    def new(name, fan_out: false, tolerated_failure_rate: 0, fan_out_timeout: nil, fan_in: true, **rest)
       raise ArgumentError, "unknown keyword: group (use batch_size: instead)" if rest.key?(:group)
       raise ArgumentError, "unknown keyword: concurrency (use batch_size: instead)" if rest.key?(:concurrency)
       raise ArgumentError, "batch_size has moved to the Step class. Use `batch_size N` in your Step definition." if rest.key?(:batch_size)
       raise ArgumentError, "unknown keyword(s): #{rest.keys.join(", ")}" if rest.any?
 
-      super(name: name, fan_out: fan_out, tolerated_failure_rate: tolerated_failure_rate, fan_out_timeout: nil, fan_in: fan_in)
-    end
-
-    def fan_out?
-      fan_out
+      _data_new(
+        name: name,
+        fan_out: fan_out,
+        tolerated_failure_rate: tolerated_failure_rate,
+        fan_out_timeout: fan_out_timeout,
+        fan_in: fan_in
+      )
     end
   end
 
@@ -38,6 +61,17 @@ module Turbofan
       @steps << step
       @nodes << name
       step
+    end
+
+    # Replace a step in the DAG with an updated immutable copy.
+    # DagBuilder#fan_out uses this to record fan_out/timeout/fan_in
+    # attributes on an already-added step without mutating its Data instance.
+    def replace_step(step_name, new_step)
+      raise "DAG is frozen; cannot replace steps after construction" if @frozen
+
+      idx = @steps.index { |s| s.name == step_name }
+      raise ArgumentError, "step :#{step_name} not found in DAG" unless idx
+      @steps[idx] = new_step
     end
 
     def add_edge(from:, to:)
@@ -168,10 +202,12 @@ module Turbofan
       end
       step = @dag.steps.find { |s| s.name == proxy.step_name }
       raise ArgumentError, "step :#{proxy.step_name} not found in DAG" unless step
-      step.fan_out = true
-      step.tolerated_failure_rate = tolerated_failure_rate
-      step.fan_out_timeout = timeout
-      step.fan_in = fan_in
+      @dag.replace_step(proxy.step_name, step.with(
+        fan_out: true,
+        tolerated_failure_rate: tolerated_failure_rate,
+        fan_out_timeout: timeout,
+        fan_in: fan_in
+      ))
       proxy
     end
 

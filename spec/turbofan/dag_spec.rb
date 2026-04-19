@@ -317,4 +317,56 @@ RSpec.describe Turbofan::DagStep do
       expect(step.fan_in).to be false
     end
   end
+
+  describe "immutability (Data.define)" do
+    it "is frozen on construction" do
+      step = described_class.new(:process)
+      expect(step).to be_frozen
+    end
+
+    it "cannot be mutated via writers (no writers exist)" do
+      step = described_class.new(:process)
+      expect(step).not_to respond_to(:fan_out=)
+      expect(step).not_to respond_to(:name=)
+    end
+
+    it "supports .with to produce an updated copy" do
+      original = described_class.new(:process, fan_out: false)
+      updated = original.with(fan_out: true, fan_out_timeout: 600)
+      expect(original.fan_out).to be false
+      expect(updated.fan_out).to be true
+      expect(updated.fan_out_timeout).to eq(600)
+      expect(updated).not_to equal(original)
+    end
+  end
+end
+
+RSpec.describe Turbofan::Dag do
+  describe "#replace_step" do
+    it "swaps a step with an updated immutable copy" do
+      dag = described_class.new
+      dag.add_step(:process)
+      updated = Turbofan::DagStep.new(:process, fan_out: true)
+
+      dag.replace_step(:process, updated)
+
+      expect(dag.steps.find { |s| s.name == :process }.fan_out?).to be true
+    end
+
+    it "raises when the step name is not found" do
+      dag = described_class.new
+      replacement = Turbofan::DagStep.new(:missing)
+      expect { dag.replace_step(:missing, replacement) }
+        .to raise_error(ArgumentError, /:missing not found/)
+    end
+
+    it "raises after the DAG is frozen" do
+      dag = described_class.new
+      dag.add_step(:process)
+      dag.freeze!
+      replacement = Turbofan::DagStep.new(:process, fan_out: true)
+      expect { dag.replace_step(:process, replacement) }
+        .to raise_error(/frozen/)
+    end
+  end
 end
