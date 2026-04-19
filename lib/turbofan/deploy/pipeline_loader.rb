@@ -6,7 +6,7 @@ module Turbofan
       LoadResult = Struct.new(:pipeline, :steps, :step_dirs, keyword_init: true)
 
       def self.load(pipeline_file, turbofans_root:)
-        Turbofan.schemas_path = File.join(turbofans_root, "schemas")
+        Turbofan.config.schemas_path = File.join(turbofans_root, "schemas")
 
         config_file = File.join(turbofans_root, "config", "turbofan.rb")
         Kernel.load(File.expand_path(config_file)) if File.exist?(config_file)

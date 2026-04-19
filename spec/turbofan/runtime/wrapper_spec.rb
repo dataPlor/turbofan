@@ -723,7 +723,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     let(:schemas_dir) { Dir.mktmpdir("turbofan-wrapper-schemas", SPEC_TMP_ROOT) }
 
     before do
-      Turbofan.schemas_path = schemas_dir
+      Turbofan.config.schemas_path = schemas_dir
       File.write(File.join(schemas_dir, "passthrough.json"), '{"type": "object"}')
       File.write(File.join(schemas_dir, "query_input.json"), JSON.generate({
         "type" => "object",
@@ -797,7 +797,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
     end
 
     it "auto-configures schemas_path from TURBOFAN_SCHEMAS_PATH env var" do
-      Turbofan.schemas_path = nil
+      Turbofan.config.schemas_path = nil
 
       valid_step = make_step(name: "EnvStep")
 
@@ -805,7 +805,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
       ENV["TURBOFAN_SCHEMAS_PATH"] = schemas_dir
       begin
         run_wrapper(valid_step, env: {"TURBOFAN_INPUT" => "{}"})
-        expect(Turbofan.schemas_path).to eq(schemas_dir)
+        expect(Turbofan.config.schemas_path).to eq(schemas_dir)
       ensure
         ENV["TURBOFAN_SCHEMAS_PATH"] = saved
       end
@@ -886,7 +886,7 @@ RSpec.describe Turbofan::Runtime::Wrapper, :schemas do
 
     it "does not fail schema validation on __ fields even with additionalProperties: false" do
       schemas_dir = Dir.mktmpdir("turbofan-strict-schema", SPEC_TMP_ROOT)
-      Turbofan.schemas_path = schemas_dir
+      Turbofan.config.schemas_path = schemas_dir
       File.write(File.join(schemas_dir, "strict_input.json"), JSON.generate({
         "type" => "object",
         "properties" => {"gkey" => {"type" => "string"}},

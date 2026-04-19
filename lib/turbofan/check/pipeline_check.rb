@@ -228,7 +228,7 @@ module Turbofan
       private_class_method :validate_steps
 
       def self.validate_schema_files(steps, errors)
-        return unless Turbofan.schemas_path
+        return unless Turbofan.config.schemas_path
 
         steps.each do |step_name, step_class|
           [
@@ -236,7 +236,7 @@ module Turbofan
             [:output_schema, step_class.turbofan_output_schema_file]
           ].each do |kind, filename|
             next unless filename
-            path = File.join(Turbofan.schemas_path, filename)
+            path = File.join(Turbofan.config.schemas_path, filename)
             unless File.exist?(path)
               errors << "Step :#{step_name} #{kind} file not found: #{path}"
               next

@@ -77,7 +77,7 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
 
   after do
     FileUtils.rm_rf(tmpdir)
-    Turbofan.schemas_path = nil
+    Turbofan.config.schemas_path = nil
     %i[MyPipeline GenerateCsvs BulkLoad].each do |name|
       Object.send(:remove_const, name) if Object.const_defined?(name) # rubocop:disable RSpec/RemoveConst
     end
@@ -120,9 +120,9 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
       expect(result.step_dirs[:bulk_load]).to eq(File.join(turbofans_root, "steps", "bulk_load"))
     end
 
-    it "sets Turbofan.schemas_path" do
+    it "sets Turbofan.config.schemas_path" do
       result
-      expect(Turbofan.schemas_path).to eq(schemas_dir)
+      expect(Turbofan.config.schemas_path).to eq(schemas_dir)
     end
   end
 

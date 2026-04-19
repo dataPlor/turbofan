@@ -662,7 +662,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
       end
 
       before do
-        Turbofan.schemas_path = schemas_dir
+        Turbofan.config.schemas_path = schemas_dir
         File.write(File.join(schemas_dir, "latlng_output.json"), JSON.generate({
           "type" => "object",
           "properties" => {"lat" => {"type" => "number"}, "lng" => {"type" => "number"}}
@@ -738,7 +738,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
       end
 
       before do
-        Turbofan.schemas_path = schemas_dir
+        Turbofan.config.schemas_path = schemas_dir
         File.write(File.join(schemas_dir, "broken.json"), "{not valid json")
         File.write(File.join(schemas_dir, "passthrough.json"), '{"type": "object"}')
       end

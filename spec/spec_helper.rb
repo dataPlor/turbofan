@@ -41,7 +41,7 @@ RSpec.configure do |config|
   Kernel.srand config.seed
 
   config.before(:example, :schemas) do
-    Turbofan.schemas_path = FIXTURE_SCHEMAS_DIR
+    Turbofan.config.schemas_path = FIXTURE_SCHEMAS_DIR
   end
 
   config.after do

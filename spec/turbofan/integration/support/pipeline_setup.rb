@@ -371,10 +371,10 @@ RSpec.shared_context "when using integration pipeline setup" do
     stub_const("Aggregate", aggregate_class)
     stub_const("IntegrationTest", pipeline_class)
     Turbofan.config.bucket = INTEGRATION_BUCKET
-    Turbofan.schemas_path = FIXTURE_SCHEMAS_DIR
+    Turbofan.config.schemas_path = FIXTURE_SCHEMAS_DIR
   end
 
   after do
-    Turbofan.schemas_path = nil
+    Turbofan.config.schemas_path = nil
   end
 end

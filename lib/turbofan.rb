@@ -75,14 +75,6 @@ module Turbofan
     end
   end
 
-  def self.schemas_path
-    config.schemas_path
-  end
-
-  def self.schemas_path=(path)
-    config.schemas_path = path
-  end
-
   def self.discover_components
     steps = {}
     Discovery.subclasses_of(Step).each do |c|

@@ -9,7 +9,7 @@ RSpec.describe "turbofan check" do # rubocop:disable RSpec/DescribeClass
 
   after do
     FileUtils.rm_rf(tmpdir)
-    Turbofan.schemas_path = nil
+    Turbofan.config.schemas_path = nil
   end
 
   # Helper to clean up dynamically defined constants

@@ -17,7 +17,7 @@ module Turbofan
 
       def run
         $stdout.sync = true
-        Turbofan.schemas_path ||= ENV["TURBOFAN_SCHEMAS_PATH"]
+        Turbofan.config.schemas_path ||= ENV["TURBOFAN_SCHEMAS_PATH"]
         storage_path = setup_storage
         set_tmpdir(storage_path) if storage_path
         context = build_context(storage_path)

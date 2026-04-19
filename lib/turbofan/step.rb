@@ -404,8 +404,8 @@ module Turbofan
       end
 
       def load_schema(filename)
-        raise "No schemas_path configured" unless Turbofan.schemas_path
-        path = File.join(Turbofan.schemas_path, filename)
+        raise "No schemas_path configured" unless Turbofan.config.schemas_path
+        path = File.join(Turbofan.config.schemas_path, filename)
         JSON.parse(File.read(path))
       end
 
