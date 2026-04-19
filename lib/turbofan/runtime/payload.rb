@@ -10,7 +10,9 @@ module Turbofan
       def self.serialize(result, s3_client:, bucket:, execution_id:, step_name:)
         json = JSON.generate(result)
         key = FanOut.s3_key(execution_id, step_name, "output.json")
-        s3_client.put_object(bucket: bucket, key: key, body: json)
+        Turbofan::Retryable.call do
+          s3_client.put_object(bucket: bucket, key: key, body: json)
+        end
         json
       end
 
@@ -23,7 +25,9 @@ module Turbofan
         bucket = parsed.host
         key = parsed.path.delete_prefix("/")
 
-        response = s3_client.get_object(bucket: bucket, key: key)
+        # Retryable doesn't retry NoSuchKey — it propagates to the outer rescue
+        # below and gets remapped to HydrationError.
+        response = Turbofan::Retryable.call { s3_client.get_object(bucket: bucket, key: key) }
         JSON.parse(response.body.read)
       rescue Aws::S3::Errors::NoSuchKey => e
         raise HydrationError, "Failed to hydrate from #{ref}: #{e.message}"
