@@ -12,13 +12,20 @@ module Turbofan
         @step_name = step_name
         @size = size
         @pending = []
+        # fan_out workers may call emit() concurrently. Array#<< is not
+        # thread-safe under MRI — two racing appends can drop an entry
+        # or leave the array in an inconsistent state. flush() reads and
+        # drains @pending, so it also needs mutex protection or a
+        # concurrent emit() can land in a batch that's already been
+        # serialized to CloudWatch payload form but not yet shifted off.
+        @mutex = Mutex.new
       end
 
       def emit(name, value, unit: nil)
         raise ArgumentError, "metric value must be Numeric, got #{value.class}" unless value.is_a?(Numeric)
         entry = {name: name, value: value}
         entry[:unit] = unit if unit
-        @pending << entry
+        @mutex.synchronize { @pending << entry }
       end
 
       # CloudWatch PutMetricData supports up to 1000 metrics per call (1 MB
@@ -33,7 +40,7 @@ module Turbofan
         # after retry exhaustion, the unsent remainder stays in @pending so a
         # subsequent flush call (if the container lives long enough) can retry.
         until @pending.empty?
-          batch = @pending.first(BATCH_SIZE)
+          batch = @mutex.synchronize { @pending.first(BATCH_SIZE) }
           metric_data = batch.map { |entry| build_metric_datum(entry) }
           Turbofan::Retryable.call do
             cloudwatch_client.put_metric_data(
@@ -41,7 +48,7 @@ module Turbofan
               metric_data: metric_data
             )
           end
-          @pending.shift(batch.size)
+          @mutex.synchronize { @pending.shift(batch.size) }
         end
       rescue Aws::Errors::ServiceError => e
         warn("[Turbofan] WARNING: Failed to flush #{@pending.size} remaining metrics: #{e.message}")
@@ -57,7 +64,10 @@ module Turbofan
       # `max_attempts: 1` works across standard/adaptive/legacy modes; the
       # legacy-only `retry_limit: 0` would be ignored in modern modes.
       def cloudwatch_client
-        @cloudwatch_client ||= Aws::CloudWatch::Client.new(retry_mode: "standard", max_attempts: 1)
+        return @cloudwatch_client if defined?(@cloudwatch_client) && @cloudwatch_client
+        @mutex.synchronize do
+          @cloudwatch_client ||= Aws::CloudWatch::Client.new(retry_mode: "standard", max_attempts: 1)
+        end
       end
 
       def build_metric_datum(entry)

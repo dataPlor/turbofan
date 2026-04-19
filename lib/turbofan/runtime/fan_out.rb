@@ -154,6 +154,20 @@ module Turbofan
       #     (preserves backtrace, adds work-item identifier)
       #   - Multiple failures → raises a WorkerErrors aggregating all of them
       #     (each individual error available via #errors)
+      #
+      # Early exit:
+      #   When `Turbofan.config.fan_out_early_exit_threshold` is a positive
+      #   Integer N, workers stop dequeuing new items after N _non-transient_
+      #   errors accumulate. Items already in flight complete normally; items
+      #   still in the queue are skipped. This guards against poison-pill
+      #   work items that would otherwise fail every remaining child at
+      #   non-zero S3 / Retryable cost.
+      #
+      #   Transient errors (AWS throttling, networking) do NOT count toward
+      #   the threshold — a throttle storm fails every worker with a
+      #   retry-able error, and aborting early would make the operator's
+      #   "your burst is being throttled" scenario indistinguishable from
+      #   "your code has a real bug." Mike Perham flagged this specifically.
       def threaded_work(work_items, &block)
         return if work_items.empty?
 
@@ -161,10 +175,18 @@ module Turbofan
         work_items.each { |item| queue << item }
         errors = Queue.new
 
+        threshold = Turbofan.config.fan_out_early_exit_threshold
+        non_transient_count_mutex = Mutex.new
+        non_transient_count = 0
+        aborted = false
+
         thread_count = [work_items.size, THREAD_POOL_SIZE].min
         threads = Array.new(thread_count) do
           Thread.new do
             loop do
+              # Check abort flag before dequeuing. Once tripped, drain
+              # the remaining queue without doing any work.
+              break if aborted
               item = begin
                 queue.pop(true)
               rescue ThreadError
@@ -174,6 +196,16 @@ module Turbofan
                 yield(*item)
               rescue => e
                 errors << WorkerError.new(item, e)
+                # Non-transient failures count toward the early-exit
+                # threshold. Uses Turbofan::Retryable.transient? as the
+                # single source of truth for what "transient" means
+                # (HTTP 408/429/5xx + curated code list).
+                next if threshold.nil?
+                next if Turbofan::Retryable.transient?(e)
+                non_transient_count_mutex.synchronize do
+                  non_transient_count += 1
+                  aborted = true if non_transient_count >= threshold
+                end
               end
             end
           end

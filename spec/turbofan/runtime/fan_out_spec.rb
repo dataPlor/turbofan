@@ -395,4 +395,67 @@ RSpec.describe Turbofan::Runtime::FanOut do
       end
     end
   end
+
+  describe "threaded_work early-exit (Turbofan.config.fan_out_early_exit_threshold)" do
+    after { Turbofan.config.fan_out_early_exit_threshold = nil }
+
+    it "preserves all-workers-complete when threshold is nil (default, backward-compat)" do
+      invocations = Queue.new
+      work = 20.times.map { |i| [i] }
+      begin
+        described_class.send(:threaded_work, work) do |i|
+          invocations << i
+          raise "non-transient boom" if i < 3
+        end
+      rescue Turbofan::Runtime::FanOut::WorkerErrors
+        # expected — 3 failures aggregated
+      end
+      drained = []
+      drained << invocations.pop until invocations.empty?
+      expect(drained.size).to eq(20) # all items processed despite failures
+    end
+
+    it "stops dequeueing remaining items after N non-transient failures" do
+      Turbofan.config.fan_out_early_exit_threshold = 2
+      invocations = Queue.new
+      work = 200.times.map { |i| [i] }
+      begin
+        described_class.send(:threaded_work, work) do |i|
+          invocations << i
+          raise "non-transient boom"
+        end
+      rescue Turbofan::Runtime::FanOut::WorkerErrors
+        # expected
+      end
+      drained = []
+      drained << invocations.pop until invocations.empty?
+      # Workers already in flight when the threshold was hit may complete;
+      # the key property is that MOST items are skipped, not all.
+      expect(drained.size).to be < work.size,
+        "expected early-exit to skip some items; saw #{drained.size}/#{work.size} processed"
+    end
+
+    it "does NOT trigger early-exit on transient errors (throttle-storm safety)" do
+      Turbofan.config.fan_out_early_exit_threshold = 1
+      invocations = Queue.new
+      work = 10.times.map { |i| [i] }
+      begin
+        described_class.send(:threaded_work, work) do |i|
+          invocations << i
+          # Simulate an AWS throttle — Retryable.transient? returns true
+          # for SlowDown, so this should NOT count toward the threshold.
+          err = Aws::S3::Errors::SlowDown.allocate
+          err.define_singleton_method(:code) { "SlowDown" }
+          err.define_singleton_method(:context) { nil }
+          raise err
+        end
+      rescue Turbofan::Runtime::FanOut::WorkerErrors
+        # expected
+      end
+      drained = []
+      drained << invocations.pop until invocations.empty?
+      expect(drained.size).to eq(10),
+        "all items should process despite 'transient' errors; saw #{drained.size}/10"
+    end
+  end
 end

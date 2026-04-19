@@ -5,7 +5,7 @@ module Turbofan
     attr_accessor :bucket, :schemas_path, :default_region,
       :log_retention_days, :notification_topic_arn, :docker_registry,
       :duckdb_version, :aws_account_id, :subnets, :security_groups,
-      :cur_s3_uri
+      :cur_s3_uri, :fan_out_early_exit_threshold
 
     def initialize
       @bucket = nil
@@ -19,6 +19,13 @@ module Turbofan
       @subnets = []
       @security_groups = []
       @cur_s3_uri = nil
+      # nil = preserve original all-workers-complete behavior. Operators
+      # can set this to an Integer N to have FanOut.threaded_work abort
+      # remaining work after N non-transient worker failures (poison-pill
+      # protection). Transient errors (AWS throttling, networking) do
+      # NOT count toward this threshold — they deserve backoff, not
+      # early exit.
+      @fan_out_early_exit_threshold = nil
     end
   end
 

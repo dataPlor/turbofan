@@ -84,7 +84,7 @@ module Turbofan
           )
         else
           key = FanOut.s3_key(context.execution_id, prev_step, "output.json")
-          response = Turbofan::Retryable.call { context.s3.get_object(bucket: bucket, key: key) }
+          response = Turbofan::Retryable.call(logger: context.logger, metrics: context.metrics) { context.s3.get_object(bucket: bucket, key: key) }
           JSON.parse(response.body.read)
         end
       end
@@ -95,7 +95,7 @@ module Turbofan
         bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
         prev_steps.map do |prev_step|
           key = FanOut.s3_key(context.execution_id, prev_step, "output.json")
-          response = Turbofan::Retryable.call { context.s3.get_object(bucket: bucket, key: key) }
+          response = Turbofan::Retryable.call(logger: context.logger, metrics: context.metrics) { context.s3.get_object(bucket: bucket, key: key) }
           JSON.parse(response.body.read)
         end
       end
@@ -104,7 +104,7 @@ module Turbofan
       def self.resolve_items_s3_uri(uri, context)
         bucket = ENV.fetch("TURBOFAN_BUCKET", "turbofan-data")
         key = uri.sub("s3://#{bucket}/", "")
-        response = Turbofan::Retryable.call { context.s3.get_object(bucket: bucket, key: key) }
+        response = Turbofan::Retryable.call(logger: context.logger, metrics: context.metrics) { context.s3.get_object(bucket: bucket, key: key) }
         JSON.parse(response.body.read)
       end
       private_class_method :resolve_items_s3_uri

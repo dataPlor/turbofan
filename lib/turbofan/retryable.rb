@@ -71,10 +71,29 @@ module Turbofan
     # entry per retry attempt with: attempt, max, error_class, code, delay_ms.
     # Default `nil` keeps Retryable silent — no behavior change for existing
     # callers. Pass `logger: context.logger` at call sites that have a Context.
+    #
+    # Optional `metrics:` kwarg takes any object responding to
+    # `#emit(name, value, unit:)` (including Turbofan::Runtime::Metrics).
+    # Emits two distinct metrics:
+    #
+    #   RetryAttempt      — one datapoint per individual retry. Graph to
+    #                       observe retry rate (e.g. throttle storms).
+    #   RetriesExhausted  — one datapoint when max is hit without success.
+    #                       Page-worthy alert signal; distinct from the
+    #                       aggregated retry-rate series so you can alert
+    #                       on "we gave up" without false positives from
+    #                       "we retried and eventually succeeded."
+    #
+    # Dimensions follow Mike Perham's cardinality discipline — only the
+    # low-cardinality Pipeline/Stage/Step/Size dimensions inherited from
+    # the Metrics object are used. Error codes, request IDs, and other
+    # high-cardinality values are NOT added as dimensions (CloudWatch
+    # bills per unique combination).
     def self.call(max: 5, base: 0.5, cap: 30,
                   sleeper: Kernel.method(:sleep),
                   jitter_rand: Kernel.method(:rand),
-                  logger: nil)
+                  logger: nil,
+                  metrics: nil)
       raise ArgumentError, "block required" unless block_given?
       raise ArgumentError, "max must be 1..#{MAX_ATTEMPTS_LIMIT}, got #{max}" unless max.is_a?(Integer) && max >= 1 && max <= MAX_ATTEMPTS_LIMIT
       raise ArgumentError, "base must be > 0, got #{base}" unless base.is_a?(Numeric) && base > 0
@@ -86,7 +105,13 @@ module Turbofan
       rescue => e
         attempt += 1
         raise unless transient?(e)
-        raise if attempt > max
+        if attempt > max
+          # Final attempt exhausted. Emit RetriesExhausted before re-raising
+          # so operators see the terminal failure in metrics even when the
+          # caller doesn't rescue.
+          metrics&.emit("RetriesExhausted", 1)
+          raise
+        end
         backoff = [cap, base * (2**(attempt - 1))].min.to_f
         delay = jitter_rand.call * backoff
         logger&.info("Retryable: transient error, retrying",
@@ -95,6 +120,7 @@ module Turbofan
           error_class: e.class.name,
           code: (e.respond_to?(:code) ? e.code : nil),
           delay_ms: (delay * 1000).round)
+        metrics&.emit("RetryAttempt", 1)
         sleeper.call(delay)
         retry
       end

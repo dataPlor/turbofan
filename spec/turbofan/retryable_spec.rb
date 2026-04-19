@@ -367,4 +367,82 @@ RSpec.describe Turbofan::Retryable do
       expect(log_entries.map { |e| e["attempt"] }).to eq([1, 2])
     end
   end
+
+  describe "observability via metrics: kwarg" do
+    let(:recorder) do
+      Class.new do
+        attr_reader :emitted
+
+        def initialize
+          @emitted = []
+        end
+
+        def emit(name, value, unit: nil)
+          @emitted << {name: name, value: value, unit: unit}
+        end
+      end.new
+    end
+
+    it "emits a RetryAttempt metric for each retry when eventually succeeding" do
+      attempts = 0
+      described_class.call(max: 3, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, metrics: recorder) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 3
+        :ok
+      end
+
+      retry_attempts = recorder.emitted.select { |e| e[:name] == "RetryAttempt" }
+      expect(retry_attempts.size).to eq(2)
+      expect(retry_attempts.map { |e| e[:value] }).to eq([1, 1])
+    end
+
+    it "emits a single RetriesExhausted metric when max is hit" do
+      begin
+        described_class.call(max: 2, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, metrics: recorder) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown")
+        end
+      rescue Aws::Errors::ServiceError
+        # expected
+      end
+
+      retry_attempts = recorder.emitted.select { |e| e[:name] == "RetryAttempt" }
+      retries_exhausted = recorder.emitted.select { |e| e[:name] == "RetriesExhausted" }
+      expect(retry_attempts.size).to eq(2) # 2 retries (after attempt 1 and 2)
+      expect(retries_exhausted.size).to eq(1) # exactly one "we gave up" signal
+      expect(retries_exhausted.first[:value]).to eq(1)
+    end
+
+    it "does not emit RetriesExhausted when the block eventually succeeds" do
+      attempts = 0
+      described_class.call(max: 5, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, metrics: recorder) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 2
+        :ok
+      end
+
+      expect(recorder.emitted.map { |e| e[:name] }).not_to include("RetriesExhausted")
+    end
+
+    it "does not emit on non-transient errors (no retry happens)" do
+      begin
+        described_class.call(sleeper: ->(_) {}, jitter_rand: -> { 0.0 }, metrics: recorder) do
+          raise build_aws_error(Aws::S3::Errors::ServiceError, code: "AccessDenied", status: 403)
+        end
+      rescue Aws::Errors::ServiceError
+        # expected
+      end
+
+      expect(recorder.emitted).to be_empty
+    end
+
+    it "does nothing when metrics is nil (default, backward-compat)" do
+      attempts = 0
+      described_class.call(max: 2, sleeper: ->(_) {}, jitter_rand: -> { 0.0 }) do
+        attempts += 1
+        raise build_aws_error(Aws::S3::Errors::ServiceError, code: "SlowDown") if attempts < 2
+        :ok
+      end
+      # No assertion beyond "did not raise" — nil metrics means no-op.
+    end
+  end
 end
