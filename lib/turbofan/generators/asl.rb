@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "asl/state_builder"
 
 module Turbofan
   module Generators

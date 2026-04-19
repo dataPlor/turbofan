@@ -39,6 +39,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "aws-sdk-secretsmanager", "~> 1"
   spec.add_dependency "oj", "~> 3"
   spec.add_dependency "json_schemer", "~> 2"
+  spec.add_dependency "zeitwerk", "~> 2.6"
 
   spec.files = Dir["lib/**/*", "exe/*"] + %w[README.md CHANGELOG.md LICENSE]
   spec.bindir = "exe"

@@ -1,14 +1,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "asl"
-require_relative "cloudformation/job_definition"
-require_relative "cloudformation/iam"
-require_relative "cloudformation/logs"
-require_relative "cloudformation/dashboard"
-require_relative "cloudformation/sns"
-require_relative "cloudformation/chunking_lambda"
-require_relative "cloudformation/tolerance_lambda"
 
 module Turbofan
   module Generators

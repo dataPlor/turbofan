@@ -196,18 +196,5 @@ module Turbofan
   end
 end
 
-require_relative "cli/prompt"
-require_relative "cli/new"
-require_relative "cli/add"
-require_relative "cli/add_router"
-require_relative "cli/check"
-require_relative "cli/destroy"
-require_relative "cli/logs"
-require_relative "cli/deploy"
-require_relative "cli/run"
-require_relative "cli/status"
-require_relative "cli/rollback"
-require_relative "cli/ce"
-require_relative "cli/resources"
-require_relative "cli/cost"
-require_relative "cli/history"
+# Zeitwerk autoloads the CLI subcommand modules (Turbofan::CLI::New, ...)
+# on first reference. Previously required manually here.

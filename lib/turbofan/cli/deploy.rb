@@ -3,7 +3,6 @@
 require "json"
 require "yaml"
 require "aws-sdk-sts"
-require_relative "deploy/preflight"
 
 module Turbofan
   class CLI < Thor

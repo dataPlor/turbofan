@@ -1,53 +1,58 @@
 # frozen_string_literal: true
 
-require_relative "turbofan/errors"  # must be first — other files reference Turbofan::Error
-require_relative "turbofan/configuration"
-require_relative "turbofan/discovery"
-require_relative "turbofan/extensions"
-require_relative "turbofan/version"
-require_relative "turbofan/naming"
-require_relative "turbofan/retryable"
-require_relative "turbofan/subprocess"
-require_relative "turbofan/instance_catalog"
-require_relative "turbofan/instance_selector"
-require_relative "turbofan/step"
-require_relative "turbofan/dag"
-require_relative "turbofan/pipeline"
-require_relative "turbofan/compute_environment"
-require_relative "turbofan/resource"
-require_relative "turbofan/resources/postgres"
-require_relative "turbofan/router"
-require_relative "turbofan/s3_uri"
-require_relative "turbofan/check/result"
-require_relative "turbofan/check/dag_check"
-require_relative "turbofan/check/router_check"
-require_relative "turbofan/check/instance_check"
-require_relative "turbofan/check/pipeline_check"
-require_relative "turbofan/check/resource_check"
-require_relative "turbofan/generators/cloudformation"
-require_relative "turbofan/generators/asl"
-require_relative "turbofan/runtime/logger"
-require_relative "turbofan/runtime/metrics"
-require_relative "turbofan/runtime/context"
-require_relative "turbofan/runtime/payload"
-require_relative "turbofan/runtime/input_resolver"
-require_relative "turbofan/runtime/output_serializer"
-require_relative "turbofan/runtime/schema_validator"
-require_relative "turbofan/runtime/step_metrics"
-require_relative "turbofan/runtime/wrapper"
-require_relative "turbofan/runtime/resource_attacher"
-require_relative "turbofan/runtime/fan_out"
-require_relative "turbofan/runtime/lineage"
-require_relative "turbofan/observability/insights_query"
-require_relative "turbofan/cli"
-require_relative "turbofan/deploy/pipeline_loader"
-require_relative "turbofan/deploy/image_builder"
-require_relative "turbofan/deploy/stack_manager"
-require_relative "turbofan/deploy/execution"
-require_relative "turbofan/deploy/pipeline_context"
-require_relative "turbofan/status"
+require "zeitwerk"
+
+# Errors must exist before Zeitwerk resolves any gem file that references
+# Turbofan::Error / Turbofan::ConfigError / Turbofan::ValidationError.
+# Loading them manually here means subsequent autoload triggers find the
+# base classes already defined.
+require_relative "turbofan/errors"
 
 module Turbofan
+  class << self
+    attr_reader :loader
+  end
+
+  @loader = Zeitwerk::Loader.for_gem
+  loader.inflector.inflect(
+    "asl" => "ASL",
+    "cli" => "CLI",
+    "cloudformation" => "CloudFormation"
+  )
+
+  # turbofan/resources/postgres.rb defines Turbofan::Postgres (a mixin
+  # users include into their Resource classes), NOT Turbofan::Resources::
+  # Postgres. Tell Zeitwerk the `resources` segment is collapsed so file
+  # paths map to the parent namespace: lib/turbofan/resources/FOO.rb →
+  # Turbofan::FOO.
+  loader.collapse("#{__dir__}/turbofan/resources")
+
+  # errors.rb defines multiple top-level error classes (Error,
+  # ConfigError, ValidationError, plus the grouped subclasses) — it does
+  # NOT map to a single constant named `Turbofan::Errors`. Since it's
+  # loaded manually above to satisfy the other files' forward references,
+  # Zeitwerk must be told to ignore it.
+  loader.ignore("#{__dir__}/turbofan/errors.rb")
+
+  # Lambda-bundle files are shipped INTO AWS Lambda zip archives at deploy
+  # time; they are not Ruby constants in the gem's autoload tree. Their
+  # `require_relative "router"` / `"turbofan_router"` lines only resolve
+  # once the zip is deployed — autoloading them here would fail at boot.
+  loader.ignore("#{__dir__}/turbofan/generators/cloudformation/chunking_handler.rb")
+
+  # Optional autoload tracing for diagnosing inflector or file-layout
+  # surprises. Enable with TURBOFAN_LOADER_LOG=1.
+  loader.log! if ENV["TURBOFAN_LOADER_LOG"]
+
+  loader.setup
+
+  # Eager-load gem-internal Resource subclasses so
+  # Discovery.subclasses_of(Resource) finds them via ObjectSpace. User
+  # Step/Pipeline/Resource classes are loaded via PipelineLoader at a
+  # later point (Kernel.load populates ObjectSpace synchronously), so
+  # only the built-in resources directory needs eager-loading here.
+  loader.eager_load_dir("#{__dir__}/turbofan/resources")
+
   # Raised on SIGTERM (Spot reclaim / Batch termination). Subclasses
   # SystemExit so `ensure` blocks still run, but the final process exit
   # status is 143 — which AWS Batch's retry strategy matches via
@@ -98,5 +103,4 @@ module Turbofan
       .join("_")
       .to_sym
   end
-
 end

@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "lambdas/packager"
-
 module Turbofan
   module Generators
     class CloudFormation

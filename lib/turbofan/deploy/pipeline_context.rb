@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "pipeline_loader"
-
 module Turbofan
   module Deploy
     # Consolidates the 4-line pipeline-loading preamble used across CLI

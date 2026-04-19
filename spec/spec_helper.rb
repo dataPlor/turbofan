@@ -4,6 +4,11 @@ require "bundler/setup"
 require "fileutils"
 require "turbofan"
 
+# Force Zeitwerk to eager-load every file under lib/turbofan/**. Any
+# inflector mismatch or file/module nesting drift raises immediately,
+# before the first spec runs. Cheap (runs once at load time).
+Turbofan.loader.eager_load(force: true)
+
 Dir[File.join(__dir__, "support", "**", "*.rb")].each { |f| require f }
 
 module ComputeEnvironments; end unless defined?(ComputeEnvironments)

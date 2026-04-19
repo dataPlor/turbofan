@@ -17,7 +17,7 @@ module Turbofan
     end
 
     def self.subclasses_of(mod)
-      ObjectSpace.each_object(Class).select { |c|
+      matches = ObjectSpace.each_object(Class).select { |c|
         class_name = CLASS_NAME.bind_call(c)
         next false unless class_name
         is_subclass = begin
@@ -33,6 +33,11 @@ module Turbofan
         end
         live == c
       }
+      # Sort by fully-qualified class name for deterministic iteration
+      # order. ObjectSpace.each_object is GC-order dependent, which would
+      # otherwise produce non-reproducible CloudFormation diffs and ASL
+      # state ordering across runs/platforms. Flagged by Xavier Noria.
+      matches.sort_by { |c| CLASS_NAME.bind_call(c) }
     end
   end
 end
