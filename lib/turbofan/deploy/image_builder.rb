@@ -224,6 +224,8 @@ module Turbofan
         Turbofan::Subprocess.capture(*cmd)
       rescue Turbofan::Subprocess::Error => e
         raise "Command failed: #{cmd.first(3).join(" ")}\n#{e.stderr}"
+      rescue Errno::ENOENT
+        raise "Command failed: #{cmd.first(3).join(" ")}\ncommand not found"
       end
       private_class_method :run_cmd
     end

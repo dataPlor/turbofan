@@ -136,6 +136,14 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
         described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
       }.to raise_error(/Command failed/)
     end
+
+    it "raises a descriptive error when docker binary is missing (ENOENT)" do
+      allow(Turbofan::Subprocess).to receive(:capture).and_raise(Errno::ENOENT)
+
+      expect {
+        described_class.build(step_dir, schemas_dir, tag: "sha-abc123", repository_uri: repository_uri)
+      }.to raise_error(/Command failed.*command not found/m)
+    end
   end
 
   describe ".push" do

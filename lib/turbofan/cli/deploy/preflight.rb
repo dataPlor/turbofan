@@ -17,6 +17,11 @@ module Turbofan
         end
 
         def self.git_clean?
+          # If git isn't installed (Errno::ENOENT), we intentionally let the
+          # error propagate -- unlike buildkit_available? which tolerates
+          # missing docker. Protected-stage deploys rely on this check to
+          # gate pushes; returning a default here would mask a misconfigured
+          # environment instead of failing loudly.
           stdout, _, _ = Turbofan::Subprocess.capture("git", "status", "--porcelain", allow_failure: true)
           stdout.strip.empty?
         end
