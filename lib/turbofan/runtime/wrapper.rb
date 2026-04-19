@@ -19,7 +19,7 @@ module Turbofan
         storage_path = setup_storage
         set_tmpdir(storage_path) if storage_path
         context = build_context(storage_path)
-        install_sigterm_handler(context, storage_path: storage_path)
+        install_sigterm_handler(context)
         attach_resources(context)
         Lineage.emit(Lineage.start_event(context: context, step_class: @step_class), context: context)
 
@@ -46,6 +46,13 @@ module Turbofan
         StepMetrics.emit_success(context, @step_class, duration)
         Lineage.emit(Lineage.complete_event(context: context, step_class: @step_class), context: context)
         $stdout.puts(output)
+      rescue Turbofan::Interrupted => e
+        # SIGTERM-driven cooperative shutdown (e.g., Spot reclaim). Not a
+        # user-code failure — log at info level and skip failure metrics /
+        # Lineage fail_event. Re-raise so `ensure` runs and SystemExit
+        # propagates with exit status 143.
+        context&.logger&.info("Interrupted by signal", reason: e.message)
+        raise
       rescue => e
         context&.logger&.error("Step failed", error_class: e.class.name, error_message: e.message)
         begin
@@ -114,12 +121,22 @@ module Turbofan
         )
       end
 
-      def install_sigterm_handler(context, storage_path: nil)
+      # Install a minimal SIGTERM trap. Ruby forbids almost everything useful
+      # in trap context (no Mutex, no logging IO, and doing heavy work risks
+      # races with in-flight S3 uploads or DuckDB queries). We do two things:
+      #
+      #   1. Set the interrupt flag (atomic boolean write — safe in trap).
+      #   2. Inject Turbofan::Interrupted onto the main thread via
+      #      Thread#raise. This is the same mechanism Ruby's default SIGINT
+      #      handler uses to raise `Interrupt`. The exception unwinds through
+      #      the step's call stack, reaches Wrapper#run's rescue chain, logs
+      #      cleanly, runs `ensure` (storage cleanup + metrics flush), and
+      #      exits with code 143 via SystemExit propagation.
+      def install_sigterm_handler(context)
+        main = Thread.current
         trap("TERM") do
           context.interrupt!
-          context.logger.info("SIGTERM received, shutting down")
-          cleanup_storage(storage_path)
-          exit(143)
+          main.raise(Turbofan::Interrupted.new)
         end
       end
 
