@@ -1,5 +1,21 @@
 # frozen_string_literal: true
 
+# ⚠ DO NOT CREATE A lib/turbofan/errors/ SUBDIRECTORY.
+#
+# This file is explicitly `loader.ignore`d by Zeitwerk in lib/turbofan.rb
+# because it defines multiple top-level error classes (Error, ConfigError,
+# ValidationError, SchemaIncompatibleError, etc.) rather than a single
+# Turbofan::Errors constant. That design is intentional — operators need
+# a flat, rescuable hierarchy in one place.
+#
+# If you add a lib/turbofan/errors/ subdirectory, Zeitwerk will demand
+# a Turbofan::Errors parent module to house its contents (Zeitwerk's
+# file+directory namespace pattern). But there is no Turbofan::Errors —
+# we have Turbofan::Error (singular). The loader will raise at
+# `eager_load(force: true)` during CI's spec_helper or during any first
+# cold boot. New error classes belong in this file, not a subdirectory.
+# (Flagged by Xavier Noria during the 0.6.0 final review.)
+
 module Turbofan
   # Base class for every error the gem raises. Lives in its own file so
   # it can be required before any other lib/turbofan/** file — those
