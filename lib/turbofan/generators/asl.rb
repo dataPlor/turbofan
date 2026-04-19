@@ -87,7 +87,7 @@ module Turbofan
 
             if step.fan_out?
               step_class = resolve_step_class(step.name)
-              routed = step_class&.turbofan_sizes&.any?
+              routed = step_class&.turbofan&.sizes&.any?
               chunk_prev = is_join ? nil : find_prev(sorted, index, visited)
               router_class = routed ? "#{Naming.pascal_case(step.name)}Router" : nil
 

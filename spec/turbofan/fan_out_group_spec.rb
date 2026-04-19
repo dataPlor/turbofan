@@ -16,12 +16,12 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         runs_on :batch
         batch_size 100
       end
-      expect(klass.turbofan_batch_size).to eq(100)
+      expect(klass.turbofan.batch_size).to eq(100)
     end
 
     it "defaults to 1" do
       klass = Class.new { include Turbofan::Step; runs_on :batch }
-      expect(klass.turbofan_batch_size).to eq(1)
+      expect(klass.turbofan.batch_size).to eq(1)
     end
 
     it "raises ArgumentError when batch_size is zero" do
@@ -62,7 +62,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         runs_on :batch
         size :s, cpu: 1, ram: 2, batch_size: 100
       end
-      expect(klass.turbofan_sizes[:s][:batch_size]).to eq(100)
+      expect(klass.turbofan.sizes[:s][:batch_size]).to eq(100)
     end
 
     it "defaults per-size batch_size to nil" do
@@ -71,7 +71,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         runs_on :batch
         size :s, cpu: 1, ram: 2
       end
-      expect(klass.turbofan_sizes[:s][:batch_size]).to be_nil
+      expect(klass.turbofan.sizes[:s][:batch_size]).to be_nil
     end
 
     it "raises ArgumentError when per-size batch_size is zero" do
@@ -105,7 +105,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
     end
   end
 
-  describe "Step.turbofan_batch_size_for" do
+  describe "Step.turbofan.batch_size_for" do
     it "returns per-size batch_size when set" do
       klass = Class.new do
         include Turbofan::Step
@@ -113,7 +113,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         batch_size 10
         size :s, cpu: 1, ram: 2, batch_size: 100
       end
-      expect(klass.turbofan_batch_size_for(:s)).to eq(100)
+      expect(klass.turbofan.batch_size_for(:s)).to eq(100)
     end
 
     it "falls back to step default when per-size not set" do
@@ -123,7 +123,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         batch_size 10
         size :s, cpu: 1, ram: 2
       end
-      expect(klass.turbofan_batch_size_for(:s)).to eq(10)
+      expect(klass.turbofan.batch_size_for(:s)).to eq(10)
     end
 
     it "falls back to default of 1 when neither per-size nor explicit default set" do
@@ -132,7 +132,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         runs_on :batch
         size :s, cpu: 1, ram: 2
       end
-      expect(klass.turbofan_batch_size_for(:s)).to eq(1)
+      expect(klass.turbofan.batch_size_for(:s)).to eq(1)
     end
   end
 
@@ -192,7 +192,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
         dag = pipeline_class.turbofan_dag
         step = dag.steps.find { |s| s.name == :no_bs_process }
         expect(step.fan_out?).to be true
-        expect(no_bs_step.turbofan_batch_size).to eq(1)
+        expect(no_bs_step.turbofan.batch_size).to eq(1)
       end
     end
 
@@ -213,7 +213,7 @@ RSpec.describe "batch_size on Step class", :schemas do # rubocop:disable RSpec/D
       end
 
       it "reads batch_size from the step class" do
-        expect(step_class.turbofan_batch_size).to eq(100)
+        expect(step_class.turbofan.batch_size).to eq(100)
       end
     end
 

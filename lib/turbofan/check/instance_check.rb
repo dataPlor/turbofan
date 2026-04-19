@@ -10,14 +10,14 @@ module Turbofan
         warnings = []
 
         steps.each do |step_name, step_class|
-          duckdb = step_class.turbofan_needs_duckdb?
+          duckdb = step_class.turbofan.needs_duckdb?
 
-          if step_class.turbofan_sizes.empty?
+          if step_class.turbofan.sizes.empty?
             report[step_name] = build_single_report(step_class, duckdb)
             check_narrow_pool(report[step_name][:instance_types], step_name, warnings)
           else
             sizes_report = {}
-            step_class.turbofan_sizes.each do |size_name, derived|
+            step_class.turbofan.sizes.each do |size_name, derived|
               size_cpu = derived[:cpu]
               size_ram = derived[:ram]
               size_cpu ||= [size_ram / 2, 1].max if size_ram
@@ -43,8 +43,8 @@ module Turbofan
       end
 
       def self.build_single_report(step_class, duckdb)
-        cpu = step_class.turbofan_default_cpu
-        ram = step_class.turbofan_default_ram
+        cpu = step_class.turbofan.default_cpu
+        ram = step_class.turbofan.default_ram
         return {instance_types: [], waste: {}, spot_availability: nil, note: "no cpu/ram set"} unless cpu || ram
 
         # Default missing dimension based on what was specified

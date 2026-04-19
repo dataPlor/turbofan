@@ -10,7 +10,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
-    expect(klass.turbofan_input_schema_file).to eq("geocode_input.json")
+    expect(klass.turbofan.input_schema_file).to eq("geocode_input.json")
   end
 
   it "stores output_schema filename" do
@@ -20,7 +20,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
-    expect(klass.turbofan_output_schema_file).to eq("geocode_output.json")
+    expect(klass.turbofan.output_schema_file).to eq("geocode_output.json")
   end
 
   it "loads and caches parsed input schema" do
@@ -30,7 +30,7 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
       input_schema "geocode_input.json"
       output_schema "geocode_output.json"
     end
-    schema = klass.turbofan_input_schema
+    schema = klass.turbofan.input_schema
     expect(schema).to be_a(Hash)
     expect(schema["properties"]).to have_key("query")
   end
@@ -42,6 +42,6 @@ RSpec.describe "Step schema DSL", :schemas do # rubocop:disable RSpec/DescribeCl
       input_schema "nonexistent.json"
       output_schema "geocode_output.json"
     end
-    expect { klass.turbofan_input_schema }.to raise_error(Errno::ENOENT)
+    expect { klass.turbofan.input_schema }.to raise_error(Errno::ENOENT)
   end
 end

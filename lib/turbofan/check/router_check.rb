@@ -10,7 +10,7 @@ module Turbofan
           step_class = steps[step_name]
           next unless step_class
 
-          step_sizes = step_class.turbofan_sizes.keys
+          step_sizes = step_class.turbofan.sizes.keys
           router_sizes = router_class.turbofan_sizes
           extra = router_sizes - step_sizes
 

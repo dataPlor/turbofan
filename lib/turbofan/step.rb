@@ -74,6 +74,24 @@ module Turbofan
       def uses_s3 = @step_class.send(:uses_s3)
       def writes_to_s3 = @step_class.send(:writes_to_s3)
 
+      # Per-size batch_size resolution. Accepts a size symbol (matching
+      # a `size` macro declaration) or nil. Returns per-size override
+      # when present, else the step-level default.
+      def batch_size_for(size_name)
+        per_size = @step_class.instance_variable_get(:@turbofan_sizes).dig(size_name, :batch_size)
+        per_size || @step_class.instance_variable_get(:@turbofan_batch_size)
+      end
+
+      # Network placement resolution — falls back to Turbofan.config
+      # defaults when the step hasn't overridden.
+      def resolved_subnets
+        @step_class.instance_variable_get(:@turbofan_subnets) || Turbofan.config.subnets
+      end
+
+      def resolved_security_groups
+        @step_class.instance_variable_get(:@turbofan_security_groups) || Turbofan.config.security_groups
+      end
+
       def inspect
         attrs = FIELDS.map { |f| "#{f}=#{public_send(f).inspect}" }.join(" ")
         "#<Turbofan::Step::ConfigFacade #{Turbofan::Discovery.class_name_of(@step_class)} #{attrs}>"

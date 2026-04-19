@@ -22,19 +22,19 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores the CPU count directly" do
-      expect(step_class.turbofan_default_cpu).to eq(2)
+      expect(step_class.turbofan.default_cpu).to eq(2)
     end
 
     it "does not auto-derive RAM from cpu" do
-      expect(step_class.turbofan_default_ram).to be_nil
+      expect(step_class.turbofan.default_ram).to be_nil
     end
 
     it "tracks uses declarations as structured hashes" do
-      expect(step_class.turbofan_uses).to eq([{type: :resource, key: :duckdb}])
+      expect(step_class.turbofan.uses).to eq([{type: :resource, key: :duckdb}])
     end
 
     it "reports no named sizes for a single-size step" do
-      expect(step_class.turbofan_sizes).to be_empty
+      expect(step_class.turbofan.sizes).to be_empty
     end
 
     it "stores the compute_environment" do
@@ -54,11 +54,11 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores the RAM value directly" do
-      expect(step_class.turbofan_default_ram).to eq(4096)
+      expect(step_class.turbofan.default_ram).to eq(4096)
     end
 
     it "does not auto-derive CPU from ram" do
-      expect(step_class.turbofan_default_cpu).to be_nil
+      expect(step_class.turbofan.default_cpu).to be_nil
     end
   end
 
@@ -75,11 +75,11 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores cpu directly as given" do
-      expect(step_class.turbofan_default_cpu).to eq(4)
+      expect(step_class.turbofan.default_cpu).to eq(4)
     end
 
     it "stores ram directly as given" do
-      expect(step_class.turbofan_default_ram).to eq(8192)
+      expect(step_class.turbofan.default_ram).to eq(8192)
     end
   end
 
@@ -96,11 +96,11 @@ RSpec.describe Turbofan::Step do
     end
 
     it "tracks :duckdb in uses" do
-      expect(step_class.turbofan_uses).to eq([{type: :resource, key: :duckdb}])
+      expect(step_class.turbofan.uses).to eq([{type: :resource, key: :duckdb}])
     end
 
     it "includes :duckdb in turbofan_resource_keys" do
-      expect(step_class.turbofan_resource_keys).to include(:duckdb)
+      expect(step_class.turbofan.resource_keys).to include(:duckdb)
     end
   end
 
@@ -118,14 +118,14 @@ RSpec.describe Turbofan::Step do
     end
 
     it "tracks all declared dependencies" do
-      expect(step_class.turbofan_uses).to contain_exactly(
+      expect(step_class.turbofan.uses).to contain_exactly(
         {type: :resource, key: :duckdb},
         {type: :resource, key: :gpu}
       )
     end
 
     it "returns all resource keys" do
-      expect(step_class.turbofan_resource_keys).to contain_exactly(:duckdb, :gpu)
+      expect(step_class.turbofan.resource_keys).to contain_exactly(:duckdb, :gpu)
     end
   end
 
@@ -142,11 +142,11 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores S3 URIs as structured hashes" do
-      expect(step_class.turbofan_uses).to eq([{type: :s3, uri: "s3://data-bucket/input/*"}])
+      expect(step_class.turbofan.uses).to eq([{type: :s3, uri: "s3://data-bucket/input/*"}])
     end
 
     it "does not include S3 URIs in turbofan_resource_keys" do
-      expect(step_class.turbofan_resource_keys).to be_empty
+      expect(step_class.turbofan.resource_keys).to be_empty
     end
 
     it "returns S3 deps via the façade (uses_s3)" do
@@ -168,15 +168,15 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores symbol writes_to as structured hashes" do
-      expect(step_class.turbofan_writes_to).to include({type: :resource, key: :places_write})
+      expect(step_class.turbofan.writes_to).to include({type: :resource, key: :places_write})
     end
 
     it "stores S3 URI writes_to as structured hashes" do
-      expect(step_class.turbofan_writes_to).to include({type: :s3, uri: "s3://output-bucket/results/"})
+      expect(step_class.turbofan.writes_to).to include({type: :s3, uri: "s3://output-bucket/results/"})
     end
 
     it "includes write resource keys in turbofan_resource_keys" do
-      expect(step_class.turbofan_resource_keys).to include(:places_write)
+      expect(step_class.turbofan.resource_keys).to include(:places_write)
     end
 
     it "returns write S3 deps via the façade (writes_to_s3)" do
@@ -198,11 +198,11 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores reads_from symbols in turbofan_uses" do
-      expect(step_class.turbofan_uses).to include({type: :resource, key: :places_read})
+      expect(step_class.turbofan.uses).to include({type: :resource, key: :places_read})
     end
 
     it "stores reads_from S3 URIs in turbofan_uses" do
-      expect(step_class.turbofan_uses).to include({type: :s3, uri: "s3://data-lake/parquet/"})
+      expect(step_class.turbofan.uses).to include({type: :s3, uri: "s3://data-lake/parquet/"})
     end
   end
 
@@ -216,7 +216,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses :duckdb
       end
-      expect(step.turbofan_needs_duckdb?).to be true
+      expect(step.turbofan.needs_duckdb?).to be true
     end
 
     it "is true when step uses a non-duckdb resource key" do
@@ -228,7 +228,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses :places_read
       end
-      expect(step.turbofan_needs_duckdb?).to be true
+      expect(step.turbofan.needs_duckdb?).to be true
     end
 
     it "is true when step writes_to a resource key" do
@@ -240,7 +240,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         writes_to :places_write
       end
-      expect(step.turbofan_needs_duckdb?).to be true
+      expect(step.turbofan.needs_duckdb?).to be true
     end
 
     it "is false when step only uses S3 URIs" do
@@ -252,7 +252,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses "s3://bucket/path"
       end
-      expect(step.turbofan_needs_duckdb?).to be false
+      expect(step.turbofan.needs_duckdb?).to be false
     end
 
     it "is false when step has no dependencies" do
@@ -263,7 +263,7 @@ RSpec.describe Turbofan::Step do
         compute_environment :test_ce
         cpu 1
       end
-      expect(step.turbofan_needs_duckdb?).to be false
+      expect(step.turbofan.needs_duckdb?).to be false
     end
 
     it "is true when step has duckdb extensions but no resource keys" do
@@ -275,7 +275,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses(:duckdb) { extensions :spatial }
       end
-      expect(step.turbofan_needs_duckdb?).to be true
+      expect(step.turbofan.needs_duckdb?).to be true
     end
   end
 
@@ -290,7 +290,7 @@ RSpec.describe Turbofan::Step do
         uses :duckdb
         uses :duckdb
       end
-      expect(step.turbofan_uses.size).to eq(1)
+      expect(step.turbofan.uses.size).to eq(1)
     end
 
     it "does not store duplicate writes_to" do
@@ -303,7 +303,7 @@ RSpec.describe Turbofan::Step do
         writes_to :places
         writes_to :places
       end
-      expect(step.turbofan_writes_to.size).to eq(1)
+      expect(step.turbofan.writes_to.size).to eq(1)
     end
   end
 
@@ -365,7 +365,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "returns all resource keys from both uses and writes_to" do
-      expect(step_class.turbofan_resource_keys).to contain_exactly(:places_read, :duckdb, :places_write)
+      expect(step_class.turbofan.resource_keys).to contain_exactly(:places_read, :duckdb, :places_write)
     end
 
     it "deduplicates keys appearing in both uses and writes_to" do
@@ -378,7 +378,7 @@ RSpec.describe Turbofan::Step do
         uses :shared_db
         writes_to :shared_db
       end
-      expect(step.turbofan_resource_keys).to eq([:shared_db])
+      expect(step.turbofan.resource_keys).to eq([:shared_db])
     end
   end
 
@@ -412,7 +412,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores the custom retries count" do
-      expect(step_class.turbofan_retries).to eq(5)
+      expect(step_class.turbofan.retries).to eq(5)
     end
   end
 
@@ -430,7 +430,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores all secret declarations with name and path" do
-      expect(step_class.turbofan_secrets).to eq([
+      expect(step_class.turbofan.secrets).to eq([
         {name: :db_url, from: "turbofan/my-pipeline/db-url"},
         {name: :api_key, from: "turbofan/my-pipeline/api-key"}
       ])
@@ -454,11 +454,11 @@ RSpec.describe Turbofan::Step do
       end
 
       it "sets turbofan_retries to 3" do
-        expect(step_class.turbofan_retries).to eq(3)
+        expect(step_class.turbofan.retries).to eq(3)
       end
 
       it "sets turbofan_retry_on to nil" do
-        expect(step_class.turbofan_retry_on).to be_nil
+        expect(step_class.turbofan.retry_on).to be_nil
       end
     end
 
@@ -475,11 +475,11 @@ RSpec.describe Turbofan::Step do
       end
 
       it "sets turbofan_retries to 3" do
-        expect(step_class.turbofan_retries).to eq(3)
+        expect(step_class.turbofan.retries).to eq(3)
       end
 
       it "sets turbofan_retry_on to the specified error types" do
-        expect(step_class.turbofan_retry_on).to eq(["States.TaskFailed"])
+        expect(step_class.turbofan.retry_on).to eq(["States.TaskFailed"])
       end
     end
 
@@ -496,11 +496,11 @@ RSpec.describe Turbofan::Step do
       end
 
       it "sets turbofan_retries to 2" do
-        expect(step_class.turbofan_retries).to eq(2)
+        expect(step_class.turbofan.retries).to eq(2)
       end
 
       it "stores multiple error types in turbofan_retry_on" do
-        expect(step_class.turbofan_retry_on).to eq(["States.Timeout", "Batch.ServerException"])
+        expect(step_class.turbofan.retry_on).to eq(["States.Timeout", "Batch.ServerException"])
       end
     end
   end
@@ -521,23 +521,23 @@ RSpec.describe Turbofan::Step do
     end
 
     it "defaults retries to 3" do
-      expect(step_class.turbofan_retries).to eq(3)
+      expect(step_class.turbofan.retries).to eq(3)
     end
 
     it "has no uses by default" do
-      expect(step_class.turbofan_uses).to be_empty
+      expect(step_class.turbofan.uses).to be_empty
     end
 
     it "has no writes_to by default" do
-      expect(step_class.turbofan_writes_to).to be_empty
+      expect(step_class.turbofan.writes_to).to be_empty
     end
 
     it "has no secrets by default" do
-      expect(step_class.turbofan_secrets).to be_empty
+      expect(step_class.turbofan.secrets).to be_empty
     end
 
     it "has no named sizes by default" do
-      expect(step_class.turbofan_sizes).to be_empty
+      expect(step_class.turbofan.sizes).to be_empty
     end
   end
 
@@ -569,14 +569,14 @@ RSpec.describe Turbofan::Step do
       step_a
       step_b
 
-      expect(step_a.turbofan_default_cpu).to eq(2)
-      expect(step_b.turbofan_default_ram).to eq(16)
+      expect(step_a.turbofan.default_cpu).to eq(2)
+      expect(step_b.turbofan.default_ram).to eq(16)
 
-      expect(step_a.turbofan_uses).to eq([{type: :resource, key: :duckdb}])
-      expect(step_b.turbofan_uses).to be_empty
+      expect(step_a.turbofan.uses).to eq([{type: :resource, key: :duckdb}])
+      expect(step_b.turbofan.uses).to be_empty
 
-      expect(step_a.turbofan_retries).to eq(5)
-      expect(step_b.turbofan_retries).to eq(3)
+      expect(step_a.turbofan.retries).to eq(5)
+      expect(step_b.turbofan.retries).to eq(3)
     end
   end
 
@@ -799,7 +799,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "adds to turbofan_secrets via inject_secret" do
-      expect(step_class.turbofan_secrets).to eq([
+      expect(step_class.turbofan.secrets).to eq([
         {name: :db_url, from: "arn:aws:secretsmanager:us-east-1:123456789:secret:db-url"}
       ])
     end
@@ -819,7 +819,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "adds to turbofan_secrets via the old secret method" do
-      expect(step_class.turbofan_secrets).to eq([
+      expect(step_class.turbofan.secrets).to eq([
         {name: :api_key, from: "arn:aws:secretsmanager:us-east-1:123456789:secret:api-key"}
       ])
     end
@@ -838,7 +838,7 @@ RSpec.describe Turbofan::Step do
     end
 
     it "stores declared extensions" do
-      expect(step_class.turbofan_duckdb_extensions).to eq([:spatial, :h3])
+      expect(step_class.turbofan.duckdb_extensions).to eq([:spatial, :h3])
     end
 
     it "deduplicates extensions" do
@@ -850,7 +850,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses(:duckdb) { extensions :spatial, :spatial, :h3 }
       end
-      expect(step.turbofan_duckdb_extensions).to eq([:spatial, :h3])
+      expect(step.turbofan.duckdb_extensions).to eq([:spatial, :h3])
     end
 
     it "converts string extensions to symbols" do
@@ -862,7 +862,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         uses(:duckdb) { extensions "spatial" }
       end
-      expect(step.turbofan_duckdb_extensions).to eq([:spatial])
+      expect(step.turbofan.duckdb_extensions).to eq([:spatial])
     end
 
     it "raises ArgumentError for non-duckdb target with block" do
@@ -899,7 +899,7 @@ RSpec.describe Turbofan::Step do
         compute_environment :test_ce
         cpu 1
       end
-      expect(step.turbofan_duckdb_extensions).to eq([])
+      expect(step.turbofan.duckdb_extensions).to eq([])
     end
 
     it "accumulates extensions across multiple uses :duckdb calls" do
@@ -912,7 +912,7 @@ RSpec.describe Turbofan::Step do
         uses(:duckdb) { extensions :spatial }
         uses(:duckdb) { extensions :h3 }
       end
-      expect(step.turbofan_duckdb_extensions).to eq([:spatial, :h3])
+      expect(step.turbofan.duckdb_extensions).to eq([:spatial, :h3])
     end
   end
 
@@ -926,7 +926,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         docker_image "123456789.dkr.ecr.us-east-1.amazonaws.com/my-step:latest"
       end
-      expect(step_class.turbofan_external?).to be true
+      expect(step_class.turbofan.external?).to be true
     end
 
     it "returns false when docker_image is set to an empty string" do
@@ -938,7 +938,7 @@ RSpec.describe Turbofan::Step do
         cpu 1
         docker_image ""
       end
-      expect(step_class.turbofan_external?).to be false
+      expect(step_class.turbofan.external?).to be false
     end
 
     it "returns false when docker_image is not set" do
@@ -949,7 +949,7 @@ RSpec.describe Turbofan::Step do
         compute_environment :test_ce
         cpu 1
       end
-      expect(step_class.turbofan_external?).to be false
+      expect(step_class.turbofan.external?).to be false
     end
   end
 
@@ -959,7 +959,7 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :batch
       end
-      expect(klass.turbofan_execution).to eq(:batch)
+      expect(klass.turbofan.execution).to eq(:batch)
     end
 
     it "sets execution to :lambda" do
@@ -967,7 +967,7 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :lambda
       end
-      expect(klass.turbofan_execution).to eq(:lambda)
+      expect(klass.turbofan.execution).to eq(:lambda)
     end
 
     it "sets execution to :fargate" do
@@ -975,12 +975,12 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :fargate
       end
-      expect(klass.turbofan_execution).to eq(:fargate)
+      expect(klass.turbofan.execution).to eq(:fargate)
     end
 
     it "defaults to nil" do
       klass = Class.new { include Turbofan::Step }
-      expect(klass.turbofan_execution).to be_nil
+      expect(klass.turbofan.execution).to be_nil
     end
 
     it "raises ArgumentError for invalid execution model" do
@@ -997,8 +997,8 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :lambda
       end
-      expect(klass.turbofan_lambda?).to be true
-      expect(klass.turbofan_fargate?).to be false
+      expect(klass.turbofan.lambda?).to be true
+      expect(klass.turbofan.fargate?).to be false
     end
 
     it "turbofan_fargate? returns true for :fargate" do
@@ -1006,8 +1006,8 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :fargate
       end
-      expect(klass.turbofan_fargate?).to be true
-      expect(klass.turbofan_lambda?).to be false
+      expect(klass.turbofan.fargate?).to be true
+      expect(klass.turbofan.lambda?).to be false
     end
 
     it "turbofan_lambda? and turbofan_fargate? both false for :batch" do
@@ -1015,8 +1015,8 @@ RSpec.describe Turbofan::Step do
         include Turbofan::Step
         runs_on :batch
       end
-      expect(klass.turbofan_lambda?).to be false
-      expect(klass.turbofan_fargate?).to be false
+      expect(klass.turbofan.lambda?).to be false
+      expect(klass.turbofan.fargate?).to be false
     end
   end
 
@@ -1027,7 +1027,7 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         subnets ["subnet-abc", "subnet-def"]
       end
-      expect(klass.turbofan_subnets).to eq(["subnet-abc", "subnet-def"])
+      expect(klass.turbofan.subnets).to eq(["subnet-abc", "subnet-def"])
     end
 
     it "wraps a single value in an array" do
@@ -1036,12 +1036,12 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         subnets "subnet-abc"
       end
-      expect(klass.turbofan_subnets).to eq(["subnet-abc"])
+      expect(klass.turbofan.subnets).to eq(["subnet-abc"])
     end
 
     it "defaults to nil" do
       klass = Class.new { include Turbofan::Step }
-      expect(klass.turbofan_subnets).to be_nil
+      expect(klass.turbofan.subnets).to be_nil
     end
 
     it "raises on Batch step" do
@@ -1090,12 +1090,12 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         security_groups ["sg-abc"]
       end
-      expect(klass.turbofan_security_groups).to eq(["sg-abc"])
+      expect(klass.turbofan.security_groups).to eq(["sg-abc"])
     end
 
     it "defaults to nil" do
       klass = Class.new { include Turbofan::Step }
-      expect(klass.turbofan_security_groups).to be_nil
+      expect(klass.turbofan.security_groups).to be_nil
     end
 
     it "raises on Batch step" do
@@ -1144,12 +1144,12 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         storage 100
       end
-      expect(klass.turbofan_storage).to eq(100)
+      expect(klass.turbofan.storage).to eq(100)
     end
 
     it "defaults to nil" do
       klass = Class.new { include Turbofan::Step }
-      expect(klass.turbofan_storage).to be_nil
+      expect(klass.turbofan.storage).to be_nil
     end
 
     it "raises on Batch step" do
@@ -1208,7 +1208,7 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         storage 21
       end
-      expect(klass.turbofan_storage).to eq(21)
+      expect(klass.turbofan.storage).to eq(21)
     end
 
     it "accepts boundary value 200" do
@@ -1217,7 +1217,7 @@ RSpec.describe Turbofan::Step do
         runs_on :fargate
         storage 200
       end
-      expect(klass.turbofan_storage).to eq(200)
+      expect(klass.turbofan.storage).to eq(200)
     end
   end
 end

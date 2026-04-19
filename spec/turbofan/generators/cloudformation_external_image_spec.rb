@@ -98,21 +98,21 @@ RSpec.describe Turbofan::Generators::CloudFormation, "external container images"
 
   describe "external step still requires schemas" do
     it "step declares input_schema" do
-      expect(external_step.turbofan_input_schema_file).to eq("passthrough.json")
+      expect(external_step.turbofan.input_schema_file).to eq("passthrough.json")
     end
 
     it "step declares output_schema" do
-      expect(external_step.turbofan_output_schema_file).to eq("passthrough.json")
+      expect(external_step.turbofan.output_schema_file).to eq("passthrough.json")
     end
 
     it "step is marked as external" do
-      expect(external_step.turbofan_external?).to be true
+      expect(external_step.turbofan.external?).to be true
     end
   end
 
   describe "normal step is not external" do
     it "normal step is not marked as external" do
-      expect(normal_step.turbofan_external?).to be false
+      expect(normal_step.turbofan.external?).to be false
     end
   end
 

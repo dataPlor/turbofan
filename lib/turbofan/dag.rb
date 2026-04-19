@@ -223,11 +223,11 @@ module Turbofan
           "Step :#{source_proxy.step_name} has no output schema"
       end
       target_label = Turbofan::Discovery.class_name_of(target_class) || target_class.inspect
-      unless target_class.turbofan_input_schema
+      unless target_class.turbofan.input_schema
         raise SchemaIncompatibleError,
           "Step #{target_label} has no input schema"
       end
-      target_schema = target_class.turbofan_input_schema
+      target_schema = target_class.turbofan.input_schema
       source_schema = source_proxy.schema
       required_props = target_schema["required"] || []
       # If the source output is an {items: [...]} envelope, validate against

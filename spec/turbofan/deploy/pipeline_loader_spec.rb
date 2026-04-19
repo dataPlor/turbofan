@@ -102,15 +102,15 @@ RSpec.describe Turbofan::Deploy::PipelineLoader do
     it "loads step classes that include Turbofan::Step" do
       generate = result.steps[:generate_csvs]
       expect(generate.turbofan_compute_environment).to eq(:test_ce)
-      expect(generate.turbofan_default_cpu).to eq(2)
-      expect(generate.turbofan_uses).to include({type: :resource, key: :duckdb})
+      expect(generate.turbofan.default_cpu).to eq(2)
+      expect(generate.turbofan.uses).to include({type: :resource, key: :duckdb})
     end
 
     it "loads all step classes with correct config" do
       bulk = result.steps[:bulk_load]
       expect(bulk.turbofan_compute_environment).to eq(:test_ce)
-      expect(bulk.turbofan_default_cpu).to eq(1)
-      expect(bulk.turbofan_uses).to be_empty
+      expect(bulk.turbofan.default_cpu).to eq(1)
+      expect(bulk.turbofan.uses).to be_empty
     end
 
     it "returns step_dirs mapping step names to directory paths" do

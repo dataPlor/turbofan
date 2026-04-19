@@ -114,7 +114,7 @@ module Turbofan
             validate_unique_name!(method_name)
             @dag.add_step(method_name)
             @dag.add_edge(from: input_proxy.step_name, to: method_name)
-            DagProxy.new(method_name, schema: klass.turbofan_output_schema)
+            DagProxy.new(method_name, schema: klass.turbofan.output_schema)
           end
         end
         components[:pipelines].each do |method_name, klass|

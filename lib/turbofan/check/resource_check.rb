@@ -15,7 +15,7 @@ module Turbofan
         fan_out_step_names = detect_fan_out_steps(pipeline)
 
         steps.each do |step_name, step_class|
-          keys = step_class.turbofan_resource_keys
+          keys = step_class.turbofan.resource_keys
           next if keys.empty?
 
           keys.each do |key|

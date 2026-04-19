@@ -11,9 +11,9 @@ module Turbofan
       started_at = execution.start_date
 
       step_results = steps_entries(steps).map do |step_name, step_class|
-        if step_class&.respond_to?(:turbofan_sizes) && step_class.turbofan_sizes.any?
+        if step_class&.respond_to?(:turbofan_sizes) && step_class.turbofan.sizes.any?
           counts = {pending: 0, running: 0, succeeded: 0, failed: 0}
-          step_class.turbofan_sizes.each_key do |size|
+          step_class.turbofan.sizes.each_key do |size|
             job_queue = "turbofan-#{pipeline_name}-#{stage}-queue-#{step_name}-#{size}"
             size_counts = count_jobs(batch_client, job_queue, after: started_at)
             counts.each_key { |k| counts[k] += size_counts[k] }

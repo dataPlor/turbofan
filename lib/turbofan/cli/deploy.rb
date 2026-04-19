@@ -131,7 +131,7 @@ module Turbofan
             tag: image_tags[step_name],
             external_deps: step_deps.fetch(step_name, []),
             project_root: project_root,
-            lambda_wrap: step_class&.turbofan_lambda? || false
+            lambda_wrap: step_class&.turbofan&.lambda? || false
           }
         end
         Turbofan::Deploy::ImageBuilder.build_and_push_all(step_configs: configs)

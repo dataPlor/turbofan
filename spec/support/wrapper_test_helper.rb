@@ -69,8 +69,8 @@ module WrapperTestHelper
       pipeline_name: env["TURBOFAN_PIPELINE"] || "test-pipeline",
       array_index: env.key?("AWS_BATCH_JOB_ARRAY_INDEX") ? env["AWS_BATCH_JOB_ARRAY_INDEX"].to_i : nil,
       storage_path: storage_base,
-      uses: step_klass.turbofan_uses,
-      writes_to: step_klass.turbofan_writes_to,
+      uses: step_klass.turbofan.uses,
+      writes_to: step_klass.turbofan.writes_to,
       size: env["TURBOFAN_SIZE"]
     )
 

@@ -6,7 +6,7 @@ module Turbofan
   module Runtime
     module SchemaValidator
       def self.validate_input!(step_class, inputs)
-        schema = step_class.turbofan_input_schema
+        schema = step_class.turbofan.input_schema
         unless schema
           raise Turbofan::SchemaValidationError,
             "#{step_class} has no input_schema declared"
@@ -24,7 +24,7 @@ module Turbofan
       end
 
       def self.validate_output!(step_class, output)
-        schema = step_class.turbofan_output_schema
+        schema = step_class.turbofan.output_schema
         unless schema
           raise Turbofan::SchemaValidationError,
             "#{step_class} has no output_schema declared"

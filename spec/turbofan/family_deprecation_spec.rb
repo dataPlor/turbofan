@@ -82,8 +82,8 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       end
 
       # cpu 2 should store exactly 2 — no ram auto-derivation
-      expect(step_class.turbofan_default_cpu).to eq(2)
-      expect(step_class.turbofan_default_ram).to be_nil
+      expect(step_class.turbofan.default_cpu).to eq(2)
+      expect(step_class.turbofan.default_ram).to be_nil
     end
 
     it "ram sets the value directly without derivation" do
@@ -98,8 +98,8 @@ RSpec.describe "Family removal" do # rubocop:disable RSpec/DescribeClass
       end
 
       # ram 4096 should store exactly 4096 — no cpu auto-derivation
-      expect(step_class.turbofan_default_ram).to eq(4096)
-      expect(step_class.turbofan_default_cpu).to be_nil
+      expect(step_class.turbofan.default_ram).to eq(4096)
+      expect(step_class.turbofan.default_cpu).to be_nil
     end
   end
 

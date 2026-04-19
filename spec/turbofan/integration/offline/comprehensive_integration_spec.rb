@@ -71,7 +71,7 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
       score = dag.steps.find { |s| s.name == :score_items }
       expect(score.fan_out?).to be true
       score_class = steps_hash[:score_items]
-      expect(score_class.turbofan_batch_size).to eq(2)
+      expect(score_class.turbofan.batch_size).to eq(2)
     end
 
     it "has correct serial chain after parallel join" do
@@ -372,12 +372,12 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
 
   describe "step class configuration" do
     it "retry_demo has retries set to 2" do
-      expect(retry_demo_class.turbofan_retries).to eq(2)
+      expect(retry_demo_class.turbofan.retries).to eq(2)
     end
 
     it "fetch_brand needs duckdb (postgres resource) and uses NvmeCe" do
-      expect(fetch_brand_class.turbofan_needs_duckdb?).to be true
-      expect(fetch_brand_class.turbofan_resource_keys).to include(:places_read)
+      expect(fetch_brand_class.turbofan.needs_duckdb?).to be true
+      expect(fetch_brand_class.turbofan.resource_keys).to include(:places_read)
       expect(fetch_brand_class.turbofan_compute_environment).to eq(:nvme_ce)
     end
 
@@ -387,12 +387,12 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "classify is an external step" do
-      expect(classify_class.turbofan_external?).to be true
-      expect(classify_class.turbofan_docker_image).to include("classify:latest")
+      expect(classify_class.turbofan.external?).to be true
+      expect(classify_class.turbofan.docker_image).to include("classify:latest")
     end
 
     it "score_items has 3 sizes (s, m, l)" do
-      expect(score_items_class.turbofan_sizes.keys).to contain_exactly(:s, :m, :l)
+      expect(score_items_class.turbofan.sizes.keys).to contain_exactly(:s, :m, :l)
     end
 
     it "score_items has timeout 300" do
@@ -405,12 +405,12 @@ RSpec.describe "Comprehensive integration (offline)", :schemas do # rubocop:disa
     end
 
     it "controlled_step has SFN retry configuration" do
-      expect(controlled_step_class.turbofan_retry_on).to eq(["States.TaskFailed"])
-      expect(controlled_step_class.turbofan_retries).to eq(2)
+      expect(controlled_step_class.turbofan.retry_on).to eq(["States.TaskFailed"])
+      expect(controlled_step_class.turbofan.retries).to eq(2)
     end
 
     it "controlled_step has inject_secret configured" do
-      expect(controlled_step_class.turbofan_secrets).to include(
+      expect(controlled_step_class.turbofan.secrets).to include(
         hash_including(name: :pg_url)
       )
     end

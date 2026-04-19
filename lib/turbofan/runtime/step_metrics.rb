@@ -8,10 +8,10 @@ module Turbofan
         context.metrics.emit("JobSuccess", 1)
         context.metrics.emit("PeakMemoryMB", peak_memory_mb)
         context.metrics.emit("CpuUtilization", cpu_utilization(duration))
-        allocated_ram_gb = if context.size && step_class.turbofan_sizes.any?
-          step_class.turbofan_sizes.dig(context.size.to_sym, :ram)
+        allocated_ram_gb = if context.size && step_class.turbofan.sizes.any?
+          step_class.turbofan.sizes.dig(context.size.to_sym, :ram)
         else
-          step_class.turbofan_default_ram
+          step_class.turbofan.default_ram
         end
         if allocated_ram_gb
           context.metrics.emit("MemoryUtilization", memory_utilization(peak_memory_mb, allocated_ram_gb))

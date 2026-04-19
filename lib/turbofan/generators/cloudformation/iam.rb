@@ -152,7 +152,7 @@ module Turbofan
         private_class_method :job_role
 
         def self.execution_role(prefix, steps, tags, secret_arns)
-          ecr_arns = steps.reject { |_, sclass| sclass.turbofan_external? }
+          ecr_arns = steps.reject { |_, sclass| sclass.turbofan.external? }
             .map { |sname, _| "arn:aws:ecr:*:*:repository/#{prefix}-ecr-#{sname}" }
 
           secrets_statement = if secret_arns.any?
@@ -388,8 +388,8 @@ module Turbofan
         def self.collect_secret_arns(steps, resources)
           arns = Set.new
           steps.each_value do |sclass|
-            sclass.turbofan_secrets.each { |s| arns << s[:from] }
-            sclass.turbofan_resource_keys.each do |k|
+            sclass.turbofan.secrets.each { |s| arns << s[:from] }
+            sclass.turbofan.resource_keys.each do |k|
               r = resources[k]
               arns << r.turbofan_secret if r&.respond_to?(:turbofan_secret) && r.turbofan_secret
             end

@@ -117,10 +117,10 @@ module Turbofan
           pipeline_name: ENV.fetch("TURBOFAN_PIPELINE", "unknown"),
           array_index: ENV.key?("AWS_BATCH_JOB_ARRAY_INDEX") ? ENV["AWS_BATCH_JOB_ARRAY_INDEX"].to_i : nil,
           storage_path: storage_path,
-          uses: @step_class.turbofan_uses,
-          writes_to: @step_class.turbofan_writes_to,
+          uses: @step_class.turbofan.uses,
+          writes_to: @step_class.turbofan.writes_to,
           size: ENV["TURBOFAN_SIZE"],
-          duckdb_extensions: @step_class.turbofan_duckdb_extensions
+          duckdb_extensions: @step_class.turbofan.duckdb_extensions
         )
       end
 

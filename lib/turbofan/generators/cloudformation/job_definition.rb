@@ -5,8 +5,8 @@ module Turbofan
     class CloudFormation
       module JobDefinition
         def self.generate(prefix:, step_name:, step_class:, job_role_ref:, execution_role_ref:, log_group_ref:, duckdb:, tags:, size_name: nil, size_config: nil, image_tag: nil, external_image: nil, consumable_resource_refs: [])
-          cpu = size_config ? size_config[:cpu] : step_class.turbofan_default_cpu
-          ram = size_config ? size_config[:ram] : step_class.turbofan_default_ram
+          cpu = size_config ? size_config[:cpu] : step_class.turbofan.default_cpu
+          ram = size_config ? size_config[:ram] : step_class.turbofan.default_ram
 
           image = external_image || image_uri(prefix, step_name, image_tag: image_tag)
 

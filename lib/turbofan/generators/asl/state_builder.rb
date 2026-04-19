@@ -52,7 +52,7 @@ module Turbofan
 
           if prev_step&.fan_out? && prev_step.fan_in != false
             if routed_fan_out?(prev_step)
-              sizes = resolve_step_class(prev_step.name).turbofan_sizes
+              sizes = resolve_step_class(prev_step.name).turbofan.sizes
               env << {"Name" => "TURBOFAN_PREV_FAN_OUT_SIZES", "Value" => sizes.keys.map(&:to_s).join(",")}
               sizes.each_key do |size_name|
                 env << {
@@ -73,8 +73,8 @@ module Turbofan
 
         def resolve_job_refs(step_name)
           step_class = resolve_step_class(step_name)
-          jobdef_suffix = if step_class&.turbofan_sizes&.any?
-            "#{step_name}-#{step_class.turbofan_sizes.keys.first}"
+          jobdef_suffix = if step_class&.turbofan&.sizes&.any?
+            "#{step_name}-#{step_class.turbofan.sizes.keys.first}"
           else
             step_name
           end
@@ -102,7 +102,7 @@ module Turbofan
         def routed_fan_out?(step)
           return false unless step&.fan_out?
           step_class = resolve_step_class(step.name)
-          step_class&.turbofan_sizes&.any?
+          step_class&.turbofan&.sizes&.any?
         end
 
         def execution_tags
@@ -141,12 +141,12 @@ module Turbofan
           step_name = step.name
           step_class = resolve_step_class(step_name)
 
-          if step_class&.turbofan_lambda?
+          if step_class&.turbofan&.lambda?
             return build_lambda_state(step, next_step_name, first: first, last: last,
               prev_step_name: prev_step_name, prev_step: prev_step, prev_step_names: prev_step_names)
           end
 
-          if step_class&.turbofan_fargate?
+          if step_class&.turbofan&.fargate?
             return build_fargate_state(step, next_step_name, first: first, last: last,
               prev_step_name: prev_step_name, prev_step: prev_step, prev_step_names: prev_step_names)
           end
@@ -179,10 +179,10 @@ module Turbofan
             state["TimeoutSeconds"] = step_class.turbofan_timeout
           end
 
-          if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan_retry_on && !step.fan_out?
+          if step_class&.respond_to?(:turbofan_retry_on) && step_class.turbofan.retry_on && !step.fan_out?
             state["Retry"] = [{
-              "ErrorEquals" => step_class.turbofan_retry_on,
-              "MaxAttempts" => step_class.turbofan_retries,
+              "ErrorEquals" => step_class.turbofan.retry_on,
+              "MaxAttempts" => step_class.turbofan.retries,
               "IntervalSeconds" => 2,
               "BackoffRate" => 2.0
             }]
@@ -258,16 +258,16 @@ module Turbofan
             prev_step: prev_step, prev_step_names: prev_step_names)
 
           # Networking priority: step-level > CE (backward compat) > Turbofan.config
-          subnets = if step_class.turbofan_subnets
-            step_class.turbofan_subnets
+          subnets = if step_class.turbofan.subnets
+            step_class.turbofan.subnets
           elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
             Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_subnets
           else
             Turbofan.config.subnets
           end
 
-          security_groups = if step_class.turbofan_security_groups
-            step_class.turbofan_security_groups
+          security_groups = if step_class.turbofan.security_groups
+            step_class.turbofan.security_groups
           elsif (ce_sym = step_class.turbofan_compute_environment || @pipeline.turbofan_compute_environment)
             Turbofan::ComputeEnvironment.resolve(ce_sym).resolved_security_groups
           else
@@ -478,14 +478,14 @@ module Turbofan
           step_class = resolve_step_class(step.name)
           payload = {
             "step_name" => step.name.to_s,
-            "group_size" => step_class.turbofan_batch_size,
+            "group_size" => step_class.turbofan.batch_size,
             "execution_id.$" => "$$.Execution.Id"
           }
 
-          if routed && step_class.turbofan_sizes.any?
+          if routed && step_class.turbofan.sizes.any?
             batch_sizes = {}
-            step_class.turbofan_sizes.each do |size_name, size_config|
-              bs = step_class.turbofan_batch_size_for(size_name)
+            step_class.turbofan.sizes.each do |size_name, size_config|
+              bs = step_class.turbofan.batch_size_for(size_name)
               batch_sizes[size_name.to_s] = bs if bs
             end
             payload["batch_sizes"] = batch_sizes
@@ -536,7 +536,7 @@ module Turbofan
         def build_routed_parallel_state(step, next_step_name)
           step_name = step.name
           step_class = resolve_step_class(step_name)
-          sizes = step_class.turbofan_sizes
+          sizes = step_class.turbofan.sizes
           config_hash = config_hash_for(step_class)
 
           branches = sizes.map do |size_name, _size_config|

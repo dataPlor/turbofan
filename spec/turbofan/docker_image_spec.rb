@@ -15,11 +15,11 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores the docker image URI" do
-      expect(step_class.turbofan_docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
+      expect(step_class.turbofan.docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
     end
 
     it "reports as external" do
-      expect(step_class.turbofan_external?).to be true
+      expect(step_class.turbofan.external?).to be true
     end
   end
 
@@ -34,11 +34,11 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "defaults docker_image to nil" do
-      expect(step_class.turbofan_docker_image).to be_nil
+      expect(step_class.turbofan.docker_image).to be_nil
     end
 
     it "reports as not external" do
-      expect(step_class.turbofan_external?).to be false
+      expect(step_class.turbofan.external?).to be false
     end
   end
 
@@ -54,11 +54,11 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores the empty string" do
-      expect(step_class.turbofan_docker_image).to eq("")
+      expect(step_class.turbofan.docker_image).to eq("")
     end
 
     it "reports as not external (empty string is not a valid image)" do
-      expect(step_class.turbofan_external?).to be false
+      expect(step_class.turbofan.external?).to be false
     end
   end
 
@@ -75,7 +75,7 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "last docker_image call wins" do
-      expect(step_class.turbofan_docker_image).to eq("second-image:v2")
+      expect(step_class.turbofan.docker_image).to eq("second-image:v2")
     end
   end
 
@@ -92,9 +92,9 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "stores both docker_image and tags independently" do
-      expect(step_class.turbofan_docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
+      expect(step_class.turbofan.docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
       expect(step_class.turbofan_tags).to eq("stack" => "ml", "model" => "sentiment")
-      expect(step_class.turbofan_external?).to be true
+      expect(step_class.turbofan.external?).to be true
     end
   end
 
@@ -110,9 +110,9 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
     end
 
     it "allows docker_image alongside family and cpu" do
-      expect(step_class.turbofan_docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
-      expect(step_class.turbofan_external?).to be true
-      expect(step_class.turbofan_default_cpu).to eq(4)
+      expect(step_class.turbofan.docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
+      expect(step_class.turbofan.external?).to be true
+      expect(step_class.turbofan.default_cpu).to eq(4)
     end
   end
 
@@ -172,10 +172,10 @@ RSpec.describe "docker_image DSL" do # rubocop:disable RSpec/DescribeClass
       step_a
       step_b
 
-      expect(step_a.turbofan_docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
-      expect(step_a.turbofan_external?).to be true
-      expect(step_b.turbofan_docker_image).to be_nil
-      expect(step_b.turbofan_external?).to be false
+      expect(step_a.turbofan.docker_image).to eq("123456789.dkr.ecr.us-east-1.amazonaws.com/sentiment:latest")
+      expect(step_a.turbofan.external?).to be true
+      expect(step_b.turbofan.docker_image).to be_nil
+      expect(step_b.turbofan.external?).to be false
     end
   end
 end

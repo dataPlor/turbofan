@@ -42,7 +42,7 @@ module Turbofan
 
         # Per-step resources
         @steps.each do |sname, sclass|
-          step_duckdb = sclass.turbofan_needs_duckdb?
+          step_duckdb = sclass.turbofan.needs_duckdb?
 
           # Build per-step tags (all_resource_tags + step-specific tags)
           step_tags = all_resource_tags + step_specific_tags(sname) + custom_step_tags(sclass)
@@ -58,22 +58,22 @@ module Turbofan
           # Check if this step uses consumable resources
           consumable_resource_refs = find_consumable_resource_refs(sclass, prefix)
 
-          if sclass.turbofan_fargate?
+          if sclass.turbofan.fargate?
             # Fargate task definition with container image from ECR
-            image_uri = sclass.turbofan_external? ? sclass.turbofan_docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
-            cpu_units = (sclass.turbofan_default_cpu * 1024).to_i.to_s
-            memory_mb = (sclass.turbofan_default_ram * 1024).to_i.to_s
+            image_uri = sclass.turbofan.external? ? sclass.turbofan.docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
+            cpu_units = (sclass.turbofan.default_cpu * 1024).to_i.to_s
+            memory_mb = (sclass.turbofan.default_ram * 1024).to_i.to_s
             resources.merge!(fargate_step_resources(
               prefix: prefix, step_name: sname, step_class: sclass,
               image_uri: image_uri, cpu_units: cpu_units, memory_mb: memory_mb,
-              storage_gib: sclass.turbofan_storage,
+              storage_gib: sclass.turbofan.storage,
               tags: step_tags, log_group_ref: {"Ref" => log_group_key},
               pipeline_name: pipeline_name, resources: @resources
             ))
-          elsif sclass.turbofan_lambda?
+          elsif sclass.turbofan.lambda?
             # Lambda function with container image from ECR
-            image_uri = sclass.turbofan_external? ? sclass.turbofan_docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
-            memory_mb = ((sclass.turbofan_default_ram || 1) * 1024).to_i
+            image_uri = sclass.turbofan.external? ? sclass.turbofan.docker_image : ecr_image_uri(prefix, sname, @image_tags[sname])
+            memory_mb = ((sclass.turbofan.default_ram || 1) * 1024).to_i
             timeout_val = sclass.turbofan_timeout || 900
             resources.merge!(lambda_step_function(
               prefix: prefix, step_name: sname, step_class: sclass, image_uri: image_uri,
@@ -86,7 +86,7 @@ module Turbofan
             Turbofan::ComputeEnvironment.resolve(ce_sym)
 
             # Batch job definitions (one per size, or one if unsized)
-            sizes = sclass.turbofan_sizes.any? ? sclass.turbofan_sizes : {nil => nil}
+            sizes = sclass.turbofan.sizes.any? ? sclass.turbofan.sizes : {nil => nil}
             sizes.each do |size_name, size_config|
               resources.merge!(JobDefinition.generate(
                 prefix: prefix,
@@ -100,7 +100,7 @@ module Turbofan
                 size_name: size_name,
                 size_config: size_config,
                 image_tag: @image_tags[sname],
-                external_image: sclass.turbofan_external? ? sclass.turbofan_docker_image : nil,
+                external_image: sclass.turbofan.external? ? sclass.turbofan.docker_image : nil,
                 consumable_resource_refs: consumable_resource_refs
               ))
             end
@@ -237,7 +237,7 @@ module Turbofan
         @pipeline.turbofan_dag.steps.any? do |dag_step|
           if dag_step.fan_out?
             step_class = @steps[dag_step.name]
-            step_class&.turbofan_batch_size
+            step_class&.turbofan&.batch_size
           end
         end
       end
@@ -249,8 +249,8 @@ module Turbofan
         @pipeline.turbofan_dag.steps.any? do |dag_step|
           next unless dag_step.fan_out?
           step_class = @steps[dag_step.name]
-          next unless step_class&.turbofan_batch_size
-          !step_class.turbofan_sizes&.any?
+          next unless step_class&.turbofan&.batch_size
+          !step_class.turbofan.sizes&.any?
         end
       end
 
@@ -258,7 +258,7 @@ module Turbofan
         @pipeline.turbofan_dag.steps.filter_map do |dag_step|
           next unless dag_step.fan_out?
           step_class = @steps[dag_step.name]
-          next unless step_class&.turbofan_sizes&.any?
+          next unless step_class&.turbofan&.sizes&.any?
           [dag_step, step_class]
         end
       end
@@ -273,7 +273,7 @@ module Turbofan
       end
 
       def fargate_step_names
-        @steps.filter_map { |sname, sclass| sname if sclass.turbofan_fargate? }
+        @steps.filter_map { |sname, sclass| sname if sclass.turbofan.fargate? }
       end
 
       def fargate_step_resources(prefix:, step_name:, step_class:, image_uri:, cpu_units:, memory_mb:, storage_gib: nil, tags:, log_group_ref:, pipeline_name:, resources: {})
@@ -380,7 +380,7 @@ module Turbofan
       end
 
       def lambda_step_names
-        @steps.filter_map { |sname, sclass| sname if sclass.turbofan_lambda? }
+        @steps.filter_map { |sname, sclass| sname if sclass.turbofan.lambda? }
       end
 
       def ecr_image_uri(prefix, step_name, image_tag)
@@ -457,7 +457,7 @@ module Turbofan
 
       def find_consumable_resource_refs(step_class, prefix)
         return [] if @resources.empty?
-        step_class.turbofan_resource_keys.filter_map { |key|
+        step_class.turbofan.resource_keys.filter_map { |key|
           resource_class = @resources[key]
           next unless resource_class&.turbofan_consumable
           {"Fn::ImportValue" => resource_class.export_name(@stage)}

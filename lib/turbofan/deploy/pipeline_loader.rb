@@ -36,7 +36,7 @@ module Turbofan
           step_dir = File.join(turbofans_root, "steps", dag_step.name.to_s)
           klass = components[:steps][dag_step.name]
           raise "No loaded class for step :#{dag_step.name}" unless klass
-          raise "Step directory not found: #{step_dir}" unless klass.turbofan_external? || Dir.exist?(step_dir)
+          raise "Step directory not found: #{step_dir}" unless klass.turbofan.external? || Dir.exist?(step_dir)
           steps[dag_step.name] = klass
           step_dirs[dag_step.name] = step_dir
         end

@@ -230,7 +230,7 @@ RSpec.describe Turbofan::Pipeline, :schemas do
 
     it "stores batch_size on the Step class" do
       pipeline_class # trigger stub_const
-      expect(Process.turbofan_batch_size).to eq(100)
+      expect(Process.turbofan.batch_size).to eq(100)
     end
 
     it "marks non-fan-out steps as regular steps" do

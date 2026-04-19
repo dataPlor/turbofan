@@ -22,7 +22,7 @@ RSpec.describe "Turbofan::Step subclass inheritance" do
     stub_const("SubclassChild", child)
 
     expect { child.uses :postgres }.not_to raise_error
-    expect(child.turbofan_uses).to eq([{type: :resource, key: :postgres}])
+    expect(child.turbofan.uses).to eq([{type: :resource, key: :postgres}])
   end
 
   it "does not leak subclass DSL mutations back into the parent class" do
@@ -34,8 +34,8 @@ RSpec.describe "Turbofan::Step subclass inheritance" do
     stub_const("LeakChild", child)
     child.uses :beta
 
-    expect(parent.turbofan_uses.map { |d| d[:key] }).to eq([:alpha])
-    expect(child.turbofan_uses.map { |d| d[:key] }).to eq([:beta])
+    expect(parent.turbofan.uses.map { |d| d[:key] }).to eq([:alpha])
+    expect(child.turbofan.uses.map { |d| d[:key] }).to eq([:beta])
   end
 
   it "preserves super in inherited so downstream hooks fire" do
@@ -70,8 +70,8 @@ RSpec.describe "Turbofan::Step subclass inheritance" do
     stub_const("SizesChild", child)
     child.size(:large, cpu: 16)
 
-    expect(parent.turbofan_sizes.keys).to eq([:medium])
-    expect(child.turbofan_sizes.keys).to eq([:large])
+    expect(parent.turbofan.sizes.keys).to eq([:medium])
+    expect(child.turbofan.sizes.keys).to eq([:large])
   end
 end
 
