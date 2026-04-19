@@ -5,12 +5,22 @@ Gem::Specification.new do |spec|
   spec.version = Turbofan::VERSION
   spec.authors = ["dataplor"]
   spec.summary = "Opinionated framework for AWS Batch data processing pipelines"
+  spec.description = <<~DESC
+    Turbofan is a Ruby DSL and runtime for building AWS Batch data processing
+    pipelines. Pipelines and steps are defined as Ruby classes; deployment
+    generates CloudFormation + Step Functions ASL. Includes a runtime harness
+    that runs inside Batch containers with retry, metrics, fan-out, and SIGTERM
+    cooperative shutdown semantics.
+  DESC
   spec.homepage = "https://github.com/dataplor/turbofan"
   spec.license = "MIT"
 
   spec.metadata = {
     "source_code_uri" => "https://github.com/dataplor/turbofan",
-    "changelog_uri" => "https://github.com/dataplor/turbofan/blob/main/CHANGELOG.md"
+    "changelog_uri" => "https://github.com/dataplor/turbofan/blob/main/CHANGELOG.md",
+    "bug_tracker_uri" => "https://github.com/dataplor/turbofan/issues",
+    "documentation_uri" => "https://github.com/dataplor/turbofan/blob/main/README.md",
+    "rubygems_mfa_required" => "true"
   }
 
   spec.required_ruby_version = ">= 3.2"
@@ -30,7 +40,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "oj", "~> 3"
   spec.add_dependency "json_schemer", "~> 2"
 
-  spec.files = Dir["lib/**/*", "bin/*"]
-  spec.bindir = "bin"
+  spec.files = Dir["lib/**/*", "exe/*"] + %w[README.md CHANGELOG.md LICENSE]
+  spec.bindir = "exe"
   spec.executables = ["turbofan"]
 end
