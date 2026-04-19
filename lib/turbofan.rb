@@ -47,6 +47,18 @@ module Turbofan
   class ResourceUnavailableError < StandardError; end
   class ExtensionLoadError < StandardError; end
 
+  # Raised on SIGTERM (Spot reclaim / Batch termination). Subclasses
+  # SystemExit so `ensure` blocks still run, but the final process exit
+  # status is 143 — which AWS Batch's retry strategy matches via
+  # `onExitCode: 143 → RETRY` without counting against the retry limit.
+  class Interrupted < SystemExit
+    EXIT_CODE = 143
+
+    def initialize(message = "SIGTERM received")
+      super(EXIT_CODE, message)
+    end
+  end
+
   def self.schemas_path
     config.schemas_path
   end
