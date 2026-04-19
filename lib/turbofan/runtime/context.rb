@@ -74,25 +74,39 @@ module Turbofan
           needs = uses_resources.any? || writes_to_resources.any? || @duckdb_extensions.any?
           return @duckdb = nil unless needs
 
-          if @storage_path
-            db_path = File.join(@storage_path, "duckdb.db")
-            tmp_dir = File.join(@storage_path, "tmp")
-            FileUtils.mkdir_p(tmp_dir)
-            raise "Invalid temp directory path" if tmp_dir.include?("'") && tmp_dir.include?("\\")
-            @duckdb = ::DuckDB::Database.open(db_path).connect
-            safe_tmp = tmp_dir.gsub("'", "''")
-            @duckdb.execute("SET temp_directory='#{safe_tmp}'")
-          else
-            @duckdb = ::DuckDB::Database.open.connect
-          end
+          begin
+            if @storage_path
+              db_path = File.join(@storage_path, "duckdb.db")
+              tmp_dir = File.join(@storage_path, "tmp")
+              FileUtils.mkdir_p(tmp_dir)
+              raise "Invalid temp directory path" if tmp_dir.include?("'") && tmp_dir.include?("\\")
+              @duckdb = ::DuckDB::Database.open(db_path).connect
+              safe_tmp = tmp_dir.gsub("'", "''")
+              @duckdb.execute("SET temp_directory='#{safe_tmp}'")
+            else
+              @duckdb = ::DuckDB::Database.open.connect
+            end
 
-          @duckdb_extensions.each do |ext|
-            @duckdb.execute("LOAD #{ext}")
-          rescue ::DuckDB::Error => e
-            raise Turbofan::ExtensionLoadError, "Failed to load DuckDB extension '#{ext}': #{e.message}"
-          end
+            @duckdb_extensions.each do |ext|
+              @duckdb.execute("LOAD #{ext}")
+            rescue ::DuckDB::Error => e
+              raise Turbofan::ExtensionLoadError, "Failed to load DuckDB extension '#{ext}': #{e.message}"
+            end
 
-          @duckdb
+            @duckdb
+          rescue
+            # Any failure during init (DB open, temp_directory set, extension
+            # LOAD) must not leave a partial @duckdb visible to next callers —
+            # close the partial connection to release its file handle, then
+            # reset so the next `context.duckdb` call retries cleanly.
+            begin
+              @duckdb&.close
+            rescue
+              # best-effort close; don't mask the original init failure
+            end
+            @duckdb = nil
+            raise
+          end
         end
       rescue NameError, LoadError
         # DuckDB gem not installed — expected in non-DuckDB environments.

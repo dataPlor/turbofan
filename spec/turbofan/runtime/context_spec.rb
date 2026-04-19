@@ -297,6 +297,50 @@ RSpec.describe Turbofan::Runtime::Context do
         ctx = build_context
         expect(ctx.duckdb_extensions).to eq([])
       end
+
+      it "resets @duckdb to nil when a LOAD fails, so a retry can re-init cleanly" do
+        mock_conn = double("DuckDB::Connection") # rubocop:disable RSpec/VerifiedDoubles
+        mock_db = double("DuckDB::Database", connect: mock_conn) # rubocop:disable RSpec/VerifiedDoubles
+        duckdb_mod = Module.new
+        duckdb_db = Class.new do
+          define_singleton_method(:open) { |*_args| mock_db }
+        end
+        duckdb_err = Class.new(StandardError)
+        duckdb_mod.const_set(:Database, duckdb_db)
+        duckdb_mod.const_set(:Error, duckdb_err)
+        stub_const("DuckDB", duckdb_mod)
+        allow(mock_conn).to receive(:execute).with("LOAD missing_ext")
+          .and_raise(duckdb_err.new("extension not found"))
+        allow(mock_conn).to receive(:close)
+
+        ctx = build_context(
+          uses: [{type: :resource, key: :some_db}],
+          duckdb_extensions: [:missing_ext]
+        )
+
+        expect { ctx.duckdb }.to raise_error(Turbofan::ExtensionLoadError, /missing_ext/)
+        expect(ctx.instance_variable_get(:@duckdb)).to be_nil,
+          "expected @duckdb reset to nil after extension load failure"
+        expect(mock_conn).to have_received(:close),
+          "expected partial DuckDB connection to be closed to release file handle"
+      end
+
+      it "resets @duckdb to nil when Database.open itself fails" do
+        duckdb_mod = Module.new
+        duckdb_db = Class.new do
+          define_singleton_method(:open) { |*_args| raise StandardError, "database open failed" }
+        end
+        duckdb_mod.const_set(:Database, duckdb_db)
+        duckdb_mod.const_set(:Error, Class.new(StandardError))
+        stub_const("DuckDB", duckdb_mod)
+
+        ctx = build_context(
+          uses: [{type: :resource, key: :some_db}]
+        )
+
+        expect { ctx.duckdb }.to raise_error(StandardError, /database open failed/)
+        expect(ctx.instance_variable_get(:@duckdb)).to be_nil
+      end
     end
   end
 
