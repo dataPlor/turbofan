@@ -98,6 +98,28 @@ RSpec.describe Turbofan::Runtime::OutputSerializer do
     end
   end
 
+  describe "transient error retry (via Retryable)" do
+    it "retries S3 put_object on SlowDown and eventually succeeds" do
+      slowdown = Aws::S3::Errors::ServiceError.new(nil, "SlowDown")
+      allow(slowdown).to receive(:code).and_return("SlowDown")
+      attempts = 0
+      allow(s3_client).to receive(:put_object) do
+        attempts += 1
+        raise slowdown if attempts < 3
+        nil
+      end
+
+      allow(Turbofan::Retryable).to receive(:call).and_wrap_original do |m, **kwargs, &blk|
+        m.call(sleeper: ->(_s) {}, **kwargs, &blk)
+      end
+
+      ctx = build_context(array_index: 0)
+      described_class.call({"ok" => true}, ctx)
+
+      expect(attempts).to eq(3)
+    end
+  end
+
   describe "non-fan-out path (array_index nil)" do
     it "delegates to Payload.serialize" do
       ctx = build_context(array_index: nil)

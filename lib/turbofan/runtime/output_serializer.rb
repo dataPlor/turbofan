@@ -18,7 +18,9 @@ module Turbofan
             ""
           end
           key = FanOut.s3_key(context.execution_id, step_name, "output", "#{segment}#{context.array_index}.json")
-          context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
+          Turbofan::Retryable.call do
+            context.s3.put_object(bucket: bucket, key: key, body: JSON.generate(result))
+          end
           JSON.generate(result)
         else
           Payload.serialize(
