@@ -118,13 +118,17 @@ module Turbofan
         # State machine
         resources.merge!(state_machine(prefix, all_resource_tags))
 
-        # EventBridge schedule — single-schedule path preserved here;
-        # multi-trigger generalization lands in 0.7 #10/#11.
-        if first_schedule_cron
+        # EventBridge triggers — one AWS::Events::Rule per `trigger`
+        # declaration, all targeting a single shared GuardLambda. If
+        # no triggers are declared the pipeline is manual-invocation
+        # only and we emit none of these resources.
+        if @pipeline.turbofan_triggers.any?
           resources.merge!(guard_lambda(prefix, all_resource_tags))
           resources.merge!(guard_lambda_role(prefix, all_resource_tags))
-          resources.merge!(guard_lambda_permission)
-          resources.merge!(eventbridge_rule(prefix, all_resource_tags))
+          @pipeline.turbofan_triggers.each_with_index do |trigger, idx|
+            resources.merge!(trigger_rule(prefix, idx, trigger, all_resource_tags))
+            resources.merge!(trigger_permission(idx, trigger))
+          end
         end
 
         bucket_prefix = Naming.bucket_prefix(pipeline_name, @stage)
@@ -546,47 +550,67 @@ module Turbofan
         }
       end
 
-      def guard_lambda_permission
+      # One Rule per trigger declaration. Deterministic logical ID
+      # (`TriggerRule0`, `TriggerRule1`, …) so CloudFormation diffs
+      # line up with the source order in the pipeline file.
+      def trigger_rule(prefix, idx, trigger, tags)
+        target = {
+          "Id" => "GuardLambdaTarget",
+          "Arn" => {"Fn::GetAtt" => ["GuardLambda", "Arn"]}
+        }
+
+        props = {
+          "Name" => "#{prefix}-trigger-#{idx}",
+          "State" => "ENABLED",
+          "Targets" => [target],
+          "Tags" => tags
+        }
+
+        case trigger[:type]
+        when :schedule
+          # EventBridge schedule: the ScheduleExpression fires the rule
+          # on cron. We override the target Input so the GuardLambda
+          # sees a consistent envelope shape with __event_schedule_
+          # expression in the detail — the same T1 code path as
+          # :event triggers.
+          props["ScheduleExpression"] = "cron(#{trigger[:cron]})"
+          target["Input"] = JSON.generate(
+            "source" => "aws.scheduler",
+            "detail-type" => "Scheduled Event",
+            "detail" => {"__event_schedule_expression" => "cron(#{trigger[:cron]})"}
+          )
+        when :event
+          pattern = {"source" => trigger[:source]}
+          pattern["detail-type"] = trigger[:detail_type] if trigger[:detail_type]
+          pattern["detail"] = trigger[:detail] if trigger[:detail]
+          props["EventPattern"] = pattern
+          props["EventBusName"] = trigger[:event_bus] if trigger[:event_bus]
+        end
+
         {
-          "GuardLambdaPermission" => {
+          "TriggerRule#{idx}" => {
+            "Type" => "AWS::Events::Rule",
+            "Properties" => props
+          }
+        }
+      end
+
+      # One Lambda::Permission per Rule → GuardLambda principal.
+      # Without this the rule can't invoke the Lambda. SourceArn
+      # scopes the grant to exactly that rule (tightest blast
+      # radius).
+      def trigger_permission(idx, _trigger)
+        {
+          "TriggerRule#{idx}Permission" => {
             "Type" => "AWS::Lambda::Permission",
             "Properties" => {
               "FunctionName" => {"Ref" => "GuardLambda"},
               "Action" => "lambda:InvokeFunction",
               "Principal" => "events.amazonaws.com",
-              "SourceArn" => {"Fn::GetAtt" => ["ScheduleRule", "Arn"]}
+              "SourceArn" => {"Fn::GetAtt" => ["TriggerRule#{idx}", "Arn"]}
             }
           }
         }
-      end
-
-      def eventbridge_rule(prefix, tags)
-        {
-          "ScheduleRule" => {
-            "Type" => "AWS::Events::Rule",
-            "Properties" => {
-              "Name" => "#{prefix}-schedule",
-              "ScheduleExpression" => "cron(#{first_schedule_cron})",
-              "State" => "ENABLED",
-              "Targets" => [
-                {
-                  "Id" => "GuardLambdaTarget",
-                  "Arn" => {"Fn::GetAtt" => ["GuardLambda", "Arn"]}
-                }
-              ],
-              "Tags" => tags
-            }
-          }
-        }
-      end
-
-      # Transitional helper during the schedule → trigger migration.
-      # Returns the cron string of the first :schedule trigger (or
-      # nil). 0.7 #10/#11 replaces the single-rule path with one
-      # AWS::Events::Rule per trigger declaration.
-      def first_schedule_cron
-        entry = @pipeline.turbofan_triggers.find { |t| t[:type] == :schedule }
-        entry&.[](:cron)
       end
     end
   end

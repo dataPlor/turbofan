@@ -304,4 +304,162 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
       expect(props["ScheduleExpression"]).to eq("cron(0 * * * ? *)")
     end
   end
+
+  describe "trigger :schedule emits Input override on the target" do
+    let(:sched_pipeline) do
+      step_klass = step_class
+      stub_const("Process", step_klass)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "sched-pipeline"
+        trigger :schedule, cron: "0 5 * * ? *"
+        pipeline { process(trigger_input) }
+      end
+    end
+
+    let(:template) do
+      described_class.new(
+        pipeline: sched_pipeline, steps: {process: step_class},
+        stage: "production", config: config
+      ).generate
+    end
+
+    it "embeds a synthetic envelope with __event_schedule_expression in detail" do
+      rule_key = template["Resources"].keys.find { |k|
+        template["Resources"][k]["Type"] == "AWS::Events::Rule"
+      }
+      input_json = template["Resources"][rule_key]["Properties"]["Targets"].first["Input"]
+      parsed = JSON.parse(input_json)
+      expect(parsed["source"]).to eq("aws.scheduler")
+      expect(parsed["detail-type"]).to eq("Scheduled Event")
+      expect(parsed.dig("detail", "__event_schedule_expression")).to eq("cron(0 5 * * ? *)")
+    end
+  end
+
+  describe "trigger :event" do
+    let(:event_pipeline) do
+      step_klass = step_class
+      stub_const("Process", step_klass)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "event-pipeline"
+        trigger :event,
+          source: "aws.s3",
+          detail_type: "Object Created",
+          detail: {"bucket" => {"name" => ["my-bucket"]}}
+        pipeline { process(trigger_input) }
+      end
+    end
+
+    let(:template) do
+      described_class.new(
+        pipeline: event_pipeline, steps: {process: step_class},
+        stage: "production", config: config
+      ).generate
+    end
+
+    let(:rule_props) do
+      key = template["Resources"].keys.find { |k|
+        template["Resources"][k]["Type"] == "AWS::Events::Rule"
+      }
+      template["Resources"][key]["Properties"]
+    end
+
+    it "uses EventPattern (not ScheduleExpression)" do
+      expect(rule_props).not_to have_key("ScheduleExpression")
+      expect(rule_props).to have_key("EventPattern")
+    end
+
+    it "sets source, detail-type, and detail in the pattern" do
+      expect(rule_props["EventPattern"]["source"]).to eq(["aws.s3"])
+      expect(rule_props["EventPattern"]["detail-type"]).to eq(["Object Created"])
+      expect(rule_props["EventPattern"]["detail"]).to eq({"bucket" => {"name" => ["my-bucket"]}})
+    end
+
+    it "does not set Input override (natural envelope from EventBridge)" do
+      target = rule_props["Targets"].first
+      expect(target).not_to have_key("Input")
+    end
+  end
+
+  describe "trigger :event with custom event bus" do
+    let(:bus_pipeline) do
+      step_klass = step_class
+      stub_const("Process", step_klass)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "bus-pipeline"
+        trigger :event, source: "myapp", event_bus: "ops-bus"
+        pipeline { process(trigger_input) }
+      end
+    end
+
+    let(:template) do
+      described_class.new(
+        pipeline: bus_pipeline, steps: {process: step_class},
+        stage: "production", config: config
+      ).generate
+    end
+
+    it "sets EventBusName on the Rule" do
+      rule_key = template["Resources"].keys.find { |k|
+        template["Resources"][k]["Type"] == "AWS::Events::Rule"
+      }
+      props = template["Resources"][rule_key]["Properties"]
+      expect(props["EventBusName"]).to eq("ops-bus")
+    end
+  end
+
+  describe "multiple triggers" do
+    let(:multi_pipeline) do
+      step_klass = step_class
+      stub_const("Process", step_klass)
+      Class.new do
+        include Turbofan::Pipeline
+        pipeline_name "multi-pipeline"
+        trigger :schedule, cron: "0 5 * * ? *"
+        trigger :event, source: "aws.s3", detail_type: "Object Created"
+        trigger :event, source: "myapp"
+        pipeline { process(trigger_input) }
+      end
+    end
+
+    let(:template) do
+      described_class.new(
+        pipeline: multi_pipeline, steps: {process: step_class},
+        stage: "production", config: config
+      ).generate
+    end
+
+    it "emits one AWS::Events::Rule per trigger declaration" do
+      rule_keys = template["Resources"].keys.select { |k|
+        template["Resources"][k]["Type"] == "AWS::Events::Rule"
+      }
+      expect(rule_keys.sort).to eq(%w[TriggerRule0 TriggerRule1 TriggerRule2])
+    end
+
+    it "emits one Lambda::Permission per rule" do
+      perm_keys = template["Resources"].keys.select { |k|
+        template["Resources"][k]["Type"] == "AWS::Lambda::Permission" && k.start_with?("TriggerRule")
+      }
+      expect(perm_keys.sort).to eq(%w[TriggerRule0Permission TriggerRule1Permission TriggerRule2Permission])
+    end
+
+    it "shares a single GuardLambda + Role across all triggers" do
+      expect(template["Resources"].keys.count { |k| template["Resources"][k]["Type"] == "AWS::Lambda::Function" && k == "GuardLambda" }).to eq(1)
+      expect(template["Resources"]).to have_key("GuardLambdaRole")
+    end
+
+    it "scopes each permission's SourceArn to its own rule" do
+      arn0 = template["Resources"]["TriggerRule0Permission"]["Properties"]["SourceArn"]
+      arn1 = template["Resources"]["TriggerRule1Permission"]["Properties"]["SourceArn"]
+      expect(arn0).to eq({"Fn::GetAtt" => ["TriggerRule0", "Arn"]})
+      expect(arn1).to eq({"Fn::GetAtt" => ["TriggerRule1", "Arn"]})
+    end
+
+    it "names each rule deterministically with its index" do
+      expect(template["Resources"]["TriggerRule0"]["Properties"]["Name"]).to match(/multi-pipeline.*-trigger-0/)
+      expect(template["Resources"]["TriggerRule2"]["Properties"]["Name"]).to match(/multi-pipeline.*-trigger-2/)
+    end
+  end
 end
