@@ -17,7 +17,8 @@ module Turbofan
   loader.inflector.inflect(
     "asl" => "ASL",
     "cli" => "CLI",
-    "cloudformation" => "CloudFormation"
+    "cloudformation" => "CloudFormation",
+    "uses_duckdb_dsl" => "UsesDuckdbDSL"
   )
 
   # turbofan/resources/postgres.rb defines Turbofan::Postgres (a mixin
