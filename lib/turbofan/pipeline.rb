@@ -8,7 +8,6 @@ module Turbofan
       turbofan_pipeline_block: nil,
       turbofan_compute_environment: nil,
       turbofan_tags: {},
-      turbofan_schedule: nil,
       turbofan_triggers: [],
       turbofan_timeout: nil
     }.freeze
@@ -39,7 +38,7 @@ module Turbofan
       end
 
       attr_reader :turbofan_name, :turbofan_metrics,
-        :turbofan_compute_environment, :turbofan_tags, :turbofan_schedule,
+        :turbofan_compute_environment, :turbofan_tags,
         :turbofan_triggers, :turbofan_timeout
 
       def pipeline_name(value)
@@ -55,10 +54,6 @@ module Turbofan
           raise ArgumentError, "Tag key '#{k}' uses reserved 'turbofan:' prefix" if k.to_s.start_with?("turbofan:")
         end
         @turbofan_tags = hash.transform_keys(&:to_s)
-      end
-
-      def schedule(cron_string)
-        @turbofan_schedule = cron_string
       end
 
       # Declare an EventBridge-backed pipeline trigger. Rails-style:

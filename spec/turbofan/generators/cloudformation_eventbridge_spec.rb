@@ -41,7 +41,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
 
         pipeline_name "scheduled-pipeline"
 
-        schedule "0 6 * * ? *"
+        trigger :schedule, cron: "0 6 * * ? *"
         pipeline do
           process(trigger_input)
         end
@@ -169,7 +169,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
 
         pipeline_name "guarded-pipeline"
 
-        schedule "0 6 * * ? *"
+        trigger :schedule, cron: "0 6 * * ? *"
         pipeline do
           process(trigger_input)
         end
@@ -280,7 +280,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
         include Turbofan::Pipeline
 
         pipeline_name "hourly-pipeline"
-        schedule "0 * * * ? *"
+        trigger :schedule, cron: "0 * * * ? *"
         pipeline do
           process(trigger_input)
         end

@@ -252,11 +252,14 @@ module Turbofan
       private_class_method :validate_schema_files
 
       def self.validate_schedule(pipeline, errors)
-        return unless pipeline.turbofan_schedule
-
-        field_count = pipeline.turbofan_schedule.strip.split(/\s+/).size
-        unless field_count == 6
-          errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
+        pipeline.turbofan_triggers.each do |trigger|
+          next unless trigger[:type] == :schedule
+          cron = trigger[:cron]
+          next if cron.nil? || cron.to_s.empty?
+          field_count = cron.strip.split(/\s+/).size
+          unless field_count == 6
+            errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
+          end
         end
       end
       private_class_method :validate_schedule

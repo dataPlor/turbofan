@@ -118,8 +118,9 @@ module Turbofan
         # State machine
         resources.merge!(state_machine(prefix, all_resource_tags))
 
-        # EventBridge schedule
-        if @pipeline.turbofan_schedule
+        # EventBridge schedule — single-schedule path preserved here;
+        # multi-trigger generalization lands in 0.7 #10/#11.
+        if first_schedule_cron
           resources.merge!(guard_lambda(prefix, all_resource_tags))
           resources.merge!(guard_lambda_role(prefix, all_resource_tags))
           resources.merge!(guard_lambda_permission)
@@ -572,7 +573,7 @@ module Turbofan
             "Type" => "AWS::Events::Rule",
             "Properties" => {
               "Name" => "#{prefix}-schedule",
-              "ScheduleExpression" => "cron(#{@pipeline.turbofan_schedule})",
+              "ScheduleExpression" => "cron(#{first_schedule_cron})",
               "State" => "ENABLED",
               "Targets" => [
                 {
@@ -584,6 +585,15 @@ module Turbofan
             }
           }
         }
+      end
+
+      # Transitional helper during the schedule → trigger migration.
+      # Returns the cron string of the first :schedule trigger (or
+      # nil). 0.7 #10/#11 replaces the single-rule path with one
+      # AWS::Events::Rule per trigger declaration.
+      def first_schedule_cron
+        entry = @pipeline.turbofan_triggers.find { |t| t[:type] == :schedule }
+        entry&.[](:cron)
       end
     end
   end

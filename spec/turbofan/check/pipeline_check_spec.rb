@@ -758,7 +758,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           include Turbofan::Pipeline
 
           pipeline_name "my-pipeline"
-          schedule "0 12 * * ? *"
+          trigger :schedule, cron: "0 12 * * ? *"
         end
       end
 
@@ -818,7 +818,7 @@ RSpec.describe Turbofan::Check::PipelineCheck, :schemas do
           include Turbofan::Pipeline
 
           pipeline_name "my-pipeline"
-          schedule "0 12 * * *"
+          trigger :schedule, cron: "0 12 * * *"
         end
       end
 
