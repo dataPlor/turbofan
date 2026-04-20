@@ -47,6 +47,11 @@ RSpec.configure do |config|
   config.after do
     Turbofan.instance_variable_set(:@config, nil) if Turbofan.instance_variable_defined?(:@config)
     Turbofan::CLI::Prompt.reset!
+    # Discovery memoizes ObjectSpace sweeps. Specs define anonymous
+    # classes via stub_const and tear them down between examples; a
+    # stale cache would leak those phantom classes into the next
+    # spec's discover_components result.
+    Turbofan::Discovery.reset_cache!
   end
 
   # Wrapper#set_tmpdir mutates ENV["TMPDIR"] as production behavior. Without

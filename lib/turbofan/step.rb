@@ -136,6 +136,7 @@ module Turbofan
     def self.included(base)
       base.extend(ClassMethods)
       init_state(base)
+      Turbofan::Discovery.reset_cache!
     end
 
     module ClassMethods

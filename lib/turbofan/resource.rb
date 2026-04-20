@@ -7,6 +7,7 @@ module Turbofan
       base.instance_variable_set(:@turbofan_consumable, nil)
       base.instance_variable_set(:@turbofan_secret, nil)
       base.extend(ClassMethods)
+      Turbofan::Discovery.reset_cache!
     end
 
     module ClassMethods

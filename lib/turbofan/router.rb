@@ -7,6 +7,7 @@ module Turbofan
     def self.included(base)
       base.extend(ClassMethods)
       base.instance_variable_set(:@turbofan_sizes, [])
+      Turbofan::Discovery.reset_cache!
     end
 
     module ClassMethods

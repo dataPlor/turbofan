@@ -83,6 +83,7 @@ module Turbofan
       base.instance_variable_set(:@turbofan_subnets, nil)
       base.instance_variable_set(:@turbofan_security_groups, nil)
       base.instance_variable_set(:@turbofan_container_insights, true)
+      Turbofan::Discovery.reset_cache!
     end
 
     module ClassMethods

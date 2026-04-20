@@ -9,13 +9,17 @@ module Turbofan
         Turbofan.config.schemas_path = File.join(turbofans_root, "schemas")
 
         config_file = File.join(turbofans_root, "config", "turbofan.rb")
-        Kernel.load(File.expand_path(config_file)) if File.exist?(config_file)
+        if File.exist?(config_file)
+          Kernel.load(File.expand_path(config_file))
+          Turbofan::Discovery.reset_cache!
+        end
 
         raise "Pipeline file not found: #{pipeline_file}" unless File.exist?(pipeline_file)
 
         before = Set.new(Turbofan::Discovery.subclasses_of(Pipeline))
 
         Kernel.load(File.expand_path(pipeline_file))
+        Turbofan::Discovery.reset_cache!
 
         components = Turbofan.discover_components
         new_pipelines = components[:pipelines].values.reject { |c| before.include?(c) }
