@@ -664,7 +664,7 @@ class DailyGeoChores
   include Turbofan::Pipeline
 
   pipeline_name "daily-geo-chores"
-  schedule "0 6 * * ? *"
+  trigger :schedule, cron: "0 6 * * ? *"
   tags stack: "geo"
 
   metric "PlacesProcessed", stat: :sum, display: :line, unit: "Count", step: :validate_places
@@ -683,7 +683,7 @@ end
 |--------|----------|---------|-------------|
 | `pipeline_name(value)` | Yes | — | Pipeline identifier. Used in CloudFormation stack names, S3 paths, and resource tags. |
 | `pipeline(&block)` | Yes | — | Block defining the step DAG. Receives `trigger_input` as argument (or use the zero-arity form). |
-| `schedule(cron_string)` | No | `nil` | 6-field EventBridge cron expression (min hour day month dow year). Creates an EventBridge rule with a guard Lambda that prevents concurrent executions. |
+| `trigger(type, **kwargs)` | No | `[]` | EventBridge-backed pipeline trigger. Declarable multiple times (each becomes its own `AWS::Events::Rule`). See [Triggers](#triggers) below for kwargs per type. Pipelines with no `trigger` declarations are manual-invocation only. |
 | `bucket(name)` | No | `Turbofan.config.bucket` | Shared S3 interchange bucket name (externally managed). Overrides the global config for this pipeline. |
 | `compute_environment(symbol)` | No | `nil` | Default CE for all steps in this pipeline (e.g., `:compute_bound`). Steps can override with their own `compute_environment`. Resolved to a class via `ComputeEnvironment.resolve(sym)` at check/deploy time. |
 | `tags(hash)` | No | `{}` | Custom tags applied to all AWS resources in the pipeline stack. Keys are converted to strings. |
@@ -725,7 +725,74 @@ end
 
 #### Reader Attributes
 
-`turbofan_name`, `turbofan_metrics`, `turbofan_compute_environment`, `turbofan_tags`, `turbofan_schedule`
+`turbofan_name`, `turbofan_metrics`, `turbofan_compute_environment`, `turbofan_tags`, `turbofan_triggers`, `turbofan_timeout`
+
+#### Triggers
+
+A `trigger` declaration is how a pipeline wakes up. Each declaration
+becomes one `AWS::Events::Rule`, all targeting a single shared
+`GuardLambda` (which serializes executions — no concurrent runs of
+the same state machine). Declare as many as you need.
+
+Two types:
+
+**Scheduled (cron):**
+
+```ruby
+trigger :schedule, cron: "0 6 * * ? *"
+```
+
+- `cron:` — 6-field EventBridge cron (`min hour day month dow year`). Required.
+
+**Event-pattern matches:**
+
+```ruby
+# S3 object-created — only the pipeline's watched bucket
+trigger :event,
+  source: "aws.s3",
+  detail_type: "Object Created",
+  detail: {"bucket" => {"name" => ["dataplor-incoming"]}}
+
+# Batch job state changes (no detail filter)
+trigger :event,
+  source: "aws.batch",
+  detail_type: ["Batch Job State Change"]
+
+# Custom application event on a non-default bus
+trigger :event,
+  source: "myapp.ingest",
+  detail_type: "Batch Prepared",
+  event_bus: "data-platform-bus"
+```
+
+- `source:` — Required. String or Array of Strings.
+- `detail_type:` — Optional. String or Array of Strings.
+- `detail:` — Optional Hash. Full EventBridge pattern syntax
+  (prefix/suffix/exists/numeric/anything-but/cidr matchers).
+- `event_bus:` — Optional. Non-default bus name.
+
+**T1 input transform.** The pipeline's first step receives
+`event.detail` as its input, with these metadata keys injected at
+the top level:
+
+| Key | Value |
+|-----|-------|
+| `__event_source` | `event.source` (e.g. `"aws.s3"`) |
+| `__event_detail_type` | `event["detail-type"]` |
+| `__event_time` | `event.time` ISO-8601 UTC |
+| `__event_id` | EventBridge's event `id` |
+| `__event_account` | AWS account |
+| `__event_region` | AWS region |
+
+For `trigger :schedule`, the GuardLambda sees a synthetic envelope
+(source `"aws.scheduler"`, detail-type `"Scheduled Event"`) with
+`__event_schedule_expression` inside `detail` so the first step can
+discriminate across schedules when a pipeline has several.
+
+**`items_s3_uri` passthrough.** If `event.detail` contains an
+`items_s3_uri` key it arrives at the pipeline input unchanged; a
+first-step `fan_out` can read it directly instead of re-deriving
+the manifest.
 
 ---
 

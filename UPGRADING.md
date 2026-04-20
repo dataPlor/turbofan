@@ -1,5 +1,96 @@
 # Upgrading
 
+## Upgrading to 0.7.0
+
+0.7 is a hard-break release. The install base is entirely internal, so we chose correctness over migration grace — no deprecation cycles on the items below. Three classes of change:
+
+1. **Legacy readers removed** — `Step#turbofan_*` attr_readers are gone; use the `.turbofan` façade.
+2. **Deprecated DSL macros removed** — `execution`, `uses(:duckdb, extensions: [...])`, `schedule "..."`.
+3. **New feature** — `trigger :schedule|:event, **kwargs` replaces and generalizes `schedule`.
+
+### 1. `Step#turbofan_*` attr_readers removed
+
+All ~20 legacy readers (`turbofan_uses`, `turbofan_execution`, `turbofan_tags`, `turbofan_timeout`, `turbofan_compute_environment`, etc.) are deleted from `Turbofan::Step::ClassMethods`. Reach DSL state through the `.turbofan` façade that has been available since 0.6.0:
+
+```ruby
+# Before (0.6)
+MyStep.turbofan_uses
+MyStep.turbofan_execution
+MyStep.turbofan_tags
+MyStep.turbofan_compute_environment
+
+# After (0.7)
+MyStep.turbofan.uses
+MyStep.turbofan.execution
+MyStep.turbofan.tags
+MyStep.turbofan.compute_environment
+```
+
+Mechanical migration (sed-driven) — run from the repo root once:
+
+```bash
+# Single invocation, word-boundary safe. Repeat the list of reader
+# names if you add any custom ones.
+for name in uses writes_to secrets sizes batch_size execution timeout \
+            retries retry_on default_cpu default_ram compute_environment \
+            input_schema_file output_schema_file tags docker_image \
+            duckdb_extensions subnets security_groups storage; do
+  # Matches `.turbofan_<name>` and `&.turbofan_<name>` not followed by
+  # another identifier character. Pipeline/Router/CE readers with the
+  # same names are on different receiver types and are not affected.
+  perl -i -pe 's/\.turbofan_'"$name"'(?![a-zA-Z0-9_])/.turbofan.'"$name"'/g' \
+    $(git ls-files '*.rb')
+done
+```
+
+Predicate readers follow the same pattern — `turbofan_lambda?` → `turbofan.lambda?`, `turbofan_external?` → `turbofan.external?`, etc.
+
+### 2. Removed DSL macros
+
+| Before (0.6, deprecated) | After (0.7) |
+|---|---|
+| `execution :batch` | `runs_on :batch` |
+| `uses :duckdb, extensions: [:json, :parquet]` | `uses(:duckdb) { extensions :json, :parquet }` |
+| `schedule "0 6 * * ? *"` | `trigger :schedule, cron: "0 6 * * ? *"` |
+
+Mechanical migration:
+
+```bash
+# execution → runs_on
+perl -i -pe 's/^(\s*)execution(\s+:)/\1runs_on\2/' $(git ls-files '*.rb')
+
+# schedule "..." → trigger :schedule, cron: "..."
+perl -i -pe 's/^(\s*)schedule\s+("[^"]+")/\1trigger :schedule, cron: \2/' \
+  $(git ls-files '*.rb')
+
+# uses :duckdb, extensions: [:json, :parquet] → block form
+# (manual — the Ruby block rewrite is harder to express as sed; grep
+# and hand-edit the handful of sites.)
+grep -rn 'uses :duckdb, extensions:' $(git ls-files '*.rb')
+```
+
+### 3. New feature — EventBridge triggers
+
+`trigger :schedule` is a straight rename of the removed `schedule` macro. `trigger :event` is new:
+
+```ruby
+# S3 object-created in a specific bucket
+trigger :event,
+  source: "aws.s3",
+  detail_type: "Object Created",
+  detail: {"bucket" => {"name" => ["dataplor-incoming"]}}
+
+# Multiple triggers — any one of them fires the pipeline
+trigger :schedule, cron: "0 6 * * ? *"
+trigger :event, source: "aws.batch", detail_type: "Batch Job State Change"
+```
+
+Each `trigger` declaration becomes its own `AWS::Events::Rule` with a per-rule `AWS::Lambda::Permission`. All target a single shared `GuardLambda` per pipeline — concurrent-execution semantics unchanged.
+
+The pipeline's first step receives `event.detail` as input with `__event_source` / `__event_detail_type` / `__event_time` / `__event_id` / `__event_account` / `__event_region` injected at the top level. See the [Triggers](README.md#triggers) section of the README for the full T1 input contract.
+
+---
+
 ## Upgrading to 0.6.0
 
 0.6 is the biggest release since 0.1 — foundation, observability, and DSL polish all land together. Most changes are additive or deprecation-aliased, so the upgrade path is **gradual, not forced**. Flip `Turbofan.config.deprecations = true` in CI to surface every call site that still uses a to-be-removed form.
