@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-04-19
+
+0.7 is a hard-break release. The install base is entirely internal, so
+correctness outweighs migration grace on every breaking item below — no
+deprecation cycles, no shim aliases. Three themes: remove the legacy
+DSL surface (readers, `execution`, `schedule`, `uses-extensions`),
+generalize pipeline triggers beyond cron-only via EventBridge, and
+tighten internal polish (Discovery memoization, `step.rb` split,
+`bin/release` private-gem workflow). See [UPGRADING.md](UPGRADING.md#upgrading-to-070)
+for migration commands.
+
+All pre-cut issues flagged in the 5-legend review (Jeremy Evans, Mike
+Perham, Matz, Xavier Noria, Andrew Kane) were addressed. Six TODOs
+were deferred to 0.7.1: Pipeline façade parity, GuardLambda
+idempotency token, freeze-on-assign for tags/deps, `storage_gib`
+rename, `loader.on_load` privatization of `UsesDuckdbDSL`,
+`InputTransformer` for schedule triggers, and `trigger
+:s3_object_created`-style sugar.
+
 ### Added
 - **`trigger(type, **kwargs)` macro on Pipeline** — Rails-style
   declaration of EventBridge-backed pipeline triggers. Multiple
