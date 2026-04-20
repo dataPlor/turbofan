@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`trigger(type, **kwargs)` macro on Pipeline** — Rails-style
+  declaration of EventBridge-backed pipeline triggers. Multiple
+  triggers per pipeline; each becomes its own `AWS::Events::Rule`
+  sharing a single `GuardLambda`. Two types supported:
+  - `trigger :schedule, cron: "0 5 * * ? *"` — cron-backed firing.
+  - `trigger :event, source: "aws.s3", detail_type: "Object Created", detail: {...}, event_bus: "..."` —
+    full EventBridge pattern matching, optional custom event bus.
+  Pipelines with no `trigger` declarations are manual-invocation only
+  (unchanged semantics).
+- **T1 input transform.** The new GuardLambda passes `event.detail`
+  as the pipeline input with `__event_source`, `__event_detail_type`,
+  `__event_time`, `__event_id`, `__event_account`, `__event_region`
+  injected at the top level. For `trigger :schedule`, a synthetic
+  envelope carries `__event_schedule_expression` the same way, so
+  first steps use one code path regardless of trigger origin.
+- **`Turbofan::Discovery.reset_cache!`** — exposes the cache
+  invalidation hook that `PipelineLoader` and the root modules'
+  `included` hooks call automatically. Needed for tests that create
+  anonymous subclasses across examples.
+
+### Changed
+- **`Turbofan::Discovery.subclasses_of` memoized per-module.** Cache
+  invalidates automatically when new classes include
+  Step/Pipeline/Resource/Router/ComputeEnvironment, and when
+  `PipelineLoader` re-enters `Kernel.load`. Thread-safe via Mutex
+  (subclasses_of runs from fan_out workers concurrently).
+- **`lib/turbofan/step.rb` split into focused files** under
+  `lib/turbofan/step/` (class_methods, config_facade,
+  uses_duckdb_dsl, validators). Behaviour unchanged; file is now 52
+  lines instead of 457.
+- **`bin/release` private-gem workflow.** `gem push` is off by
+  default; opt in with `--public`. Matches how Turbofan is actually
+  distributed (GitHub-tag pinning).
+
 ### Removed (breaking)
 - **`Step#turbofan_*` attr_readers removed.** All ~20 legacy readers
   (`turbofan_uses`, `turbofan_execution`, `turbofan_tags`, etc.) are
@@ -18,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`execution :batch` macro removed** — use `runs_on :batch`.
 - **`uses(:duckdb, extensions: [...])` kwarg form removed** — use the
   block form: `uses(:duckdb) { extensions :json, :parquet }`.
+- **`schedule "..."` Pipeline macro removed** — use
+  `trigger :schedule, cron: "..."`. Hard break, no alias cycle.
+
+See [UPGRADING.md](UPGRADING.md#upgrading-to-070) for migration
+commands.
 
 ## [0.6.1] — 2026-04-19
 

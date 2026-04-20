@@ -27,22 +27,30 @@ module Turbofan
     @cache = {}
 
     def self.subclasses_of(mod)
-      cached = @cache_mutex.synchronize { @cache[mod.object_id] }
+      cached = @cache_mutex.synchronize { @cache[mod] }
       return cached if cached
 
       computed = compute_subclasses_of(mod)
-      @cache_mutex.synchronize { @cache[mod.object_id] ||= computed }
-      computed
+      @cache_mutex.synchronize do
+        # Proper double-checked locking: re-read under the lock so a
+        # racing caller's already-stored result wins and we don't
+        # replace-then-return a different array.
+        @cache[mod] ||= computed
+      end
     end
 
-    # Clear the subclass cache. Must be called after `Kernel.load` or
-    # any runtime that defines new user classes (PipelineLoader does
-    # this automatically). Tests that define anonymous subclasses
-    # inside `Class.new` receivers don't need to reset — those are
-    # reachable via their caller's local var, not via `const_get`, so
-    # they're already filtered out of the cache.
+    # Clear the subclass cache. Called automatically from each root
+    # module's `included` hook (Step/Pipeline/Resource/Router/
+    # ComputeEnvironment) and from PipelineLoader after `Kernel.load`.
+    # Test helpers may also call it — otherwise users should not need
+    # to touch it.
     def self.reset_cache!
-      @cache_mutex.synchronize { @cache.clear }
+      @cache_mutex.synchronize do
+        # Gate on non-empty to avoid thrashing the mutex on boot — every
+        # user `include Turbofan::Step` during Zeitwerk eager_load fires
+        # this hook, and the cache is empty at that point anyway.
+        @cache.clear unless @cache.empty?
+      end
     end
 
     def self.compute_subclasses_of(mod)

@@ -36,21 +36,19 @@ module Turbofan
         end
       end
 
-      # Computed readers that forward to existing class methods so
-      # callers see the same parsed/memoized values as the legacy API.
-      def input_schema = @step_class.turbofan_input_schema
-      def output_schema = @step_class.turbofan_output_schema
-      def resource_keys = @step_class.turbofan_resource_keys
-      def needs_duckdb? = @step_class.turbofan_needs_duckdb?
-      def lambda? = @step_class.turbofan_lambda?
-      def fargate? = @step_class.turbofan_fargate?
-      def external? = @step_class.turbofan_external?
+      # Computed readers. The `turbofan_*` methods on Step::ClassMethods
+      # they delegate to are private — the façade is the only public
+      # seam, reached internally via #send.
+      def input_schema = @step_class.send(:turbofan_input_schema)
+      def output_schema = @step_class.send(:turbofan_output_schema)
+      def resource_keys = @step_class.send(:turbofan_resource_keys)
+      def needs_duckdb? = @step_class.send(:turbofan_needs_duckdb?)
+      def lambda? = @step_class.send(:turbofan_lambda?)
+      def fargate? = @step_class.send(:turbofan_fargate?)
+      def external? = @step_class.send(:turbofan_external?)
 
-      # S3 dependency filters — previously public-by-accident on
-      # Step::ClassMethods (Jeremy Evans's audit flag), now routed
-      # exclusively through the façade. The private-on-ClassMethods
-      # versions still exist and this delegates to them via send so
-      # privatization doesn't break internal behavior.
+      # S3 dependency filters — private on Step::ClassMethods (Jeremy
+      # Evans's audit flag), routed exclusively through the façade.
       def uses_s3 = @step_class.send(:uses_s3)
       def writes_to_s3 = @step_class.send(:writes_to_s3)
 

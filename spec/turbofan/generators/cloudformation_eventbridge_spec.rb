@@ -324,7 +324,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
       ).generate
     end
 
-    it "embeds a synthetic envelope with __event_schedule_expression in detail" do
+    it "embeds a synthetic envelope with _turbofan.event.schedule_expression in detail" do
       rule_key = template["Resources"].keys.find { |k|
         template["Resources"][k]["Type"] == "AWS::Events::Rule"
       }
@@ -332,7 +332,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, "eventbridge rules", :schem
       parsed = JSON.parse(input_json)
       expect(parsed["source"]).to eq("aws.scheduler")
       expect(parsed["detail-type"]).to eq("Scheduled Event")
-      expect(parsed.dig("detail", "__event_schedule_expression")).to eq("cron(0 5 * * ? *)")
+      expect(parsed.dig("detail", "_turbofan", "event", "schedule_expression")).to eq("cron(0 5 * * ? *)")
     end
   end
 

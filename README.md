@@ -772,27 +772,63 @@ trigger :event,
 - `event_bus:` — Optional. Non-default bus name.
 
 **T1 input transform.** The pipeline's first step receives
-`event.detail` as its input, with these metadata keys injected at
-the top level:
+`event.detail` as its input, with event provenance namespaced under
+a single `_turbofan` key at the top level so it can't collide with
+user detail fields:
 
-| Key | Value |
-|-----|-------|
-| `__event_source` | `event.source` (e.g. `"aws.s3"`) |
-| `__event_detail_type` | `event["detail-type"]` |
-| `__event_time` | `event.time` ISO-8601 UTC |
-| `__event_id` | EventBridge's event `id` |
-| `__event_account` | AWS account |
-| `__event_region` | AWS region |
+```json
+{
+  "...user detail fields...": "...",
+  "_turbofan": {
+    "event": {
+      "source": "aws.s3",
+      "detail_type": "Object Created",
+      "time": "2026-04-19T10:00:00Z",
+      "id": "abc-123",
+      "account": "111122223333",
+      "region": "us-east-1"
+    }
+  }
+}
+```
 
-For `trigger :schedule`, the GuardLambda sees a synthetic envelope
-(source `"aws.scheduler"`, detail-type `"Scheduled Event"`) with
-`__event_schedule_expression` inside `detail` so the first step can
-discriminate across schedules when a pipeline has several.
+For `trigger :schedule`, the envelope carries
+`_turbofan.event.schedule_expression` (the cron string) so the first
+step can discriminate across schedules when a pipeline has several.
+Publishers can attach their own provenance by setting additional keys
+under `_turbofan.*` in the event detail; Turbofan only overwrites
+the `event` sub-hash.
 
 **`items_s3_uri` passthrough.** If `event.detail` contains an
 `items_s3_uri` key it arrives at the pipeline input unchanged; a
 first-step `fan_out` can read it directly instead of re-deriving
 the manifest.
+
+#### Triggers — Gotchas
+
+- **At-most-once while a pipeline is running.** The shared
+  `GuardLambda` checks for a `RUNNING` execution before starting a
+  new one. If a trigger fires while the pipeline is mid-run, it is
+  dropped (with a CloudWatch `WARN` log line that includes the event
+  source, detail-type, event id, and any `items_s3_uri`). Design
+  your pipeline to be either (a) idempotent over its effective
+  input window, or (b) tolerant of missed triggers — Turbofan does
+  not queue.
+- **`items_s3_uri` is read lazily.** The first step reads the
+  manifest at the URI during its run, which can be seconds-to-minutes
+  after the event fired. Mutation of the manifest in that window is
+  the publisher's problem.
+- **Trigger order is stable.** Generator emits `TriggerRule0`,
+  `TriggerRule1`, … in source order. Reordering `trigger` calls in
+  the pipeline file produces a no-op-ish CloudFormation diff (rule
+  bodies swap across logical IDs, no resource replacement). Avoid
+  reordering unless you want to read a noisy diff.
+- **GuardLambda `list_executions` → `start_execution` is TOCTOU-y.**
+  Two triggers firing within a few hundred ms of each other can both
+  see an empty running list and both start. Step Functions' execution
+  names are unique so this doesn't corrupt; it just means you get one
+  extra execution in the rare collision. Tightening this with an
+  idempotency token is tracked for 0.7.1.
 
 ---
 

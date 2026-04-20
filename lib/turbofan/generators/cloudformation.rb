@@ -570,14 +570,20 @@ module Turbofan
         when :schedule
           # EventBridge schedule: the ScheduleExpression fires the rule
           # on cron. We override the target Input so the GuardLambda
-          # sees a consistent envelope shape with __event_schedule_
-          # expression in the detail — the same T1 code path as
-          # :event triggers.
+          # sees a consistent envelope shape. The cron expression is
+          # tucked inside `detail._turbofan.event.schedule_expression`
+          # so the T1 code path is identical for :event and :schedule
+          # triggers — the handler lifts the sub-hash into the final
+          # pipeline input's `_turbofan.event` namespace.
           props["ScheduleExpression"] = "cron(#{trigger[:cron]})"
           target["Input"] = JSON.generate(
             "source" => "aws.scheduler",
             "detail-type" => "Scheduled Event",
-            "detail" => {"__event_schedule_expression" => "cron(#{trigger[:cron]})"}
+            "detail" => {
+              "_turbofan" => {
+                "event" => {"schedule_expression" => "cron(#{trigger[:cron]})"}
+              }
+            }
           )
         when :event
           pattern = {"source" => trigger[:source]}

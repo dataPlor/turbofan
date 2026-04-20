@@ -18,8 +18,6 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
     driver = <<~PY
       import json, sys, types
 
-      # Stub boto3 before the module imports it — the T1 function is pure
-      # and doesn't touch AWS, so we only need the name to resolve.
       boto3 = types.ModuleType("boto3")
       boto3.client = lambda name: None
       sys.modules["boto3"] = boto3
@@ -27,7 +25,6 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
       import os
       os.environ["STATE_MACHINE_ARN"] = "arn:aws:states:::stub"
 
-      # Load the module from disk (not as an importable package).
       mod_code = open(#{PY_FILE.inspect}).read()
       mod = types.ModuleType("guard_handler")
       exec(mod_code, mod.__dict__)
@@ -66,14 +63,16 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
       expect(result["object"]).to eq({"key" => "foo.csv"})
     end
 
-    it "injects __event_* metadata at top level" do
+    it "nests all provenance under _turbofan.event (no flat __event_* keys)" do
       result = t1(event)
-      expect(result["__event_source"]).to eq("aws.s3")
-      expect(result["__event_detail_type"]).to eq("Object Created")
-      expect(result["__event_time"]).to eq("2026-04-19T10:00:00Z")
-      expect(result["__event_id"]).to eq("abc-123")
-      expect(result["__event_account"]).to eq("111122223333")
-      expect(result["__event_region"]).to eq("us-east-1")
+      expect(result.keys).not_to include(a_string_matching(/\A__event_/))
+      ev = result.dig("_turbofan", "event")
+      expect(ev["source"]).to eq("aws.s3")
+      expect(ev["detail_type"]).to eq("Object Created")
+      expect(ev["time"]).to eq("2026-04-19T10:00:00Z")
+      expect(ev["id"]).to eq("abc-123")
+      expect(ev["account"]).to eq("111122223333")
+      expect(ev["region"]).to eq("us-east-1")
     end
   end
 
@@ -82,24 +81,33 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
       {
         "source" => "aws.scheduler",
         "detail-type" => "Scheduled Event",
-        "detail" => {"__event_schedule_expression" => "cron(0 5 * * ? *)"}
+        "detail" => {
+          "_turbofan" => {
+            "event" => {"schedule_expression" => "cron(0 5 * * ? *)"}
+          }
+        }
       }
     end
 
-    it "passes the synthetic schedule_expression through from detail" do
+    it "lifts the schedule expression into _turbofan.event namespace" do
       result = t1(event)
-      expect(result["__event_schedule_expression"]).to eq("cron(0 5 * * ? *)")
+      expect(result.dig("_turbofan", "event", "schedule_expression")).to eq("cron(0 5 * * ? *)")
     end
 
-    it "attaches __event_source aws.scheduler" do
+    it "sets source = aws.scheduler and detail_type" do
       result = t1(event)
-      expect(result["__event_source"]).to eq("aws.scheduler")
-      expect(result["__event_detail_type"]).to eq("Scheduled Event")
+      expect(result.dig("_turbofan", "event", "source")).to eq("aws.scheduler")
+      expect(result.dig("_turbofan", "event", "detail_type")).to eq("Scheduled Event")
     end
 
-    it "fills __event_time with now() when missing" do
+    it "fills time with now() when missing" do
       result = t1(event)
-      expect(result["__event_time"]).to match(/\d{4}-\d{2}-\d{2}T/)
+      expect(result.dig("_turbofan", "event", "time")).to match(/\d{4}-\d{2}-\d{2}T/)
+    end
+
+    it "does not leak the raw _turbofan sub-hash from detail into top level" do
+      # Only the top-level _turbofan key — nothing else with that name.
+      expect(result_for_schedule = t1(event)).not_to have_key("schedule_expression")
     end
   end
 
@@ -134,25 +142,54 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
       result = t1(event)
       expect(result["jobArn"]).to start_with("arn:aws:batch:")
       expect(result["status"]).to eq("SUCCEEDED")
-      expect(result["__event_source"]).to eq("aws.batch")
+      expect(result.dig("_turbofan", "event", "source")).to eq("aws.batch")
     end
   end
 
   describe "empty detail" do
-    it "produces pipeline input with only __event_* metadata" do
+    it "produces pipeline input with only the _turbofan namespace" do
       result = t1({"source" => "aws.s3", "detail-type" => "Object Created", "detail" => {}})
-      expect(result.keys).to contain_exactly(
-        "__event_source", "__event_detail_type", "__event_time",
-        "__event_id", "__event_account", "__event_region"
-      )
+      expect(result.keys).to eq(["_turbofan"])
     end
   end
 
   describe "missing detail" do
     it "treats missing detail as empty dict" do
       result = t1({"source" => "custom.source"})
-      expect(result["__event_source"]).to eq("custom.source")
-      expect(result.key?("__event_detail_type")).to be true
+      expect(result.dig("_turbofan", "event", "source")).to eq("custom.source")
+      expect(result.dig("_turbofan", "event")).to have_key("detail_type")
+    end
+  end
+
+  describe "collision safety" do
+    it "does not clobber user detail fields that happen to be named like event fields" do
+      # A publisher's detail carries `source` as business data; our T1 must
+      # not blow it away. source is namespaced under _turbofan.event.
+      result = t1({
+        "source" => "aws.custom",
+        "detail-type" => "Widget Event",
+        "detail" => {"source" => "user-supplied-provenance"}
+      })
+      expect(result["source"]).to eq("user-supplied-provenance")
+      expect(result.dig("_turbofan", "event", "source")).to eq("aws.custom")
+    end
+
+    it "preserves unrelated _turbofan sub-keys the publisher set" do
+      # An upstream system can pass through their own namespaced
+      # provenance in _turbofan.* — we only overwrite the `event` sub-hash.
+      result = t1({
+        "source" => "upstream",
+        "detail-type" => "Handoff",
+        "detail" => {
+          "_turbofan" => {
+            "upstream_trace_id" => "trace-xyz",
+            "event" => {"should_be_overwritten" => true}
+          }
+        }
+      })
+      expect(result.dig("_turbofan", "upstream_trace_id")).to eq("trace-xyz")
+      expect(result.dig("_turbofan", "event", "source")).to eq("upstream")
+      expect(result.dig("_turbofan", "event")).not_to have_key("should_be_overwritten")
     end
   end
 end

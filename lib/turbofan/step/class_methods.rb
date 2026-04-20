@@ -260,6 +260,16 @@ module Turbofan
       # macro's kwarg path. Retroactively privatize.
       private :add_duckdb_extensions
 
+      # Same story for the `turbofan_*` computed readers: all external
+      # access is now routed through `.turbofan` (ConfigFacade), so the
+      # methods are demoted to private and the façade reaches them via
+      # `send`. Keeps the user Step's public surface to exactly one
+      # thing: `.turbofan`.
+      private :turbofan_input_schema, :turbofan_output_schema,
+        :turbofan_external?, :turbofan_lambda?, :turbofan_fargate?,
+        :turbofan_batch_size_for, :turbofan_resource_keys,
+        :turbofan_needs_duckdb?
+
       private
 
       # The four filter helpers are implementation details of the public

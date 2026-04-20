@@ -64,7 +64,7 @@ module Turbofan
         end
 
         # Verify resources stack if any consumable resources are used
-        step_resource_keys = steps.values.flat_map(&:turbofan_resource_keys).uniq
+        step_resource_keys = steps.values.flat_map { |s| s.turbofan.resource_keys }.uniq
         used_resources = resources.slice(*step_resource_keys)
         unless used_resources.empty?
           resources_stack = "turbofan-resources-#{stage}"
