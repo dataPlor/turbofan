@@ -3,14 +3,21 @@
 
 # bin/release — cut a Turbofan gem release.
 #
+# Turbofan is distributed privately via GitHub tags (Gemfile pulls
+# `gem "turbofan", github: "dataplor/turbofan", tag: "v0.X.Y"`). The
+# release workflow therefore does NOT push to rubygems.org by default
+# — it tags the commit and pushes the tag to origin. Use --public to
+# opt into a rubygems.org push when/if Turbofan ever goes public.
+#
 # Verifies the CHANGELOG has been moved out of [Unreleased] into a
 # dated version section, runs the test suite, builds the gem, and
-# (unless --dry-run) pushes to rubygems + tags the commit.
+# (unless --dry-run) tags the commit + pushes main + the tag.
 #
 # Usage:
 #
-#   bin/release              # full release
-#   bin/release --dry-run    # stop before gem push + tag
+#   bin/release              # tag + push (private-gem default)
+#   bin/release --dry-run    # stop before tag/push
+#   bin/release --public     # also `gem push` to rubygems.org
 #
 # Expected pre-state:
 #   * lib/turbofan/version.rb already bumped to the new version
@@ -22,6 +29,7 @@ require "open3"
 require_relative "../lib/turbofan/version"
 
 DRY_RUN = ARGV.include?("--dry-run")
+PUBLIC = ARGV.include?("--public")
 VERSION = Turbofan::VERSION
 TAG = "v#{VERSION}"
 
@@ -43,7 +51,14 @@ def run(*cmd, allow_failure: false)
   [stdout, stderr, status]
 end
 
-info "Releasing turbofan #{VERSION} (#{DRY_RUN ? "DRY RUN" : "LIVE"})"
+mode = if DRY_RUN
+  "DRY RUN"
+elsif PUBLIC
+  "LIVE + rubygems.org"
+else
+  "LIVE (private — tag only)"
+end
+info "Releasing turbofan #{VERSION} (#{mode})"
 
 # Pre-flight: clean working tree
 stdout, _, _ = run("git", "status", "--porcelain")
@@ -79,16 +94,25 @@ run("ruby", "-rturbofan", "-e", %(raise unless Turbofan::VERSION == "#{VERSION}"
 info "require turbofan → #{VERSION} (smoke test passed)"
 
 if DRY_RUN
-  info "dry run complete. Review turbofan-#{VERSION}.gem, then re-run without --dry-run to push + tag."
+  info "dry run complete. Review turbofan-#{VERSION}.gem, then re-run without --dry-run to tag + push."
   exit 0
 end
 
-run("gem", "push", built)
-info "pushed turbofan #{VERSION} to rubygems.org"
+if PUBLIC
+  run("gem", "push", built)
+  info "pushed turbofan #{VERSION} to rubygems.org"
+else
+  info "skipping `gem push` (private-gem workflow — consumers pin via GitHub tag)."
+  info "pass --public to push to rubygems.org."
+end
 
 run("git", "tag", "-a", TAG, "-m", "Release #{TAG}")
 run("git", "push", "origin", "main")
 run("git", "push", "origin", TAG)
 info "tagged and pushed #{TAG}"
 
-info "Done. https://rubygems.org/gems/turbofan/versions/#{VERSION}"
+if PUBLIC
+  info "Done. https://rubygems.org/gems/turbofan/versions/#{VERSION}"
+else
+  info "Done. Consumers can now update their Gemfile to `tag: \"#{TAG}\"`."
+end
