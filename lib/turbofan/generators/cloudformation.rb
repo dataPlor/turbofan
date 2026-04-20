@@ -479,6 +479,9 @@ module Turbofan
         }
       end
 
+      GUARD_HANDLER_PY = File.expand_path("cloudformation/guard_handler.py", __dir__)
+      private_constant :GUARD_HANDLER_PY
+
       def guard_lambda(prefix, tags)
         {
           "GuardLambda" => {
@@ -490,17 +493,7 @@ module Turbofan
               "Timeout" => 30,
               "Role" => {"Fn::GetAtt" => ["GuardLambdaRole", "Arn"]},
               "Code" => {
-                "ZipFile" => <<~PYTHON
-                  import json, os, boto3
-                  sfn = boto3.client('stepfunctions')
-
-                  def handler(event, context):
-                      sm_arn = os.environ['STATE_MACHINE_ARN']
-                      running = sfn.list_executions(stateMachineArn=sm_arn, statusFilter='RUNNING', maxResults=1)
-                      if not running['executions']:
-                          sfn.start_execution(stateMachineArn=sm_arn)
-                      return {'guarded': True}
-                PYTHON
+                "ZipFile" => File.read(GUARD_HANDLER_PY)
               },
               "Environment" => {
                 "Variables" => {
