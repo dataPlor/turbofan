@@ -37,11 +37,16 @@ rename, `loader.on_load` privatization of `UsesDuckdbDSL`,
   Pipelines with no `trigger` declarations are manual-invocation only
   (unchanged semantics).
 - **T1 input transform.** The new GuardLambda passes `event.detail`
-  as the pipeline input with `__event_source`, `__event_detail_type`,
-  `__event_time`, `__event_id`, `__event_account`, `__event_region`
-  injected at the top level. For `trigger :schedule`, a synthetic
-  envelope carries `__event_schedule_expression` the same way, so
-  first steps use one code path regardless of trigger origin.
+  as the pipeline input with trigger provenance namespaced under a
+  single `_turbofan.event` sub-hash at the top level —
+  `_turbofan.event.source`, `.detail_type`, `.time`, `.id`,
+  `.account`, `.region`. Single-namespace shape was chosen after the
+  pre-cut legend review flagged that flat `__event_*` keys are
+  Pythonic (dunder) and collide with publisher-supplied detail
+  fields. For `trigger :schedule`, the envelope carries
+  `_turbofan.event.schedule_expression` via the same path. Publishers
+  can forward their own provenance under `_turbofan.*`; Turbofan
+  only owns the `event` sub-key.
 - **`Turbofan::Discovery.reset_cache!`** — exposes the cache
   invalidation hook that `PipelineLoader` and the root modules'
   `included` hooks call automatically. Needed for tests that create

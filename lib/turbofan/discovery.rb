@@ -19,10 +19,12 @@ module Turbofan
     # Per-module cache of ObjectSpace sweep results. ObjectSpace walks
     # are O(N) in the live-object count — hot path during deploy (each
     # of pipeline_loader, generators, check calls this 1+ times), cold
-    # on first access. Keyed on the module's object_id (cheap, stable
-    # per-process). Invalidation is explicit via `reset_cache!`; the
-    # only event that can *add* a subclass is `Kernel.load` inside
-    # PipelineLoader, which calls `reset_cache!` before returning.
+    # on first access. Keyed on the Module itself; the cache pins the
+    # root modules (Step, Pipeline, ...) for the process lifetime,
+    # which is fine because they're library-owned. Invalidation is
+    # explicit via `reset_cache!`; the only events that add a subclass
+    # are (a) `include Turbofan::Step` (handled by the module's
+    # `included` hook) and (b) `Kernel.load` inside `PipelineLoader`.
     @cache_mutex = Mutex.new
     @cache = {}
 

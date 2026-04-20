@@ -105,9 +105,10 @@ RSpec.describe "GuardLambda build_pipeline_input (T1 transform)" do
       expect(result.dig("_turbofan", "event", "time")).to match(/\d{4}-\d{2}-\d{2}T/)
     end
 
-    it "does not leak the raw _turbofan sub-hash from detail into top level" do
-      # Only the top-level _turbofan key — nothing else with that name.
-      expect(result_for_schedule = t1(event)).not_to have_key("schedule_expression")
+    it "places schedule_expression inside _turbofan.event, not at the top level" do
+      result = t1(event)
+      expect(result).not_to have_key("schedule_expression")
+      expect(result.dig("_turbofan", "event", "schedule_expression")).to eq("cron(0 5 * * ? *)")
     end
   end
 

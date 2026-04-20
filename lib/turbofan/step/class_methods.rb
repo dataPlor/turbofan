@@ -133,11 +133,6 @@ module Turbofan
         @turbofan_batch_size = value
       end
 
-      def turbofan_batch_size_for(size_name)
-        per_size = @turbofan_sizes.dig(size_name, :batch_size)
-        per_size || @turbofan_batch_size
-      end
-
       def size(name, cpu: nil, ram: nil, batch_size: nil)
         Validators.validate_positive!(:cpu, cpu) if cpu
         Validators.validate_positive!(:ram, ram) if ram
@@ -267,8 +262,7 @@ module Turbofan
       # thing: `.turbofan`.
       private :turbofan_input_schema, :turbofan_output_schema,
         :turbofan_external?, :turbofan_lambda?, :turbofan_fargate?,
-        :turbofan_batch_size_for, :turbofan_resource_keys,
-        :turbofan_needs_duckdb?
+        :turbofan_resource_keys, :turbofan_needs_duckdb?
 
       private
 
