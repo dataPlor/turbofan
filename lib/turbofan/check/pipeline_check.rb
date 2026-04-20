@@ -8,7 +8,7 @@ module Turbofan
         warnings = []
 
         validate_pipeline_name(pipeline, errors)
-        validate_schedule(pipeline, errors)
+        validate_triggers(pipeline, errors, warnings)
         validate_steps(steps, errors)
         validate_schema_files(steps, errors)
         validate_dag_consistency(pipeline, steps, errors)
@@ -251,18 +251,84 @@ module Turbofan
       end
       private_class_method :validate_schema_files
 
-      def self.validate_schedule(pipeline, errors)
-        pipeline.turbofan_triggers.each do |trigger|
-          next unless trigger[:type] == :schedule
-          cron = trigger[:cron]
-          next if cron.nil? || cron.to_s.empty?
-          field_count = cron.strip.split(/\s+/).size
-          unless field_count == 6
-            errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
+      # Deploy-time validation of `trigger` declarations. The DSL already
+      # enforces shape (type, required kwargs, type coercion) when the
+      # macro runs; this catches semantic issues that only become
+      # apparent when CloudFormation is about to consume the values —
+      # bad cron field counts, empty detail-type arrays that match
+      # nothing, etc.
+      def self.validate_triggers(pipeline, errors, warnings)
+        pipeline.turbofan_triggers.each_with_index do |trigger, idx|
+          label = "trigger[#{idx}] (:#{trigger[:type]})"
+
+          case trigger[:type]
+          when :schedule
+            validate_schedule_trigger(trigger, label, errors)
+          when :event
+            validate_event_trigger(trigger, label, errors, warnings)
+          else
+            errors << "#{label} has unknown type #{trigger[:type].inspect}"
           end
         end
       end
-      private_class_method :validate_schedule
+      private_class_method :validate_triggers
+
+      def self.validate_schedule_trigger(trigger, label, errors)
+        cron = trigger[:cron]
+        if cron.nil? || cron.to_s.strip.empty?
+          errors << "#{label} requires a non-empty cron expression"
+          return
+        end
+        field_count = cron.strip.split(/\s+/).size
+        unless field_count == 6
+          errors << "Schedule cron expression has #{field_count} fields, but EventBridge requires exactly 6"
+        end
+      end
+      private_class_method :validate_schedule_trigger
+
+      def self.validate_event_trigger(trigger, label, errors, warnings)
+        sources = trigger[:source]
+        if sources.nil? || sources.empty?
+          errors << "#{label} requires a non-empty source"
+          return
+        end
+        unless sources.is_a?(Array) && sources.all? { |s| s.is_a?(String) && !s.empty? }
+          errors << "#{label} source must be a non-empty Array of non-empty Strings, got #{sources.inspect}"
+        end
+
+        if trigger.key?(:detail_type)
+          dt = trigger[:detail_type]
+          if !dt.is_a?(Array) || dt.empty?
+            errors << "#{label} detail_type, if present, must be a non-empty Array of Strings"
+          elsif !dt.all? { |s| s.is_a?(String) && !s.empty? }
+            errors << "#{label} detail_type entries must all be non-empty Strings, got #{dt.inspect}"
+          end
+        end
+
+        if trigger.key?(:detail)
+          detail = trigger[:detail]
+          unless detail.is_a?(Hash)
+            errors << "#{label} detail must be a Hash (EventBridge pattern), got #{detail.class}"
+          end
+          if detail.is_a?(Hash) && detail.empty?
+            warnings << "#{label} detail pattern is an empty Hash — matches nothing. Omit the kwarg if you don't need to filter."
+          end
+        end
+
+        if trigger.key?(:event_bus)
+          bus = trigger[:event_bus]
+          unless bus.is_a?(String) && !bus.empty?
+            errors << "#{label} event_bus must be a non-empty String, got #{bus.inspect}"
+          end
+        end
+
+        allowed_keys = %i[type source detail_type detail event_bus]
+        unknown = trigger.keys - allowed_keys
+        unless unknown.empty?
+          warnings << "#{label} has unknown keys #{unknown.inspect} — they will be ignored by CloudFormation"
+        end
+      end
+      private_class_method :validate_event_trigger
 
       def self.validate_pipeline_name(pipeline, errors)
         name = pipeline.turbofan_name
