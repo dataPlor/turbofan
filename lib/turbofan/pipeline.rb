@@ -9,9 +9,13 @@ module Turbofan
       turbofan_compute_environment: nil,
       turbofan_tags: {},
       turbofan_schedule: nil,
+      turbofan_triggers: [],
       turbofan_timeout: nil
     }.freeze
     private_constant :DEFAULT_STATE
+
+    VALID_TRIGGER_TYPES = %i[schedule event].freeze
+    private_constant :VALID_TRIGGER_TYPES
 
     def self.init_state(klass)
       DEFAULT_STATE.each do |key, value|
@@ -36,7 +40,7 @@ module Turbofan
 
       attr_reader :turbofan_name, :turbofan_metrics,
         :turbofan_compute_environment, :turbofan_tags, :turbofan_schedule,
-        :turbofan_timeout
+        :turbofan_triggers, :turbofan_timeout
 
       def pipeline_name(value)
         @turbofan_name = value
@@ -55,6 +59,88 @@ module Turbofan
 
       def schedule(cron_string)
         @turbofan_schedule = cron_string
+      end
+
+      # Declare an EventBridge-backed pipeline trigger. Rails-style:
+      # the first positional is the type Symbol, the rest are type-
+      # specific kwargs.
+      #
+      #   trigger :schedule, cron: "0 5 * * ? *"
+      #
+      #   trigger :event,
+      #     source: "aws.s3",
+      #     detail_type: "Object Created",
+      #     detail: {"bucket" => {"name" => ["my-bucket"]}}
+      #
+      #   trigger :event, source: "myapp.custom", event_bus: "ops-bus"
+      #
+      # Multiple trigger declarations are allowed — each generates its
+      # own AWS::Events::Rule sharing the pipeline's GuardLambda target.
+      # No triggers declared = manual-invocation-only (same as a
+      # pipeline with no schedule today).
+      #
+      # Validation:
+      # - type must be :schedule or :event
+      # - :schedule requires `cron:`
+      # - :event requires `source:` (String or Array<String>)
+      # - :event optionally accepts `detail_type:` (String or Array),
+      #   `detail:` (Hash — EventBridge pattern for detail matching),
+      #   `event_bus:` (String — custom bus name, defaults to the
+      #   account's default bus)
+      def trigger(type, **kwargs)
+        unless VALID_TRIGGER_TYPES.include?(type)
+          raise ArgumentError, "trigger type must be one of #{VALID_TRIGGER_TYPES.inspect}, got #{type.inspect}"
+        end
+
+        entry = {type: type}
+        case type
+        when :schedule
+          cron = kwargs[:cron]
+          raise ArgumentError, "trigger :schedule requires a `cron:` kwarg" if cron.nil? || cron.to_s.empty?
+          extra = kwargs.keys - [:cron]
+          unless extra.empty?
+            raise ArgumentError, "trigger :schedule does not accept #{extra.inspect}"
+          end
+          entry[:cron] = cron
+        when :event
+          source = kwargs[:source]
+          if source.nil? || (source.is_a?(Array) && source.empty?) || (source.is_a?(String) && source.empty?)
+            raise ArgumentError, "trigger :event requires a non-empty `source:` kwarg (String or Array of Strings)"
+          end
+          unless source.is_a?(String) || (source.is_a?(Array) && source.all? { |s| s.is_a?(String) })
+            raise ArgumentError, "trigger :event `source:` must be a String or Array of Strings, got #{source.inspect}"
+          end
+          entry[:source] = Array(source)
+
+          if (dt = kwargs[:detail_type])
+            unless dt.is_a?(String) || (dt.is_a?(Array) && dt.all? { |s| s.is_a?(String) })
+              raise ArgumentError, "trigger :event `detail_type:` must be a String or Array of Strings, got #{dt.inspect}"
+            end
+            entry[:detail_type] = Array(dt)
+          end
+
+          if (detail = kwargs[:detail])
+            unless detail.is_a?(Hash)
+              raise ArgumentError, "trigger :event `detail:` must be a Hash (EventBridge pattern), got #{detail.class}"
+            end
+            entry[:detail] = detail
+          end
+
+          if (bus = kwargs[:event_bus])
+            unless bus.is_a?(String) && !bus.empty?
+              raise ArgumentError, "trigger :event `event_bus:` must be a non-empty String, got #{bus.inspect}"
+            end
+            entry[:event_bus] = bus
+          end
+
+          allowed = %i[source detail_type detail event_bus]
+          extra = kwargs.keys - allowed
+          unless extra.empty?
+            raise ArgumentError, "trigger :event does not accept #{extra.inspect} (allowed: #{allowed.inspect})"
+          end
+        end
+
+        @turbofan_triggers << entry.freeze
       end
 
       def timeout(value)
