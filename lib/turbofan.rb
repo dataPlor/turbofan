@@ -8,6 +8,13 @@ require "zeitwerk"
 # base classes already defined.
 require_relative "turbofan/errors"
 
+# configuration.rb defines Turbofan.config (a module method, not a class),
+# so Zeitwerk can't autoload it via constant reference. Code paths like
+# Turbofan::Deploy::PipelineLoader.load access Turbofan.config BEFORE the
+# user's turbofans/config/turbofan.rb gets a chance to require it — that
+# would NoMethodError. Loading here mirrors the errors.rb pattern above.
+require_relative "turbofan/configuration"
+
 module Turbofan
   class << self
     attr_reader :loader
