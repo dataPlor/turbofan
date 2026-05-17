@@ -258,6 +258,48 @@ A pipeline is a Ruby class that defines a name, optional schedule, and a DAG of 
 
 A step is a Ruby class that declares compute requirements (CPU, RAM), resource dependencies, JSON schemas for input/output validation, and a `call(inputs, context)` method. Each step becomes a Batch job definition backed by a Docker container.
 
+#### Python steps
+
+Steps can ship a Python container instead of Ruby. The `worker.rb` Step class is still required (Turbofan's ObjectSpace discovery, schema declaration, and CFN/ASL generation work off it regardless of container language), but the actual `call` logic lives in `main.py` and is executed by the `turbofan_runtime` Python package.
+
+Layout:
+
+    turbofans/steps/my_step/
+      worker.rb          # Ruby Step class — no `def call` body
+      main.py            # Python implementation
+      requirements.txt   # turbofan-runtime + your deps
+      Dockerfile         # python:3.13-slim base
+
+`main.py` minimal shape:
+
+    import sys
+    from turbofan_runtime import Interrupted, Wrapper
+
+    def call(inputs, context):
+        return {"status": "ok"}
+
+    if __name__ == "__main__":
+        try:
+            Wrapper.run(call,
+                        input_schema="my_step_input.json",
+                        output_schema="my_step_output.json")
+        except Interrupted:
+            sys.exit(143)
+
+Generate via:
+
+    turbofan step new my_step --lang python
+
+`turbofan_runtime` mirrors the Ruby `Wrapper` for envelope I/O (with fan_out S3-key conventions), JSON Schema validation, CloudWatch metrics (`JobDuration`, `JobSuccess`, `JobFailure`, `PeakMemoryMB`, `CpuUtilization`, optional `MemoryUtilization`), OpenLineage events to stderr, SIGTERM cooperative shutdown, and retry of transient AWS errors. See `python/README.md` for install + usage, `examples/steps/hello_python/` for a complete worked example, and `PLAN-python-runtime-wrapper.md` for the design.
+
+**Behavioral divergences from Ruby steps** (acceptable v1 gaps documented in `PLAN-python-runtime-wrapper.md`):
+
+* SIGTERM is best-effort within ~30s rather than instant — Python signal handlers cannot interrupt threads blocked in a `boto3` syscall like Ruby's `Thread#raise` can; combined with boto3 `read_timeout=30` the interrupt is delivered at the next safe checkpoint.
+* Lineage `inputs` / `outputs` arrays are empty (no `uses:` / `writes_to:` plumbing on Python side yet).
+* `__turbofan_s3_ref` envelope on stdout (Ruby still emits raw JSON; Ruby alignment is a coordinated follow-up). `Payload.deserialize` handles both forms downstream so the change is wire-compatible.
+* `attach_resources` (postgres / secrets bootstrap) is not implemented — Python steps cannot `uses :postgres` until v2; those steps stay Ruby.
+* `TURBOFAN_PREV_STEP` / `TURBOFAN_PREV_STEPS` input resolution raises `NotImplementedError`.
+
 ### Compute Environments
 
 A compute environment is a shared EC2 instance pool managed by AWS Batch. CEs define instance types, spot pricing strategy, and scaling limits. They're deployed once and referenced by multiple steps across pipelines. You typically have a small number — compute-optimized, memory-optimized, GPU, etc.

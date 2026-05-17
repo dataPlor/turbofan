@@ -181,6 +181,27 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       volume = container["Volumes"].find { |v| v["Host"]["SourcePath"] == "/mnt/nvme" }
       expect(volume).not_to be_nil
     end
+
+    it "exports TURBOFAN_NVME_MOUNT_PATH env to the container" do
+      # Consumed by Python step containers' _setup_storage so the
+      # wrapper doesn't hardcode /mnt/nvme — single source of truth
+      # with the Volume / MountPoint above.
+      env = container["Environment"] || []
+      entry = env.find { |e| e["Name"] == "TURBOFAN_NVME_MOUNT_PATH" }
+      expect(entry).not_to be_nil
+      expect(entry["Value"]).to eq("/mnt/nvme")
+    end
+
+    it "exports TURBOFAN_ALLOCATED_RAM_MB matching the MEMORY resource req" do
+      # Consumed by Python step containers' StepMetrics.emit_success
+      # to derive MemoryUtilization. Same source value (ram * 1024) as
+      # the MEMORY ResourceRequirement, so no drift between the two.
+      env = container["Environment"] || []
+      memory = container["ResourceRequirements"].find { |r| r["Type"] == "MEMORY" }
+      entry = env.find { |e| e["Name"] == "TURBOFAN_ALLOCATED_RAM_MB" }
+      expect(entry).not_to be_nil
+      expect(entry["Value"]).to eq(memory["Value"])
+    end
   end
 
   describe "non-duckdb step (no NVMe)" do
@@ -192,6 +213,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         runs_on :batch
         compute_environment :test_ce
         cpu 2
+        ram 8
         input_schema "passthrough.json"
         output_schema "passthrough.json"
       end
@@ -225,6 +247,20 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       mounts = container["MountPoints"] || []
       nvme_mount = mounts.find { |m| m["ContainerPath"] == "/mnt/nvme" }
       expect(nvme_mount).to be_nil
+    end
+
+    it "does not export TURBOFAN_NVME_MOUNT_PATH (NVMe not mounted)" do
+      jd_key = non_duckdb_template["Resources"].keys.find { |k| k.start_with?("JobDef") }
+      container = non_duckdb_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
+      env = container["Environment"] || []
+      expect(env.find { |e| e["Name"] == "TURBOFAN_NVME_MOUNT_PATH" }).to be_nil
+    end
+
+    it "still exports TURBOFAN_ALLOCATED_RAM_MB (independent of duckdb)" do
+      jd_key = non_duckdb_template["Resources"].keys.find { |k| k.start_with?("JobDef") }
+      container = non_duckdb_template["Resources"][jd_key]["Properties"]["ContainerProperties"]
+      env = container["Environment"] || []
+      expect(env.find { |e| e["Name"] == "TURBOFAN_ALLOCATED_RAM_MB" }).not_to be_nil
     end
   end
 

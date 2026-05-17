@@ -1,1 +1,2 @@
+turbofan-runtime @ git+https://github.com/dataplor/turbofan@main#subdirectory=python
 boto3

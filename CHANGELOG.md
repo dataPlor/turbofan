@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-17
+
+First-class Python step support. Python step containers now get the
+same runtime contract as Ruby ones (envelope I/O, JSON Schema
+validation, CloudWatch metrics, OpenLineage events, SIGTERM
+cooperative shutdown, transient-error retry) via the new
+`turbofan_runtime` Python package shipped alongside the gem.
+
+### Added
+
+- **`turbofan_runtime`** Python package (under `python/`) implementing
+  `Wrapper.run(call_fn, input_schema=..., output_schema=...)` and a
+  `Context` facade mirroring `Turbofan::Runtime::Wrapper` /
+  `Turbofan::Runtime::Context`. Includes `Retryable` (full-jitter
+  exponential backoff, transient-error detection, cumulative-sleep
+  budget), `InputResolver`, `OutputSerializer`, `SchemaValidator`,
+  `Lineage`, `Metrics`, `StepMetrics`, and `Payload`. Install via
+  `pip install -e ./python` from a checkout or
+  `pip install "turbofan-runtime @ git+https://github.com/dataplor/turbofan@v0.8.0#subdirectory=python"`.
+  181 unit + integration tests including a Ruby↔Python JSON
+  equivalence harness. See [PLAN-python-runtime-wrapper.md](PLAN-python-runtime-wrapper.md).
+
+- **`turbofan step new --lang python`** generator. Emits a
+  metadata-only `worker.rb` (Turbofan's ObjectSpace discovery and
+  CFN/ASL generation still consume it), plus `main.py`,
+  `requirements.txt`, and a `python:3.13-slim` Dockerfile. `--lang ruby`
+  (default) is unchanged. Honors `--duckdb` and `--extensions` for
+  pre-downloading DuckDB extensions identically to the Ruby
+  generator. See [PLAN-python-step-generator.md](PLAN-python-step-generator.md).
+
+- **`TURBOFAN_ALLOCATED_RAM_MB`** + **`TURBOFAN_NVME_MOUNT_PATH`** env
+  vars exported by the Batch JobDefinition generator. The former is
+  consumed by Python `StepMetrics.emit_success` to compute
+  `MemoryUtilization` (the Python wrapper has no access to the Ruby
+  Step class's `ram N` declaration); the latter is consumed by the
+  Python wrapper's `_setup_storage` so the NVMe path is not
+  hardcoded. Single source of truth with the existing `MEMORY`
+  resource requirement / `NVME_MOUNT_PATH` constant.
+
+- **`examples/steps/hello_python/main.py`** ported to use
+  `turbofan_runtime.Wrapper.run`. Original raw-S3 implementation
+  preserved as `main_raw.py` for reference.
+
+- **README "Python steps" subsection** documenting the file layout,
+  `main.py` shape, generator invocation, and known v1 behavioral
+  divergences from Ruby steps.
+
+### Changed
+
+- **`cli/new.rb` `write_worker` Ruby template**: `ram 2048` →
+  `ram 2`. The 2048 value was a unit confusion bug (the `ram` DSL
+  takes GB, not MB; `job_definition.rb` multiplies by 1024 to compute
+  `MEMORY`). Existing generated worker.rb files are unaffected; only
+  new ones use the corrected value.
+
+- **`cli/new.rb` Ruby Dockerfile NVMe path** now references
+  `Turbofan::ComputeEnvironment::NVME_MOUNT_PATH` instead of the
+  hardcoded string `/mnt/nvme`. Same value; eliminates a literal
+  duplication.
+
+### Known v1 limitations (Python steps)
+
+- `TURBOFAN_PREV_STEP` / `TURBOFAN_PREV_STEPS` input resolution
+  raises `NotImplementedError`. Steps consuming parallel or routed
+  prev-step outputs must stay Ruby.
+- `attach_resources` (postgres / secrets bootstrap) not implemented.
+  Steps using `uses :postgres` must stay Ruby.
+- Lineage `inputs` / `outputs` arrays are empty (no `uses:` /
+  `writes_to:` plumbing on the Python side yet).
+- SIGTERM is best-effort within ~30s rather than instant. Python
+  signal handlers cannot interrupt a thread blocked in a `boto3`
+  syscall the way Ruby's `Thread#raise` can; combined with boto3
+  `read_timeout=30` (set by `Context._build_boto3_client`) the
+  interrupt is delivered at the next safe checkpoint.
+- Python steps emit a `{"__turbofan_s3_ref": "..."}` envelope on
+  stdout while Ruby steps still emit raw payload JSON. Downstream
+  `Payload.deserialize` handles either form transparently; alignment
+  is a coordinated follow-up.
+
 ## [0.7.0] — 2026-04-19
 
 0.7 is a hard-break release. The install base is entirely internal, so

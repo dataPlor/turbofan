@@ -171,6 +171,10 @@ module Turbofan
       option :duckdb, type: :boolean, default: nil
       option :compute_environment, type: :string, default: nil
       option :cpu, type: :numeric, default: nil
+      option :lang, type: :string, default: nil, enum: %w[ruby python],
+        desc: "Step container language (ruby|python). Default: ruby."
+      option :extensions, type: :string, default: nil,
+        desc: "Comma-separated DuckDB extensions to pre-download (e.g. spatial,vortex)."
       def new(name = nil)
         if name.nil?
           name = Turbofan::CLI::Prompt.ask("Step name (snake_case)")
@@ -186,7 +190,14 @@ module Turbofan
         end
         cpu = options[:cpu] || Turbofan::CLI::Prompt.select("CPU count", %w[1 2 4 8 16]).to_i
         duckdb = options[:duckdb].nil? ? Turbofan::CLI::Prompt.yes?("Include DuckDB?", default: true) : options[:duckdb]
-        Turbofan::CLI::Add.call(name, duckdb: duckdb, compute_environment: compute_environment, cpu: cpu)
+        lang = options[:lang] || Turbofan::CLI::Prompt.select("Language", %w[ruby python])
+        extensions = (options[:extensions] || "").split(",").map(&:strip).reject(&:empty?).map(&:to_sym)
+        Turbofan::CLI::Add.call(name,
+          duckdb: duckdb,
+          compute_environment: compute_environment,
+          cpu: cpu,
+          extensions: extensions,
+          lang: lang)
       end
 
       desc "router STEP_NAME", "Add a router to an existing step"

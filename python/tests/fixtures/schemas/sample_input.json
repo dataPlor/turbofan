@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" },
+    "count": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

@@ -8,6 +8,12 @@ tmp/
 .DS_Store
 debug_asl.rb
 
+# Python artifacts (turbofan_runtime)
+python/.venv/
+python/.pytest_cache/
+**/__pycache__/
+**/*.egg-info/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

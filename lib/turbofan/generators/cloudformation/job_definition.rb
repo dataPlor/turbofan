@@ -14,6 +14,24 @@ module Turbofan
           resource_reqs << {"Type" => "VCPU", "Value" => cpu.to_s} if cpu
           resource_reqs << {"Type" => "MEMORY", "Value" => (ram * 1024).to_i.to_s} if ram
 
+          # Static env vars baked into the JobDefinition — values don't
+          # vary per execution, so they belong here rather than in the
+          # ASL container override. ASL overrides can still add dynamic
+          # values (TURBOFAN_EXECUTION_ID, TURBOFAN_STEP_NAME, etc.) on
+          # top of these.
+          jobdef_env = []
+          if ram
+            # MB representation of the allocated RAM. Consumed by Python
+            # step containers' StepMetrics.emit_success to compute
+            # MemoryUtilization (the Python wrapper has no access to the
+            # Ruby Step class's `ram N` declaration). Single source of
+            # truth: the same `ram` value that sets MEMORY resource req.
+            jobdef_env << {
+              "Name" => "TURBOFAN_ALLOCATED_RAM_MB",
+              "Value" => (ram * 1024).to_i.to_s
+            }
+          end
+
           container = {
             "Image" => image,
             "JobRoleArn" => job_role_ref,
@@ -30,12 +48,22 @@ module Turbofan
 
           if duckdb
             container["Volumes"] = [
-              {"Name" => "nvme", "Host" => {"SourcePath" => "/mnt/nvme"}}
+              {"Name" => "nvme", "Host" => {"SourcePath" => Turbofan::ComputeEnvironment::NVME_MOUNT_PATH}}
             ]
             container["MountPoints"] = [
-              {"SourceVolume" => "nvme", "ContainerPath" => "/mnt/nvme", "ReadOnly" => false}
+              {"SourceVolume" => "nvme", "ContainerPath" => Turbofan::ComputeEnvironment::NVME_MOUNT_PATH, "ReadOnly" => false}
             ]
+            # NVMe path is only meaningful when the CE userdata script
+            # has actually mounted /mnt/nvme AND the JobDefinition
+            # mounts it into the container. The Python wrapper's
+            # _setup_storage reads this env to derive its scratch dir.
+            jobdef_env << {
+              "Name" => "TURBOFAN_NVME_MOUNT_PATH",
+              "Value" => Turbofan::ComputeEnvironment::NVME_MOUNT_PATH
+            }
           end
+
+          container["Environment"] = jobdef_env unless jobdef_env.empty?
 
           suffix = size_name ? "-#{size_name}" : ""
           resource_suffix = size_name ? Naming.pascal_case(size_name) : ""

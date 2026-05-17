@@ -21,7 +21,9 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
         .with("Step name (snake_case)")
         .and_return("prompted_step")
 
-      allow(Turbofan::CLI::Prompt).to receive_messages(select: "compute", yes?: true)
+      # Returns sequenced by prompt order: compute_environment, cpu, lang
+      allow(Turbofan::CLI::Prompt).to receive(:select).and_return("compute", "2", "ruby")
+      allow(Turbofan::CLI::Prompt).to receive(:yes?).and_return(true)
 
       Dir.chdir(tmpdir) do
         Turbofan::CLI.start(["step", "new"])
@@ -33,7 +35,7 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
   end
 
   context "when NAME is provided but flags are omitted" do
-    it "prompts for compute_environment and cpu via Prompt.select" do
+    it "prompts for compute_environment, cpu, and lang via Prompt.select" do
       expect(Turbofan::CLI::Prompt).to receive(:select) # rubocop:disable RSpec/MessageSpies, RSpec/StubbedMock
         .with(anything, array_including(/compute/i))
         .and_return("compute")
@@ -45,6 +47,10 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
       expect(Turbofan::CLI::Prompt).to receive(:yes?) # rubocop:disable RSpec/MessageSpies, RSpec/StubbedMock
         .with("Include DuckDB?", default: true)
         .and_return(false)
+
+      expect(Turbofan::CLI::Prompt).to receive(:select) # rubocop:disable RSpec/MessageSpies, RSpec/StubbedMock
+        .with("Language", %w[ruby python])
+        .and_return("ruby")
 
       Dir.chdir(tmpdir) do
         Turbofan::CLI.start(["step", "new", "my_step"])
@@ -62,7 +68,9 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
       expect(Turbofan::CLI::Prompt).not_to receive(:select) # rubocop:disable RSpec/MessageSpies
         .with(anything, array_including(/compute/i))
 
-      allow(Turbofan::CLI::Prompt).to receive_messages(select: "4", yes?: true)
+      # Returns are sequenced by remaining prompts (cpu, then lang).
+      allow(Turbofan::CLI::Prompt).to receive(:select).and_return("4", "ruby")
+      allow(Turbofan::CLI::Prompt).to receive(:yes?).and_return(true)
 
       Dir.chdir(tmpdir) do
         Turbofan::CLI.start(["step", "new", "flagged_step", "--compute-environment", "compute"])
@@ -75,7 +83,9 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
       expect(Turbofan::CLI::Prompt).not_to receive(:select) # rubocop:disable RSpec/MessageSpies
         .with(anything, %w[1 2 4 8 16])
 
-      allow(Turbofan::CLI::Prompt).to receive_messages(select: "compute", yes?: true)
+      # Returns are sequenced (compute_environment, then lang).
+      allow(Turbofan::CLI::Prompt).to receive(:select).and_return("compute", "ruby")
+      allow(Turbofan::CLI::Prompt).to receive(:yes?).and_return(true)
 
       Dir.chdir(tmpdir) do
         Turbofan::CLI.start(["step", "new", "flagged_step", "--cpu", "8"])
@@ -88,7 +98,8 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
       Dir.chdir(tmpdir) do
         Turbofan::CLI.start([
           "step", "new", "full_flags_step",
-          "--compute-environment", "compute", "--cpu", "4", "--no-duckdb"
+          "--compute-environment", "compute", "--cpu", "4", "--no-duckdb",
+          "--lang", "ruby"
         ])
       end
     end
@@ -109,8 +120,12 @@ RSpec.describe "turbofan step new wizard" do # rubocop:disable RSpec/DescribeCla
       expect(worker_content).to include("cpu 4")
     end
 
-    it "includes ram in the generated worker" do
-      expect(worker_content).to include("ram 2048")
+    it "includes ram in GB in the generated worker" do
+      # GB, not MB — matches job_definition.rb which multiplies by 1024
+      # to compute the MEMORY resource req. Previously "ram 2048" was a
+      # unit confusion bug (interpreted as GB → 2 TB).
+      expect(worker_content).to include("ram 2")
+      expect(worker_content).not_to include("ram 2048")
     end
 
     it "respects --no-duckdb" do
