@@ -7,3 +7,8 @@ PLAN-*
 tmp/
 .DS_Store
 debug_asl.rb
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

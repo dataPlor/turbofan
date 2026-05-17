@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "turbofan",
+  "project_id": "173e7c75-ecce-48ce-94d4-23c28d1f8521"
+}
