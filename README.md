@@ -224,7 +224,7 @@ If you need a true DLQ (route the failing record elsewhere for later replay with
 - **Conditional branching** — Step Functions Choice states for runtime if/else logic in the DAG. Would require a `branch` DSL primitive since native Ruby `if/else` can't capture both branches during static DAG construction.
 - **Local development** — A `turbofan run-local STEP --input '{}'` command that bootstraps env vars and runs a step in-process without AWS.
 - **Property-level DagProxy access** — `result.lat` for subfield selection from previous step output.
-- **Python SDK** — MVP is `docker_image`. A Python SDK with resource access, schema validation, and DuckDB integration could come later.
+- **Python step `uses :postgres` / `uses :secret`** — The `turbofan_runtime` Python package (added in v0.8.0) covers the bulk of the step contract (envelope I/O, schema validation, metrics, lineage, SIGTERM, retry), but `attach_resources` for postgres/secrets bootstrapping is not yet implemented. Python steps that need declarative resource access must stay Ruby until v2.
 - **OpenTelemetry** — Full tracing integration across the framework for distributed observability.
 
 ## How It Works
@@ -260,45 +260,132 @@ A step is a Ruby class that declares compute requirements (CPU, RAM), resource d
 
 #### Python steps
 
-Steps can ship a Python container instead of Ruby. The `worker.rb` Step class is still required (Turbofan's ObjectSpace discovery, schema declaration, and CFN/ASL generation work off it regardless of container language), but the actual `call` logic lives in `main.py` and is executed by the `turbofan_runtime` Python package.
+Added in v0.8.0. Steps can ship a Python container instead of Ruby, with parity on the runtime contract (envelope I/O, JSON Schema validation, CloudWatch metrics, OpenLineage events, SIGTERM cooperative shutdown, retry of transient AWS errors) via the `turbofan_runtime` Python package.
 
-Layout:
+**`worker.rb` is still required** — Turbofan's ObjectSpace discovery, schema declaration, and CFN/ASL generation all work off the Ruby Step class regardless of what runs inside the container. For a Python step, `worker.rb` is metadata only (no `def call`); the actual implementation lives in `main.py` and is invoked by `turbofan_runtime.Wrapper.run`.
 
-    turbofans/steps/my_step/
-      worker.rb          # Ruby Step class — no `def call` body
+##### Generate
+
+    turbofan step new geocode_addresses --lang python --cpu 2 --compute-environment compute --duckdb
+
+Produces:
+
+    turbofans/steps/geocode_addresses/
+      worker.rb          # Ruby Step class (metadata-only)
       main.py            # Python implementation
-      requirements.txt   # turbofan-runtime + your deps
+      requirements.txt   # turbofan-runtime + boto3 (+ duckdb if --duckdb)
       Dockerfile         # python:3.13-slim base
+    turbofans/schemas/
+      geocode_addresses_input.json
+      geocode_addresses_output.json
 
-`main.py` minimal shape:
+##### Worked example
 
-    import sys
-    from turbofan_runtime import Interrupted, Wrapper
+`turbofans/steps/geocode_addresses/worker.rb` — declares resources, runs_on, schemas. Discovered by Turbofan at deploy time:
 
-    def call(inputs, context):
-        return {"status": "ok"}
+```ruby
+class GeocodeAddresses
+  include Turbofan::Step
 
-    if __name__ == "__main__":
-        try:
-            Wrapper.run(call,
-                        input_schema="my_step_input.json",
-                        output_schema="my_step_output.json")
-        except Interrupted:
-            sys.exit(143)
+  runs_on :batch
+  compute_environment :compute
+  cpu 2
+  ram 4
+  batch_size 100
+  input_schema "geocode_addresses_input.json"
+  output_schema "geocode_addresses_output.json"
+end
+```
 
-Generate via:
+`turbofans/steps/geocode_addresses/main.py` — the actual Python implementation:
 
-    turbofan step new my_step --lang python
+```python
+import sys
+from turbofan_runtime import Interrupted, Wrapper
 
-`turbofan_runtime` mirrors the Ruby `Wrapper` for envelope I/O (with fan_out S3-key conventions), JSON Schema validation, CloudWatch metrics (`JobDuration`, `JobSuccess`, `JobFailure`, `PeakMemoryMB`, `CpuUtilization`, optional `MemoryUtilization`), OpenLineage events to stderr, SIGTERM cooperative shutdown, and retry of transient AWS errors. See `python/README.md` for install + usage, `examples/steps/hello_python/` for a complete worked example, and `PLAN-python-runtime-wrapper.md` for the design.
 
-**Behavioral divergences from Ruby steps** (acceptable v1 gaps documented in `PLAN-python-runtime-wrapper.md`):
+def call(inputs, context):
+    """Geocode a batch of addresses. `inputs` is the fan-out chunk
+    (up to batch_size=100 items); `context` exposes execution_id,
+    step_name, stage, pipeline_name, array_index, logger, metrics,
+    s3 (boto3 client), secrets_client, and an `interrupted` flag.
+    """
+    context.logger.info("Geocoding batch", count=len(inputs))
 
-* SIGTERM is best-effort within ~30s rather than instant — Python signal handlers cannot interrupt threads blocked in a `boto3` syscall like Ruby's `Thread#raise` can; combined with boto3 `read_timeout=30` the interrupt is delivered at the next safe checkpoint.
-* Lineage `inputs` / `outputs` arrays are empty (no `uses:` / `writes_to:` plumbing on Python side yet).
-* `__turbofan_s3_ref` envelope on stdout (Ruby still emits raw JSON; Ruby alignment is a coordinated follow-up). `Payload.deserialize` handles both forms downstream so the change is wire-compatible.
-* `attach_resources` (postgres / secrets bootstrap) is not implemented — Python steps cannot `uses :postgres` until v2; those steps stay Ruby.
-* `TURBOFAN_PREV_STEP` / `TURBOFAN_PREV_STEPS` input resolution raises `NotImplementedError`.
+    geocoded = []
+    for item in inputs:
+        # Periodic SIGTERM check — see "Behavioral divergences" below.
+        # Cooperative shutdown gives the framework a chance to unwind
+        # cleanly when Batch sends SIGTERM (Spot reclaim).
+        if context.interrupted:
+            raise Interrupted("SIGTERM mid-batch")
+
+        result = geocode_one(item["address"], context.s3)
+        geocoded.append({"id": item["id"], **result})
+
+    # Custom metrics land alongside the framework-emitted ones in the
+    # CloudWatch namespace Turbofan/<pipeline_name>, dims include
+    # Pipeline/Stage/Step (+Size for routed fan-out).
+    context.metrics.emit("AddressesGeocoded", len(geocoded))
+
+    return {"geocoded": geocoded}
+
+
+def geocode_one(address, s3_client):
+    # ...your geocoding logic...
+    return {"lat": 37.7749, "lng": -122.4194}
+
+
+if __name__ == "__main__":
+    try:
+        Wrapper.run(
+            call,
+            input_schema="geocode_addresses_input.json",
+            output_schema="geocode_addresses_output.json",
+        )
+    except Interrupted:
+        # SIGTERM cooperative shutdown — exit 143 (128 + SIGTERM=15)
+        # so AWS Batch classifies as signal-driven, not error.
+        sys.exit(143)
+```
+
+For a complete working example see `examples/steps/hello_python/`. Detailed runtime design in `python/README.md` and `PLAN-python-runtime-wrapper.md`.
+
+##### Context API quick reference
+
+The `context` argument to `call(inputs, context)` exposes:
+
+| Attribute | Type | Purpose |
+|---|---|---|
+| `execution_id`, `step_name`, `stage`, `pipeline_name` | `str` | Identity |
+| `array_index`, `size` | `int \| None`, `str \| None` | Fan-out positioning |
+| `attempt_number` | `int` | Batch retry attempt |
+| `envelope` | `dict` | Sibling envelope keys (everything not in `"inputs"`) |
+| `interrupted` | `bool` | SIGTERM flag — poll inside long loops |
+| `logger` | structured | `.info(msg, **extra)`, `.warn`, `.error`, `.debug` — JSON line to stdout |
+| `metrics` | `Metrics` | `.emit(name, value, unit=None)` — flushed to CloudWatch on step completion |
+| `s3` | `boto3.client("s3")` | Pre-configured (no SDK retries, `read_timeout=30` for SIGTERM responsiveness) |
+| `secrets_client` | `boto3.client("secretsmanager")` | Same configuration |
+
+##### CloudWatch metrics
+
+Emitted automatically by every Python step (matches Ruby step metric names exactly):
+
+- **Success path**: `JobDuration`, `JobSuccess`, `PeakMemoryMB`, `CpuUtilization` — plus `MemoryUtilization` when the Ruby deploy code has set `TURBOFAN_ALLOCATED_RAM_MB` on the JobDefinition (default since v0.8.0).
+- **Failure path**: `JobFailure`.
+- **Retry telemetry** (when you pass `metrics=context.metrics` to `Retryable.call`): `RetryAttempt`, `RetriesExhausted`, `RetryBudgetExhausted`.
+
+Namespace `Turbofan/<pipeline_name>`. Dimensions: `Pipeline`, `Stage`, `Step` (+ `Size` for routed fan-out).
+
+##### Behavioral divergences from Ruby steps (v1)
+
+Acceptable gaps documented in `PLAN-python-runtime-wrapper.md`:
+
+* **SIGTERM is best-effort within ~30s** rather than instant. Python signal handlers cannot interrupt a thread blocked in a `boto3` syscall the way Ruby's `Thread#raise` can; combined with boto3 `read_timeout=30` the interrupt is delivered at the next safe checkpoint. Long compute loops should periodically check `context.interrupted` and raise `Interrupted` themselves.
+* **Lineage `inputs` / `outputs` arrays are empty** — no `uses:` / `writes_to:` declaration plumbing on the Python side yet.
+* **Stdout emits the `__turbofan_s3_ref` envelope** while Ruby still emits raw payload JSON. Downstream `Payload.deserialize` handles either form transparently so the change is wire-compatible; Ruby alignment is a coordinated follow-up.
+* **`attach_resources` (postgres / secrets bootstrap) is not implemented** — Python steps cannot `uses :postgres` until v2; those steps stay Ruby.
+* **`TURBOFAN_PREV_STEP` / `TURBOFAN_PREV_STEPS` input resolution** raises `NotImplementedError` (parallel and routed prev-step output collection). Use the Ruby runtime for those step shapes.
 
 ### Compute Environments
 
