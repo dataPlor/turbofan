@@ -18,7 +18,15 @@ module Turbofan
 
     def self.init_state(klass)
       DEFAULT_STATE.each do |key, value|
-        klass.instance_variable_set(:"@#{key}", value.dup)
+        # Single-step pipelines reopen the Step class to declare the
+        # pipeline DSL on the same constant (e.g. class
+        # OvertureDivisionAreas; include Turbofan::Step; timeout 3600;
+        # then class OvertureDivisionAreas; include Turbofan::Pipeline).
+        # Without this guard, Pipeline's init_state would clobber
+        # Step-set ivars like @turbofan_timeout back to nil.
+        ivar = :"@#{key}"
+        next if klass.instance_variable_defined?(ivar)
+        klass.instance_variable_set(ivar, value.dup)
       end
     end
 

@@ -106,18 +106,19 @@ module Turbofan
           {"JobDef#{Naming.pascal_case(step_name)}#{resource_suffix}" => resource}
         end
 
-        # Batch retry attempts. Only exit code 0 (success) exits; everything
-        # else retries up to this limit. Application failures (exit 1) retry
-        # fast and exhaust the budget, but this catches all infrastructure
-        # failures (spot, OOM, CgroupError) without enumeration.
-        INFRASTRUCTURE_RETRIES = 10
+        # Batch retry attempts. Only spot reclaim ("Host EC2*" status
+        # reason) is retried; application failures and all other Batch
+        # failures exit immediately. Without this narrowing, app bugs
+        # (exit 1) burn the entire retry budget while looking healthy.
+        INFRASTRUCTURE_RETRIES = 3
 
         def self.retry_strategy(step_class)
           {
             "Attempts" => INFRASTRUCTURE_RETRIES,
             "EvaluateOnExit" => [
               {"OnExitCode" => "0", "Action" => "EXIT"},
-              {"OnReason" => "*", "Action" => "RETRY"}
+              {"OnStatusReason" => "Host EC2*", "Action" => "RETRY"},
+              {"OnReason" => "*", "Action" => "EXIT"}
             ]
           }
         end

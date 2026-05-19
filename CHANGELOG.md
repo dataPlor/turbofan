@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-05-18
+
+### Fixed
+
+- `Turbofan::Pipeline.init_state` no longer clobbers Step-set ivars
+  (`@turbofan_timeout`, `@turbofan_compute_environment`,
+  `@turbofan_tags`) when a class includes `Turbofan::Step` and then
+  reopens to include `Turbofan::Pipeline` (single-step pipeline
+  pattern). Previously, a `timeout 3600` declared via the Step DSL was
+  silently reset to `nil` once the Pipeline module was included,
+  causing the generated Step Functions Task to omit `TimeoutSeconds`.
+
+### Changed
+
+- Batch `retryStrategy` narrowed to spot-reclaim-only with
+  `attempts=3` (was `attempts=10` with retry-on-all). The new
+  evaluation chain is `OnExitCode=0 → EXIT`,
+  `OnStatusReason="Host EC2*" → RETRY`, `OnReason="*" → EXIT`, so
+  application bugs fail fast instead of consuming 10x compute. ECS
+  placement-transient errors now require a manual rerun, which is
+  acceptable given how rare they are in practice.
+
+### Added
+
+- State machine execution logging at `ERROR` level with
+  `IncludeExecutionData=true`. CloudFormation now provisions an
+  `AWS::Logs::LogGroup` named
+  `/aws/states/turbofan-<pipeline>-<stage>-statemachine` (retention
+  pulled from `Turbofan.config.log_retention_days`) and wires it into
+  the state machine's `LoggingConfiguration`. `SfnRole` already had
+  the necessary `logs:CreateLogDelivery` / `PutResourcePolicy`
+  permissions, so no IAM change was required.
+
 ## [0.8.0] — 2026-05-17
 
 First-class Python step support. Python step containers now get the

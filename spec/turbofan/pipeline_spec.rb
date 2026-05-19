@@ -564,6 +564,27 @@ RSpec.describe Turbofan::Pipeline, :schemas do
       dag = pipeline_class.turbofan_dag
       expect(dag.edges).to eq([{from: :trigger, to: :only}])
     end
+
+    it "preserves Step DSL `timeout N` when same class reopens to include Pipeline" do
+      klass = Class.new do
+        include Turbofan::Step
+        runs_on :batch
+        compute_environment :test_ce
+        cpu 2
+        ram 4
+        timeout 3600
+        input_schema "passthrough.json"
+        output_schema "passthrough.json"
+
+        include Turbofan::Pipeline
+        pipeline_name "single-step-timeout-test"
+        pipeline do
+          # no-op
+        end
+      end
+
+      expect(klass.turbofan_timeout).to eq(3600)
+    end
   end
 
   # A10: Rename Pipeline name -> pipeline_name

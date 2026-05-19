@@ -471,12 +471,29 @@ module Turbofan
 
       def state_machine(prefix, tags)
         {
+          "StateMachineLogGroup" => {
+            "Type" => "AWS::Logs::LogGroup",
+            "Properties" => {
+              "LogGroupName" => "/aws/states/#{prefix}-statemachine",
+              "RetentionInDays" => Turbofan.config.log_retention_days,
+              "Tags" => tags
+            }
+          },
           "StateMachine" => {
             "Type" => "AWS::StepFunctions::StateMachine",
             "Properties" => {
               "StateMachineName" => "#{prefix}-statemachine",
               "DefinitionString" => {"Fn::Sub" => Generators::ASL.new(pipeline: @pipeline, stage: @stage, steps: @steps).to_json},
               "RoleArn" => {"Fn::GetAtt" => ["SfnRole", "Arn"]},
+              "LoggingConfiguration" => {
+                "Level" => "ERROR",
+                "IncludeExecutionData" => true,
+                "Destinations" => [{
+                  "CloudWatchLogsLogGroup" => {
+                    "LogGroupArn" => {"Fn::GetAtt" => ["StateMachineLogGroup", "Arn"]}
+                  }
+                }]
+              },
               "Tags" => tags
             }
           }

@@ -156,11 +156,18 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(success_entry["Action"]).to eq("EXIT")
     end
 
-    it "retries all failures (catch-all RETRY)" do
+    it "retries spot reclaim (Host EC2* status reason)" do
+      evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
+      spot_entry = evaluate.find { |e| e["OnStatusReason"] == "Host EC2*" }
+      expect(spot_entry).not_to be_nil
+      expect(spot_entry["Action"]).to eq("RETRY")
+    end
+
+    it "exits on all other failures (catch-all EXIT)" do
       evaluate = jd["Properties"]["RetryStrategy"]["EvaluateOnExit"]
       catchall = evaluate.find { |e| e["OnReason"] == "*" }
       expect(catchall).not_to be_nil
-      expect(catchall["Action"]).to eq("RETRY")
+      expect(catchall["Action"]).to eq("EXIT")
     end
 
     it "propagates tags" do
@@ -623,7 +630,7 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
   end
 
   describe "state machine" do
-    let(:sfn_key) { template["Resources"].keys.find { |k| k.include?("StateMachine") } }
+    let(:sfn_key) { template["Resources"].keys.find { |k| k == "StateMachine" } }
     let(:sfn) { template["Resources"][sfn_key] }
 
     it "creates a Step Functions state machine" do
@@ -662,6 +669,31 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
       expect(json_str).to include("${AWS::AccountId}")
       expect(json_str).not_to include("${region}")
       expect(json_str).not_to include("${account}")
+    end
+  end
+
+  describe "Step Functions execution logging" do
+    let(:resources) { generator.generate["Resources"] }
+
+    it "creates a CloudWatch log group for the state machine" do
+      lg = resources["StateMachineLogGroup"]
+      expect(lg).not_to be_nil
+      expect(lg["Type"]).to eq("AWS::Logs::LogGroup")
+      expect(lg["Properties"]["LogGroupName"]).to match(%r{^/aws/states/turbofan-.+-statemachine$})
+      expect(lg["Properties"]["RetentionInDays"]).to eq(Turbofan.config.log_retention_days)
+    end
+
+    it "enables ERROR-level execution logging on the state machine" do
+      sm = resources["StateMachine"]
+      cfg = sm["Properties"]["LoggingConfiguration"]
+      expect(cfg).not_to be_nil
+      expect(cfg["Level"]).to eq("ERROR")
+      expect(cfg["IncludeExecutionData"]).to eq(true)
+      expect(cfg["Destinations"]).to be_an(Array).and have_attributes(length: 1)
+      dest = cfg["Destinations"].first
+      expect(dest["CloudWatchLogsLogGroup"]["LogGroupArn"]).to eq(
+        {"Fn::GetAtt" => ["StateMachineLogGroup", "Arn"]}
+      )
     end
   end
 
