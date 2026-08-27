@@ -362,6 +362,23 @@ RSpec.describe Turbofan::Generators::CloudFormation, :schemas do
         expect(Array(write_stmt["Resource"])).to include("arn:aws:s3:::data-bucket/output/*")
       end
 
+      it "grants DeleteObject and AbortMultipartUpload on writes_to paths" do
+        write_stmt = s3_statements.find { |s|
+          s["Action"].include?("s3:PutObject") &&
+            Array(s["Resource"]).any? { |r| r.to_s.include?("data-bucket/output") }
+        }
+        expect(write_stmt["Action"]).to include("s3:DeleteObject")
+        expect(write_stmt["Action"]).to include("s3:AbortMultipartUpload")
+      end
+
+      it "does not grant DeleteObject on read-only uses paths" do
+        read_stmt = s3_statements.find { |s|
+          s["Action"].include?("s3:GetObject") && !s["Action"].include?("s3:PutObject")
+        }
+        expect(read_stmt).not_to be_nil
+        expect(read_stmt["Action"]).not_to include("s3:DeleteObject")
+      end
+
       it "does not use Resource: * on any S3 statement" do
         s3_statements.each do |stmt|
           expect(stmt["Resource"]).not_to eq("*")
