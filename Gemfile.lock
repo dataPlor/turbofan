@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    turbofan (0.8.0)
+    turbofan (0.9.0)
       aws-sdk-batch (~> 1)
       aws-sdk-cloudformation (~> 1)
       aws-sdk-cloudwatch (~> 1)
@@ -75,7 +75,7 @@ GEM
     diff-lcs (1.6.2)
     hana (1.3.7)
     jmespath (1.6.2)
-    json (2.19.4)
+    json (2.21.2)
     json_schemer (2.5.0)
       bigdecimal
       hana (~> 1.3)
@@ -84,7 +84,7 @@ GEM
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
-    parallel (2.0.1)
+    parallel (1.28.0)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
@@ -133,6 +133,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  parallel (< 2.0)
   rexml
   rspec (~> 3)
   rubocop (~> 1)

@@ -371,7 +371,8 @@ module Turbofan
           if write_arns.any?
             statements << {
               "Effect" => "Allow",
-              "Action" => ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+              "Action" => ["s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+                            "s3:ListBucket", "s3:AbortMultipartUpload"],
               "Resource" => write_arns
             }
           end
