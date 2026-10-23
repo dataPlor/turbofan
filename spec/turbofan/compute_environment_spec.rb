@@ -198,6 +198,29 @@ RSpec.describe "Turbofan::ComputeEnvironment" do
       expect(tags["turbofan:compute-environment"]).to eq("house-stark")
     end
 
+    it "leaves managed-by and stack off the compute environment, whose Tags force replacement" do
+      template = ce_class.generate_template(stage: "production")
+      parsed = YAML.safe_load(template)
+      tags = parsed.dig("Resources", "ComputeEnvironment", "Properties", "Tags")
+      expect(tags.keys).not_to include("managed-by", "stack")
+    end
+
+    it "tags the job queue with managed-by and stack" do
+      template = ce_class.generate_template(stage: "production")
+      parsed = YAML.safe_load(template)
+      tags = parsed.dig("Resources", "JobQueue", "Properties", "Tags")
+      expect(tags).to include("managed-by" => "turbofan", "stack" => "turbofan")
+    end
+
+    it "tags launched instances with managed-by and stack" do
+      template = ce_class.generate_template(stage: "production")
+      parsed = YAML.safe_load(template)
+      specs = parsed.dig("Resources", "LaunchTemplate", "Properties", "LaunchTemplateData", "TagSpecifications")
+      instance_tags = specs.find { |s| s["ResourceType"] == "instance" }["Tags"]
+        .to_h { |t| [t["Key"], t["Value"]] }
+      expect(instance_tags).to include("managed-by" => "turbofan", "stack" => "turbofan")
+    end
+
     it "includes export output" do
       template = ce_class.generate_template(stage: "production")
       parsed = YAML.safe_load(template)

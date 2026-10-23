@@ -245,6 +245,27 @@ RSpec.describe Turbofan::Generators::CloudFormation, "tag expansion", :schemas d
     end
   end
 
+  describe "managed-by tag" do
+    it "includes managed-by = turbofan on every tagged resource except job definitions" do
+      template["Resources"].each do |key, resource|
+        next unless resource.dig("Properties", "Tags")
+        next if resource["Type"] == "AWS::Batch::JobDefinition"
+        tags_hash = described_class.tags_hash(resource["Properties"]["Tags"])
+        expect(tags_hash["managed-by"]).to eq("turbofan"),
+          "Expected resource #{key} to have managed-by=turbofan tag"
+        expect(tags_hash["stack"]).to eq("turbofan"),
+          "Expected resource #{key} to have stack=turbofan tag"
+      end
+    end
+
+    it "leaves managed-by off job definitions, whose Tags force replacement" do
+      jd_key = template["Resources"].keys.find { |k| k.start_with?("JobDef") }
+      tags_hash = described_class.tags_hash(template["Resources"][jd_key]["Properties"]["Tags"])
+      expect(tags_hash).not_to have_key("managed-by")
+      expect(tags_hash["stack"]).to eq("turbofan")
+    end
+  end
+
   describe "legacy tags preserved" do
     it "preserves the stack tag" do
       sm_resource = template["Resources"]["StateMachine"]

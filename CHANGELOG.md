@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `managed-by = turbofan` and `stack = turbofan` tags on everything
+  Turbofan deploys, for the dataPlor `required-tags-managed-by-stack`
+  AWS Config rule: every tagged resource in pipeline stacks
+  (`managed-by` joins the existing `stack` tag), the consumable
+  resources stack, the compute environment stack's job queue and
+  launched EC2 instances, and ECR repositories created on first
+  deploy. Job definitions and compute environments keep their current
+  tags, because changing `Tags` on either forces CloudFormation to
+  replace it.
+
 ## [0.9.0] — 2026-05-18
 
 ### Fixed

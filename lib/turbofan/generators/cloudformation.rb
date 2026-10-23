@@ -210,6 +210,7 @@ module Turbofan
 
       def standard_tags(pipeline_name)
         [
+          {"Key" => "managed-by", "Value" => "turbofan"},
           {"Key" => "stack", "Value" => "turbofan"},
           {"Key" => "stack-type", "Value" => @stage},
           {"Key" => "stack-component", "Value" => pipeline_name}

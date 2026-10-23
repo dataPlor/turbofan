@@ -4,6 +4,8 @@ module Turbofan
   module Generators
     class CloudFormation
       module JobDefinition
+        EXCLUDED_TAG_KEYS = ["managed-by"].freeze
+
         def self.generate(prefix:, step_name:, step_class:, job_role_ref:, execution_role_ref:, log_group_ref:, duckdb:, tags:, size_name: nil, size_config: nil, image_tag: nil, external_image: nil, consumable_resource_refs: [])
           cpu = size_config ? size_config[:cpu] : step_class.turbofan.default_cpu
           ram = size_config ? size_config[:ram] : step_class.turbofan.default_ram
@@ -76,7 +78,9 @@ module Turbofan
           # interruption" update which Batch silently ignores (immutable revisions).
           config_hash = Digest::SHA256.hexdigest("#{retry_cfg}#{timeout_val}")[0, 6]
 
-          job_tags = tags.dup
+          # Changing AWS::Batch::JobDefinition Tags forces replacement, so
+          # EXCLUDED_TAG_KEYS stay off job definitions.
+          job_tags = tags.reject { |t| EXCLUDED_TAG_KEYS.include?(t["Key"]) }
           job_tags << {"Key" => "turbofan:size", "Value" => size_name.to_s} if size_name
 
           properties = {

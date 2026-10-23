@@ -98,7 +98,11 @@ RSpec.describe Turbofan::Deploy::ImageBuilder do
       expect(described_class.image_exists?(ecr_client, "my-repo", "sha-abc123")).to be false
       expect(ecr_client).to have_received(:create_repository).with(
         repository_name: "my-repo",
-        image_scanning_configuration: {scan_on_push: true}
+        image_scanning_configuration: {scan_on_push: true},
+        tags: [
+          {key: "managed-by", value: "turbofan"},
+          {key: "stack", value: "turbofan"}
+        ]
       )
       expect(ecr_client).to have_received(:put_lifecycle_policy)
     end
