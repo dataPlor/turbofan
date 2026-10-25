@@ -634,6 +634,8 @@ RSpec.describe "turbofan resources" do # rubocop:disable RSpec/DescribeClass
         expect(tags["turbofan:managed"]).to eq("true")
         expect(tags["turbofan:resource"]).to eq("test_res")
         expect(tags["turbofan:stage"]).to eq("production")
+        expect(tags["managed-by"]).to eq("turbofan")
+        expect(tags["stack"]).to eq("turbofan")
       end
     end
 

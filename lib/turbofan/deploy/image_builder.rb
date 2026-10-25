@@ -40,6 +40,10 @@ module Turbofan
           }
         ]
       }.to_json.freeze
+      ECR_REPOSITORY_TAGS = [
+        {key: "managed-by", value: "turbofan"},
+        {key: "stack", value: "turbofan"}
+      ].freeze
       def self.content_tag(step_dir, schemas_dir, external_deps: [], project_root: Dir.pwd)
         digest = Digest::SHA256.new
         [step_dir, schemas_dir].each do |dir|
@@ -69,7 +73,8 @@ module Turbofan
       rescue Aws::ECR::Errors::RepositoryNotFoundException
         ecr_client.create_repository(
           repository_name: repository_name,
-          image_scanning_configuration: {scan_on_push: true}
+          image_scanning_configuration: {scan_on_push: true},
+          tags: ECR_REPOSITORY_TAGS
         )
         ecr_client.put_lifecycle_policy(
           repository_name: repository_name,

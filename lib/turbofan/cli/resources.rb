@@ -61,7 +61,9 @@ module Turbofan
               "Tags" => {
                 "turbofan:managed" => "true",
                 "turbofan:resource" => key.to_s,
-                "turbofan:stage" => stage
+                "turbofan:stage" => stage,
+                "managed-by" => "turbofan",
+                "stack" => "turbofan"
               }
             }
           }

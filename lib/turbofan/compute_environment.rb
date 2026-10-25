@@ -183,6 +183,10 @@ module Turbofan
                           Value: #{slug}
                         - Key: turbofan:stage
                           Value: #{stage}
+                        - Key: managed-by
+                          Value: turbofan
+                        - Key: stack
+                          Value: turbofan
                   UserData:
                     Fn::Base64: |
           #{userdata_yaml}
@@ -229,6 +233,8 @@ module Turbofan
                   turbofan:managed: 'true'
                   turbofan:compute-environment: #{slug}
                   turbofan:stage: #{stage}
+                  managed-by: turbofan
+                  stack: turbofan
 
           Outputs:
             ComputeEnvironmentArn:
