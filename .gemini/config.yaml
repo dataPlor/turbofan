@@ -1,0 +1,9 @@
+# Gemini Code Assist configuration.
+# Reviews are manual-only: automatic review, summary, and help on PR open are
+# disabled to avoid exhausting the shared daily review quota. Invoke a review on
+# demand by commenting `/gemini review` on the pull request.
+code_review:
+  pull_request_opened:
+    code_review: false
+    summary: false
+    help: false
